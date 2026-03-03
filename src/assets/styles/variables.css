@@ -1,0 +1,166 @@
+/* CSS переменные для 8 тем EchoTalk */
+
+:root {
+  /* Base */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --border-radius: 12px;
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Dark Night (default) */
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-tertiary: #1a1a25;
+  --bg-elevated: #252535;
+
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0b0;
+  --text-muted: #6a6a7a;
+
+  --accent-primary: #6366f1;
+  --accent-secondary: #8b5cf6;
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+
+  --border-color: rgba(255, 255, 255, 0.08);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --glass: rgba(255, 255, 255, 0.03);
+}
+
+/* Light Day */
+[data-theme="lightDay"] {
+  --bg-primary: #fafafa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f0f5;
+  --bg-elevated: #e8e8f0;
+
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a4a5a;
+  --text-muted: #8a8a9a;
+
+  --accent-primary: #4f46e5;
+  --accent-secondary: #7c3aed;
+  --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+
+  --border-color: rgba(0, 0, 0, 0.08);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --glass: rgba(0, 0, 0, 0.02);
+}
+
+/* Retro Game */
+[data-theme="retroGame"] {
+  --bg-primary: #0d0221;
+  --bg-secondary: #1a0b2e;
+  --bg-tertiary: #261447;
+  --bg-elevated: #3d1e6d;
+
+  --text-primary: #00ff9f;
+  --text-secondary: #00d9ff;
+  --text-muted: #7b68ee;
+
+  --accent-primary: #ff00ff;
+  --accent-secondary: #00ff9f;
+  --accent-gradient: linear-gradient(135deg, #ff00ff 0%, #00ff9f 100%);
+
+  --border-color: rgba(0, 255, 159, 0.2);
+  --shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+  --glass: rgba(255, 0, 255, 0.05);
+}
+
+/* Cosmic Neon */
+[data-theme="cosmicNeon"] {
+  --bg-primary: #050508;
+  --bg-secondary: #0a0a12;
+  --bg-tertiary: #12121f;
+  --bg-elevated: #1e1e35;
+
+  --text-primary: #ffffff;
+  --text-secondary: #b8c5ff;
+  --text-muted: #6b7aa1;
+
+  --accent-primary: #00d4aa;
+  --accent-secondary: #ff006e;
+  --accent-gradient: linear-gradient(135deg, #00d4aa 0%, #ff006e 100%);
+
+  --border-color: rgba(0, 212, 170, 0.2);
+  --shadow: 0 0 40px rgba(0, 212, 170, 0.2);
+  --glass: rgba(0, 212, 170, 0.03);
+}
+
+/* Gold Dust */
+[data-theme="goldDust"] {
+  --bg-primary: #0f0c08;
+  --bg-secondary: #1a1610;
+  --bg-tertiary: #252018;
+  --bg-elevated: #352c20;
+
+  --text-primary: #f5e6c8;
+  --text-secondary: #c9b896;
+  --text-muted: #8b7355;
+
+  --accent-primary: #d4af37;
+  --accent-secondary: #f4e4c1;
+  --accent-gradient: linear-gradient(135deg, #d4af37 0%, #f4e4c1 100%);
+
+  --border-color: rgba(212, 175, 55, 0.2);
+  --shadow: 0 8px 32px rgba(212, 175, 55, 0.15);
+  --glass: rgba(212, 175, 55, 0.03);
+}
+
+/* Deep Depth */
+[data-theme="deepDepth"] {
+  --bg-primary: #001524;
+  --bg-secondary: #002945;
+  --bg-tertiary: #003d66;
+  --bg-elevated: #005a8c;
+
+  --text-primary: #e0f7ff;
+  --text-secondary: #8ecae6;
+  --text-muted: #5c9ead;
+
+  --accent-primary: #00b4d8;
+  --accent-secondary: #90e0ef;
+  --accent-gradient: linear-gradient(135deg, #00b4d8 0%, #90e0ef 100%);
+
+  --border-color: rgba(0, 180, 216, 0.2);
+  --shadow: 0 8px 32px rgba(0, 180, 216, 0.2);
+  --glass: rgba(0, 180, 216, 0.05);
+}
+
+/* Purple Dragon */
+[data-theme="purpleDragon"] {
+  --bg-primary: #1a0a2e;
+  --bg-secondary: #2d1b4e;
+  --bg-tertiary: #3d2b5e;
+  --bg-elevated: #4e3b7e;
+
+  --text-primary: #f0e6ff;
+  --text-secondary: #c9b8e0;
+  --text-muted: #9a8ab0;
+
+  --accent-primary: #9d4edd;
+  --accent-secondary: #c77dff;
+  --accent-gradient: linear-gradient(135deg, #9d4edd 0%, #c77dff 100%);
+
+  --border-color: rgba(157, 78, 221, 0.2);
+  --shadow: 0 8px 32px rgba(157, 78, 221, 0.25);
+  --glass: rgba(157, 78, 221, 0.05);
+}
+
+/* Soft Warm */
+[data-theme="softWarm"] {
+  --bg-primary: #faf6f1;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f5ebe0;
+  --bg-elevated: #ede0d4;
+
+  --text-primary: #4a3728;
+  --text-secondary: #7a6250;
+  --text-muted: #a89f91;
+
+  --accent-primary: #e07a5f;
+  --accent-secondary: #f2cc8f;
+  --accent-gradient: linear-gradient(135deg, #e07a5f 0%, #f2cc8f 100%);
+
+  --border-color: rgba(224, 122, 95, 0.2);
+  --shadow: 0 8px 32px rgba(224, 122, 95, 0.15);
+  --glass: rgba(224, 122, 95, 0.03);
+}
