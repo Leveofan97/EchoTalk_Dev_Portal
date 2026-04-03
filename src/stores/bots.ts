@@ -1,8 +1,8 @@
 // stores/bots.ts
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { botsApi } from '@/api/bots'
-import type { BotApp, CreateBotPayload, BotInstallation } from '@/types'
+import { BotAvailableScope, botsApi } from '@/api/bots'
+import type { BotApp, CreateBotPayload, BotInstallation, ServerForInstall } from '@/types'
 import type { CreateCredentialsResponse } from '@/api/bots'
 
 export const useBotsStore = defineStore('bots', () => {
@@ -14,14 +14,14 @@ export const useBotsStore = defineStore('bots', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
+  const availableScopes = ref<BotAvailableScope[]>([])
+
   const serversForInstall = ref<ServerForInstall[]>([])
   const isInstalling = ref(false)
   const authCode = ref<string | null>(null)
 
   // Getters
-  const activeBotsCount = computed(() =>
-    bots.value.filter(b => b.status === 'active').length
-  )
+  const activeBotsCount = computed(() => bots.value.filter((b) => b.status === 'active').length)
 
   // Actions
   const fetchBots = async () => {
@@ -38,8 +38,11 @@ export const useBotsStore = defineStore('bots', () => {
       }
 
       // Ответ от Go — это напрямую массив или объект с data
-      const botsData = Array.isArray(response.data) ? response.data :
-        Array.isArray(response) ? response : []
+      const botsData = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : []
 
       bots.value = botsData
     } catch (e: any) {
@@ -73,7 +76,6 @@ export const useBotsStore = defineStore('bots', () => {
 
       bots.value.unshift(newBot as BotApp)
       return newBot as BotApp
-
     } catch (e: any) {
       console.error('Failed to create bot:', e)
       error.value = e.message || 'Failed to create bot'
@@ -105,7 +107,10 @@ export const useBotsStore = defineStore('bots', () => {
     }
   }
 
-  const updateBot = async (botId: string | number, updates: Partial<BotApp> & { scopes?: string[] }) => {
+  const updateBot = async (
+    botId: string | number,
+    updates: Partial<BotApp> & { scopes?: string[] },
+  ) => {
     isLoading.value = true
     error.value = null
 
@@ -121,7 +126,7 @@ export const useBotsStore = defineStore('bots', () => {
       currentBot.value = updated
 
       // Обновляем в списке
-      const idx = bots.value.findIndex(b => b.id === botId)
+      const idx = bots.value.findIndex((b) => b.id === botId)
       if (idx !== -1) {
         bots.value[idx] = { ...bots.value[idx], ...updated }
       }
@@ -146,7 +151,7 @@ export const useBotsStore = defineStore('bots', () => {
         throw new Error(response.error)
       }
 
-      bots.value = bots.value.filter(b => b.id !== botId)
+      bots.value = bots.value.filter((b) => b.id !== botId)
       if (currentBot.value?.id === botId) {
         currentBot.value = null
       }
@@ -157,7 +162,10 @@ export const useBotsStore = defineStore('bots', () => {
   }
 
   // Credentials
-  const createCredential = async (botId: string | number, type: 'secret' | 'public_key' = 'secret') => {
+  const createCredential = async (
+    botId: string | number,
+    type: 'secret' | 'public_key' = 'secret',
+  ) => {
     try {
       const response = await botsApi.createCredentials(botId, type)
 
@@ -175,7 +183,7 @@ export const useBotsStore = defineStore('bots', () => {
         is_active: true,
         created_at: newCred.created_at,
         last_used_at: null,
-        revoked_at: null
+        revoked_at: null,
       }
 
       // Добавляем в начало списка
@@ -258,7 +266,7 @@ export const useBotsStore = defineStore('bots', () => {
       }
 
       // Обновляем в списке тоже
-      const idx = bots.value.findIndex(b => b.id === botId)
+      const idx = bots.value.findIndex((b) => b.id === botId)
       if (idx !== -1) {
         bots.value[idx].status = updated?.status || 'active'
       }
@@ -281,7 +289,7 @@ export const useBotsStore = defineStore('bots', () => {
       }
 
       currentBotInstallations.value = currentBotInstallations.value.filter(
-        i => i.id !== installationId
+        (i) => i.id !== installationId,
       )
     } catch (err: any) {
       error.value = err.message
@@ -289,12 +297,10 @@ export const useBotsStore = defineStore('bots', () => {
     }
   }
 
-// Getters
-  const availableServers = computed(() =>
-    serversForInstall.value.filter(s => !s.has_bot)
-  )
+  // Getters
+  const availableServers = computed(() => serversForInstall.value.filter((s) => !s.has_bot))
 
-// Actions
+  // Actions
   const fetchServersForInstall = async (botId: string | number) => {
     try {
       const response = await botsApi.getServersForInstall(botId)
@@ -340,6 +346,17 @@ export const useBotsStore = defineStore('bots', () => {
     authCode.value = null
   }
 
+  const fetchAvailableScopes = async () => {
+    const response = await botsApi.getAvailableScopes()
+    if (response.error) {
+      error.value = response.error
+      return []
+    }
+
+    availableScopes.value = response.data || []
+    return availableScopes.value
+  }
+
   const clearError = () => {
     error.value = null
   }
@@ -352,6 +369,7 @@ export const useBotsStore = defineStore('bots', () => {
     currentBotInstallations,
     isLoading,
     error,
+    availableScopes,
     // Getters
     activeBotsCount,
     // Actions
@@ -369,6 +387,7 @@ export const useBotsStore = defineStore('bots', () => {
     revokeInstallation,
     serversForInstall,
     availableServers,
+    fetchAvailableScopes,
     isInstalling,
     authCode,
     fetchServersForInstall,

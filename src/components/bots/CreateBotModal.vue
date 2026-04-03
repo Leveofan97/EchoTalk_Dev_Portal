@@ -9,8 +9,8 @@
           </div>
 
           <form class="modal__body" @submit.prevent="handleSubmit">
-            <div v-if="error" class="error-alert">
-              {{ error }}
+            <div v-if="localError || botsStore.error" class="error-alert">
+              {{ localError || botsStore.error }}
             </div>
 
             <Input
@@ -39,17 +39,16 @@
 
               <div class="scopes-list">
                 <label
-                  v-for="scope in AVAILABLE_SCOPES"
-                  :key="scope.value"
+                  v-for="scope in availableScopes"
+                  :key="scope.name"
                   class="scope-checkbox"
-                  :class="{ 'scope-disabled': scope.value === 'bot' }"
+                  :class="{ 'scope-disabled': !scope.assignable }"
                 >
                   <input
                     type="checkbox"
                     v-model="form.scopes"
-                    :value="scope.value"
-                    :checked="scope.value === 'bot'"
-                    :disabled="scope.value === 'bot'"
+                    :value="scope.name"
+                    :disabled="!scope.assignable"
                   />
                   <div class="scope-info">
                     <strong>{{ scope.label }}</strong>
@@ -63,11 +62,7 @@
               <Button variant="ghost" type="button" @click="close" :disabled="isSubmitting">
                 Отмена
               </Button>
-              <Button
-                variant="primary"
-                type="submit"
-                :loading="isSubmitting"
-              >
+              <Button variant="primary" type="submit" :loading="isSubmitting">
                 Создать бота
               </Button>
             </div>
@@ -79,11 +74,11 @@
 </template>
 
 <script setup lang="ts">
-import {computed, reactive, ref} from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useBotsStore } from '@/stores/bots'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
-import {AVAILABLE_SCOPES} from "@/types";
+import { storeToRefs } from 'pinia'
 
 interface Props {
   isOpen: boolean
@@ -98,6 +93,8 @@ const emit = defineEmits<{
 
 const botsStore = useBotsStore()
 
+const { availableScopes } = storeToRefs(botsStore)
+
 const hasValidScopes = computed(() => {
   return form.scopes.length > 0 && form.scopes.includes('bot')
 })
@@ -107,13 +104,12 @@ const form = reactive({
   description: '',
   avatar_url: '',
   is_public: false,
-  scopes: ['bot'] as string[]
+  scopes: ['bot'] as string[],
 })
 
 const errors = reactive({
-  name: ''
+  name: '',
 })
-
 
 const isSubmitting = ref(false)
 const localError = ref('')
@@ -162,7 +158,7 @@ const handleSubmit = async () => {
   console.log('Creating bot:', {
     name,
     description: form.description.trim(),
-    scopes: form.scopes
+    scopes: form.scopes,
   })
 
   console.log('Creating bot:', { name, description: form.description.trim() })
@@ -170,7 +166,7 @@ const handleSubmit = async () => {
   const newBot = await botsStore.createBot({
     name: name,
     description: form.description.trim(),
-    scopes: form.scopes
+    scopes: form.scopes,
   })
 
   console.log('Create bot result:', newBot)
@@ -186,6 +182,10 @@ const handleSubmit = async () => {
     localError.value = botsStore.error || 'Не удалось создать бота'
   }
 }
+
+onMounted(async () => {
+  await botsStore.fetchAvailableScopes()
+})
 </script>
 
 <style scoped>
