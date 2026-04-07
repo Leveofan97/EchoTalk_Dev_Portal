@@ -1,6 +1,7 @@
 // api/bots.ts
 import { api } from './http'
 import type { BotApp, CreateBotPayload, ServerForInstall } from '@/types'
+import { makeApiRequest } from './http'
 
 export interface CreateCredentialsResponse {
   client_id: string
@@ -58,6 +59,29 @@ export interface BotAvailableScope {
   group: string
 }
 
+export interface ExchangeTokenPayload {
+  grant_type: 'authorization_code'
+  code: string
+  client_id: string
+  client_secret: string
+  redirect_uri: string
+}
+
+export interface TokenExchangeResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+  refresh_token: string
+  scope: string
+}
+
+export interface RefreshTokenPayload {
+  grant_type: 'refresh_token'
+  refresh_token: string
+  client_id: string
+  client_secret: string
+}
+
 export const botsApi = {
   // === ПУБЛИЧНЫЕ (без авторизации) ===
   getPublicBots: () => api.get<PublicBotInfo[]>('/api/public-bots'),
@@ -112,4 +136,40 @@ export const botsApi = {
       state: string
       redirect_uri: string
     }>('/oauth/authorize', data),
+
+  exchangeToken: (data: ExchangeTokenPayload) =>
+    api.post<TokenExchangeResponse>('/oauth/token', data),
+
+  refreshBotToken: (data: RefreshTokenPayload) =>
+    api.post<TokenExchangeResponse>('/oauth/token/refresh', data),
+
+  botMe: (token: string) => fetchBotApi('/bot/me', token),
+
+  botServer: (token: string, serverID: string | number) =>
+    fetchBotApi(`/bot/servers/${serverID}`, token),
+
+  botRooms: (token: string, serverID: string | number) =>
+    fetchBotApi(`/bot/servers/${serverID}/rooms`, token),
+
+  botSendMessage: (token: string, roomID: string | number, content: string) =>
+    fetchBotApi(`/bot/rooms/${roomID}/messages`, token, {
+      method: 'POST',
+      body: { content },
+    }),
 }
+
+const fetchBotApi = <T = any>(
+  endpoint: string,
+  token: string,
+  options: {
+    method?: 'GET' | 'POST'
+    body?: any
+  } = {},
+) =>
+  makeApiRequest<T>(endpoint, {
+    method: options.method || 'GET',
+    body: options.body,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })

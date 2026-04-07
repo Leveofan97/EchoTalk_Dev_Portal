@@ -10,12 +10,17 @@
           </div>
 
           <form @submit.prevent="handleSubmit" class="modal-body">
+            <div v-if="localError" class="error-alert">
+              {{ localError }}
+            </div>
+
             <div class="form-group">
               <label>Название бота *</label>
               <Input
                 v-model="form.name"
                 placeholder="Мой супер бот"
                 required
+                :disabled="isLoading"
               />
             </div>
 
@@ -26,6 +31,7 @@
                 placeholder="Краткое описание что делает ваш бот..."
                 rows="3"
                 class="form-textarea"
+                :disabled="isLoading"
               ></textarea>
             </div>
 
@@ -34,15 +40,13 @@
               <Input
                 v-model="form.avatar_url"
                 placeholder="https://example.com/avatar.png"
+                :disabled="isLoading"
               />
             </div>
 
             <div class="form-group form-checkbox">
               <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  v-model="form.is_public"
-                />
+                <input type="checkbox" v-model="form.is_public" :disabled="isLoading" />
                 <span>Публичный бот (виден в каталоге)</span>
               </label>
               <p class="form-hint">
@@ -50,33 +54,36 @@
               </p>
             </div>
 
-            <div class="scopes-list">
-              <label
-                v-for="scope in AVAILABLE_SCOPES"
-                :key="scope.value"
-                class="scope-checkbox"
-              >
-                <input
-                  type="checkbox"
-                  v-model="form.scopes"
-                  :value="scope.value"
-                />
-                <div class="scope-info">
-                  <strong>{{ scope.label }}</strong>
-                  <span>{{ scope.description }}</span>
-                </div>
-              </label>
+            <div class="form-group">
+              <label>Разрешения (Scopes)</label>
+              <p class="form-hint">Выберите, к каким данным бот будет иметь доступ</p>
+
+              <div class="scopes-list">
+                <label
+                  v-for="scope in availableScopes"
+                  :key="scope.name"
+                  class="scope-checkbox"
+                  :class="{ 'scope-disabled': !scope.assignable }"
+                >
+                  <input
+                    type="checkbox"
+                    v-model="form.scopes"
+                    :value="scope.name"
+                    :disabled="isLoading || !scope.assignable"
+                  />
+                  <div class="scope-info">
+                    <strong>{{ scope.label }}</strong>
+                    <span>{{ scope.description }}</span>
+                  </div>
+                </label>
+              </div>
             </div>
 
             <div class="modal-actions">
-              <Button variant="ghost" type="button" @click="close">
+              <Button variant="ghost" type="button" @click="close" :disabled="isLoading">
                 Отмена
               </Button>
-              <Button
-                variant="primary"
-                type="submit"
-                :loading="isLoading"
-              >
+              <Button variant="primary" type="submit" :loading="isLoading">
                 Сохранить изменения
               </Button>
             </div>
@@ -88,8 +95,10 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch, computed } from 'vue'
-import { AVAILABLE_SCOPES, type BotApp } from '@/types'
+import { reactive, watch, computed, ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import type { BotApp } from '@/types'
+import { useBotsStore } from '@/stores/bots'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 
@@ -104,45 +113,83 @@ const emit = defineEmits<{
   submit: [data: Partial<BotApp> & { scopes?: string[] }]
 }>()
 
+const botsStore = useBotsStore()
+const { availableScopes } = storeToRefs(botsStore)
+
+const localError = ref('')
+
 const form = reactive({
   name: '',
   description: '',
   avatar_url: '',
   is_public: false,
-  scopes: ['bot'] as string[]
+  scopes: ['bot'] as string[],
 })
-
-// Загружаем данные бота при открытии
-watch(() => props.bot, (newBot) => {
-  if (newBot) {
-    form.name = newBot.name || ''
-    form.description = newBot.description || ''
-    form.avatar_url = newBot.avatar_url || ''
-    form.is_public = newBot.is_public || false
-    form.scopes = (newBot as any).scopes?.length > 0 ? (newBot as any).scopes : ['bot']
-  }
-}, { immediate: true })
 
 const hasValidScopes = computed(() => {
   return form.scopes.length > 0 && form.scopes.includes('bot')
 })
 
+watch(
+  () => props.isOpen,
+  async (open) => {
+    if (!open) return
+    localError.value = ''
+    await botsStore.fetchAvailableScopes()
+  },
+)
+
+watch(
+  () => props.bot,
+  (newBot) => {
+    if (!newBot) return
+
+    form.name = newBot.name || ''
+    form.description = newBot.description || ''
+    form.avatar_url = newBot.avatar_url || ''
+    form.is_public = newBot.is_public || false
+
+    const botScopes = (newBot as any).scopes?.length > 0 ? [...(newBot as any).scopes] : ['bot']
+    if (!botScopes.includes('bot')) {
+      botScopes.unshift('bot')
+    }
+
+    form.scopes = botScopes
+  },
+  { immediate: true },
+)
+
 const close = () => {
+  if (props.isLoading) return
+  localError.value = ''
   emit('close')
 }
 
 const handleSubmit = () => {
+  localError.value = ''
+
+  const trimmedName = form.name.trim()
+  if (!trimmedName) {
+    localError.value = 'Введите название бота'
+    return
+  }
+
+  if (trimmedName.length < 3) {
+    localError.value = 'Минимум 3 символа'
+    return
+  }
+
   if (!hasValidScopes.value) {
-    alert('Необходимо выбрать хотя бы одно разрешение')
+    localError.value = 'Необходимо выбрать хотя бы одно разрешение'
     return
   }
 
   emit('submit', {
-    name: form.name,
-    description: form.description,
-    avatar_url: form.avatar_url,
+    name: trimmedName,
+    description: form.description.trim(),
+    avatar_url: form.avatar_url.trim(),
     is_public: form.is_public,
-    scopes: form.scopes
+    scopes: form.scopes,
   })
 }
 </script>
@@ -253,7 +300,7 @@ const handleSubmit = () => {
   color: var(--text-primary) !important;
 }
 
-.checkbox-label input[type="checkbox"] {
+.checkbox-label input[type='checkbox'] {
   width: 18px;
   height: 18px;
   accent-color: var(--accent-primary);

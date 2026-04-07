@@ -1,9 +1,9 @@
 // stores/bots.ts
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { BotAvailableScope, botsApi } from '@/api/bots'
+import { botsApi } from '@/api/bots'
 import type { BotApp, CreateBotPayload, BotInstallation, ServerForInstall } from '@/types'
-import type { CreateCredentialsResponse } from '@/api/bots'
+import type { CreateCredentialsResponse, BotAvailableScope } from '@/api/bots'
 
 export const useBotsStore = defineStore('bots', () => {
   // State

@@ -10,9 +10,7 @@
       <div v-else-if="error" class="error-state">
         <h2>😕 Бот не найден</h2>
         <p>{{ error }}</p>
-        <Button variant="primary" @click="$router.push('/explore')">
-          К каталогу
-        </Button>
+        <Button variant="primary" @click="$router.push('/explore')"> К каталогу </Button>
       </div>
 
       <!-- Content -->
@@ -20,7 +18,7 @@
         <!-- Hero -->
         <div class="bot-hero">
           <div class="bot-avatar-large">
-            <img v-if="bot.avatar_url" :src="bot.avatar_url" :alt="bot.name">
+            <img v-if="bot.avatar_url" :src="bot.avatar_url" :alt="bot.name" />
             <span v-else>{{ bot.name[0] }}</span>
           </div>
 
@@ -42,7 +40,7 @@
             <div class="owner-info">
               <span>Создатель:</span>
               <div class="owner">
-                <img v-if="bot.owner?.avatar_url" :src="bot.owner.avatar_url">
+                <img v-if="bot.owner?.avatar_url" :src="bot.owner.avatar_url" />
                 <span v-else>{{ bot.owner?.username?.[0] }}</span>
                 {{ bot.owner?.username }}
               </div>
@@ -60,12 +58,7 @@
             >
               Добавить на сервер
             </Button>
-            <Button
-              v-else
-              variant="primary"
-              size="lg"
-              @click="redirectToLogin"
-            >
+            <Button v-else variant="primary" size="lg" @click="redirectToLogin">
               Войти для установки
             </Button>
 
@@ -85,11 +78,7 @@
           <p class="hint">Этот бот запрашивает следующие разрешения:</p>
 
           <div class="scopes-list">
-            <div
-              v-for="scope in bot.scopes"
-              :key="scope"
-              class="scope-item"
-            >
+            <div v-for="scope in bot.scopes" :key="scope" class="scope-item">
               <span class="scope-icon">✓</span>
               <div class="scope-info">
                 <code>{{ scope }}</code>
@@ -115,7 +104,11 @@
     <!-- Модал выбора сервера -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="installStep === 'select-server'" class="modal-overlay" @click.self="cancelInstall">
+        <div
+          v-if="installStep === 'select-server'"
+          class="modal-overlay"
+          @click.self="cancelInstall"
+        >
           <div class="modal-content install-modal">
             <div class="modal-header">
               <h2>Выберите сервер</h2>
@@ -143,11 +136,11 @@
                   v-for="server in botsStore.serversForInstall"
                   :key="server.id"
                   class="server-card"
-                  :class="{ 'has-bot': server.has_bot, 'disabled': server.has_bot }"
+                  :class="{ 'has-bot': server.has_bot, disabled: server.has_bot }"
                   @click="!server.has_bot && selectServer(server)"
                 >
                   <div class="server-avatar">
-                    <img v-if="server.avatar_url" :src="server.avatar_url">
+                    <img v-if="server.avatar_url" :src="server.avatar_url" />
                     <span v-else>{{ server.name[0] }}</span>
                   </div>
                   <div class="server-info">
@@ -165,7 +158,11 @@
     <!-- Модал выбора scopes (НОВЫЙ) -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="installStep === 'select-scopes'" class="modal-overlay" @click.self="backToServers">
+        <div
+          v-if="installStep === 'select-scopes'"
+          class="modal-overlay"
+          @click.self="backToServers"
+        >
           <div class="modal-content install-modal">
             <div class="modal-header">
               <h2>Настройте разрешения</h2>
@@ -174,8 +171,8 @@
 
             <div class="modal-body">
               <p class="install-subtitle">
-                Выберите, какие функции бота <strong>{{ bot?.name }}</strong>
-                будут разрешены на сервере <strong>{{ selectedServer?.name }}</strong>
+                Выберите, какие функции бота <strong>{{ bot?.name }}</strong> будут разрешены на
+                сервере <strong>{{ selectedServer?.name }}</strong>
               </p>
 
               <div class="scopes-selection">
@@ -183,7 +180,7 @@
                   v-for="scope in bot?.scopes"
                   :key="scope"
                   class="scope-toggle"
-                  :class="{ 'disabled': scope === 'bot' }"
+                  :class="{ disabled: scope === 'bot' }"
                 >
                   <label class="scope-label">
                     <input
@@ -191,7 +188,7 @@
                       v-model="selectedScopes"
                       :value="scope"
                       :disabled="scope === 'bot'"
-                    >
+                    />
                     <div class="scope-content">
                       <code>{{ scope }}</code>
                       <span class="scope-desc">{{ getScopeDescription(scope) }}</span>
@@ -240,7 +237,9 @@
               </div>
 
               <div class="scopes-confirm">
-                <h4>Выданные разрешения ({{ selectedScopes.length }} из {{ bot?.scopes?.length }}):</h4>
+                <h4>
+                  Выданные разрешения ({{ selectedScopes.length }} из {{ bot?.scopes?.length }}):
+                </h4>
                 <ul class="scopes-list-confirm">
                   <li v-for="scope in selectedScopes" :key="scope">
                     <code>{{ scope }}</code>
@@ -248,17 +247,14 @@
                   </li>
                 </ul>
                 <p v-if="selectedScopes.length < (bot?.scopes?.length || 0)" class="scopes-note">
-                  Исключены: {{ bot?.scopes?.filter(s => !selectedScopes.includes(s)).join(', ') }}
+                  Исключены:
+                  {{ bot?.scopes?.filter((s) => !selectedScopes.includes(s)).join(', ') }}
                 </p>
               </div>
 
               <div class="modal-actions">
                 <Button variant="ghost" @click="backToScopes">Назад</Button>
-                <Button
-                  variant="primary"
-                  :loading="botsStore.isInstalling"
-                  @click="confirmInstall"
-                >
+                <Button variant="primary" :loading="botsStore.isInstalling" @click="confirmInstall">
                   Авторизовать
                 </Button>
               </div>
@@ -306,17 +302,89 @@
             <div class="next-steps">
               <h4>Что дальше?</h4>
               <p>Бот должен обменять этот код на access token:</p>
-              <pre>POST /oauth/token
+              <pre>
+POST /oauth/token
 {
   "grant_type": "authorization_code",
   "code": "{{ botsStore.authCode }}",
   "client_id": "{{ authResponse?.client_id }}",
   "client_secret": "YOUR_CLIENT_SECRET",
   "redirect_uri": "{{ authResponse?.redirect_uri }}"
-}</pre>
+}</pre
+              >
             </div>
 
             <Button variant="primary" @click="finishInstall">Понятно</Button>
+          </div>
+
+          <div v-if="showBotDebugPanel" class="debug-panel">
+            <h4>Debug Bot Runtime Panel</h4>
+
+            <div class="debug-field">
+              <label>Client Secret</label>
+              <input
+                v-model="debugClientSecret"
+                class="debug-input"
+                placeholder="Введите client_secret"
+              />
+            </div>
+
+            <div class="debug-actions">
+              <Button variant="secondary" @click="exchangeBotToken" :loading="debugExchangeLoading">
+                Exchange token
+              </Button>
+              <Button variant="ghost" @click="testBotMe" :loading="debugRuntimeLoading">
+                Test /bot/me
+              </Button>
+              <Button variant="ghost" @click="testBotServer" :loading="debugRuntimeLoading">
+                Test /bot/server
+              </Button>
+              <Button variant="ghost" @click="testBotRooms" :loading="debugRuntimeLoading">
+                Test /bot/rooms
+              </Button>
+            </div>
+
+            <div class="debug-field">
+              <label>Access Token</label>
+              <textarea v-model="debugAccessToken" class="debug-textarea" rows="4" />
+            </div>
+
+            <div class="debug-field">
+              <label>Refresh Token</label>
+              <textarea v-model="debugRefreshToken" class="debug-textarea" rows="4" />
+            </div>
+
+            <div class="debug-inline">
+              <div class="debug-field">
+                <label>Server ID</label>
+                <input :value="debugServerId" class="debug-input" disabled />
+              </div>
+
+              <div class="debug-field">
+                <label>Room ID</label>
+                <input v-model="debugRoomId" class="debug-input" placeholder="Введите room_id" />
+              </div>
+            </div>
+
+            <div class="debug-field">
+              <label>Message</label>
+              <textarea v-model="debugMessage" class="debug-textarea" rows="3" />
+            </div>
+
+            <div class="debug-actions">
+              <Button variant="primary" @click="testBotSendMessage" :loading="debugRuntimeLoading">
+                Test send message
+              </Button>
+            </div>
+
+            <div v-if="debugError" class="debug-error">
+              {{ debugError }}
+            </div>
+
+            <div v-if="debugResponse" class="debug-response">
+              <label>Response</label>
+              <pre>{{ JSON.stringify(debugResponse, null, 2) }}</pre>
+            </div>
           </div>
         </div>
       </Transition>
@@ -333,7 +401,7 @@ import { botsApi, type PublicBotDetail } from '@/api/bots'
 import { useClipboard } from '@/composables/useClipboard'
 import Button from '@/components/ui/Button.vue'
 import Card from '@/components/ui/Card.vue'
-import type { ServerForInstall } from "@/types"
+import type { ServerForInstall } from '@/types'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -345,10 +413,30 @@ const loading = ref(true)
 const error = ref('')
 
 // Исправленный тип - убран 'success', добавлен 'select-scopes' и 'code-issued'
-const installStep = ref<'ready' | 'select-server' | 'select-scopes' | 'confirm' | 'code-issued'>('ready')
+const installStep = ref<'ready' | 'select-server' | 'select-scopes' | 'confirm' | 'code-issued'>(
+  'ready',
+)
 const selectedServer = ref<ServerForInstall | null>(null)
 const selectedScopes = ref<string[]>([])
-const authResponse = ref<{client_id: string, redirect_uri: string} | null>(null)
+const authResponse = ref<{ client_id: string; redirect_uri: string } | null>(null)
+
+// ================ Debug
+const showBotDebugPanel = computed(() => {
+  return import.meta.env.DEV || import.meta.env.VITE_ENABLE_BOT_DEBUG === 'true'
+})
+
+const debugClientSecret = ref('')
+const debugAccessToken = ref('')
+const debugRefreshToken = ref('')
+const debugExchangeLoading = ref(false)
+const debugRuntimeLoading = ref(false)
+const debugError = ref('')
+const debugResponse = ref<any>(null)
+
+const debugServerId = computed(() => selectedServer.value?.id || '')
+const debugRoomId = ref('')
+const debugMessage = ref('Hello from bot debug panel')
+// ======================
 
 const botId = computed(() => route.params.id as string)
 const isAuthenticated = computed(() => !!authStore.token)
@@ -415,14 +503,14 @@ const confirmInstall = async () => {
     bot_id: parseInt(botId.value),
     server_id: selectedServer.value.id,
     scopes: selectedScopes.value,
-    state: state
+    state: state,
   })
 
   if (result) {
     // Сохраняем ответ для отображения
     authResponse.value = {
       client_id: result.client_id,
-      redirect_uri: result.redirect_uri
+      redirect_uri: result.redirect_uri,
     }
     installStep.value = 'code-issued'
   }
@@ -444,6 +532,8 @@ const finishInstall = () => {
   selectedScopes.value = []
   authResponse.value = null
   botsStore.clearAuthCode()
+
+  resetDebugPanel()
 }
 
 const cancelInstall = () => {
@@ -451,18 +541,143 @@ const cancelInstall = () => {
   selectedServer.value = null
   selectedScopes.value = []
   botsStore.serversForInstall = []
+
+  resetDebugPanel()
 }
 
 const getScopeDescription = (scope: string) => {
   const descriptions: Record<string, string> = {
-    'bot': 'Базовые функции бота',
-    'messages:read': 'Читать сообщения в каналах',
-    'messages:write': 'Отправлять сообщения',
-    'members:read': 'Видеть список участников',
-    'rooms:read': 'Просмотр комнат',
-    'server:manage': 'Управление сервером'
+    bot: 'Базовые функции бота',
+    'server.view': 'Просмотр информации о сервере',
+    'server.members.view': 'Просмотр участников сервера',
+    'room.view': 'Просмотр доступных комнат',
+    'room.sendMessage': 'Отправка сообщений в комнаты',
   }
   return descriptions[scope] || scope
+}
+
+//==================================================
+const exchangeBotToken = async () => {
+  if (!botsStore.authCode || !authResponse.value?.client_id || !authResponse.value?.redirect_uri) {
+    debugError.value = 'Недостаточно данных для exchange'
+    return
+  }
+
+  if (!debugClientSecret.value.trim()) {
+    debugError.value = 'Введите client_secret'
+    return
+  }
+
+  debugExchangeLoading.value = true
+  debugError.value = ''
+  debugResponse.value = null
+
+  const response = await botsApi.exchangeToken({
+    grant_type: 'authorization_code',
+    code: botsStore.authCode,
+    client_id: authResponse.value.client_id,
+    client_secret: debugClientSecret.value.trim(),
+    redirect_uri: authResponse.value.redirect_uri,
+  })
+
+  debugExchangeLoading.value = false
+
+  if (response.error) {
+    debugError.value = response.error
+    return
+  }
+
+  debugAccessToken.value = response.data?.access_token || ''
+  debugRefreshToken.value = response.data?.refresh_token || ''
+  debugResponse.value = response.data || response
+}
+
+const testBotMe = async () => {
+  if (!debugAccessToken.value) {
+    debugError.value = 'Нет access token'
+    return
+  }
+
+  debugRuntimeLoading.value = true
+  debugError.value = ''
+  const response = await botsApi.botMe(debugAccessToken.value)
+  debugRuntimeLoading.value = false
+
+  if (response.error) {
+    debugError.value = response.error
+    debugResponse.value = response
+    return
+  }
+
+  debugResponse.value = response.data || response
+}
+
+const testBotServer = async () => {
+  if (!debugAccessToken.value || !debugServerId.value) return
+
+  debugRuntimeLoading.value = true
+  debugError.value = ''
+  const response = await botsApi.botServer(debugAccessToken.value, debugServerId.value)
+  debugRuntimeLoading.value = false
+
+  if (response.error) {
+    debugError.value = response.error
+    debugResponse.value = response
+    return
+  }
+
+  debugResponse.value = response.data || response
+}
+
+const testBotRooms = async () => {
+  if (!debugAccessToken.value || !debugServerId.value) return
+
+  debugRuntimeLoading.value = true
+  debugError.value = ''
+  const response = await botsApi.botRooms(debugAccessToken.value, debugServerId.value)
+  debugRuntimeLoading.value = false
+
+  if (response.error) {
+    debugError.value = response.error
+    debugResponse.value = response
+    return
+  }
+
+  debugResponse.value = response.data || response
+}
+
+const testBotSendMessage = async () => {
+  if (!debugAccessToken.value || !debugRoomId.value || !debugMessage.value.trim()) {
+    debugError.value = 'Нужны room_id и message'
+    return
+  }
+
+  debugRuntimeLoading.value = true
+  debugError.value = ''
+  const response = await botsApi.botSendMessage(
+    debugAccessToken.value,
+    debugRoomId.value,
+    debugMessage.value.trim(),
+  )
+  debugRuntimeLoading.value = false
+
+  if (response.error) {
+    debugError.value = response.error
+    debugResponse.value = response
+    return
+  }
+
+  debugResponse.value = response.data || response
+}
+
+const resetDebugPanel = () => {
+  debugClientSecret.value = ''
+  debugAccessToken.value = ''
+  debugRefreshToken.value = ''
+  debugError.value = ''
+  debugResponse.value = null
+  debugRoomId.value = ''
+  debugMessage.value = 'Hello from bot debug panel'
 }
 
 onMounted(() => {
@@ -502,7 +717,9 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-state {
@@ -951,7 +1168,7 @@ onMounted(() => {
   margin: 0;
 }
 
-.scope-label input[type="checkbox"] {
+.scope-label input[type='checkbox'] {
   width: 20px;
   height: 20px;
   margin-top: 2px;
@@ -959,7 +1176,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.scope-label input[type="checkbox"]:disabled {
+.scope-label input[type='checkbox']:disabled {
   cursor: not-allowed;
 }
 
@@ -1261,5 +1478,73 @@ onMounted(() => {
     max-width: 100%;
     margin: 0.5rem;
   }
+}
+
+.debug-panel {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.06);
+  text-align: left;
+}
+
+.debug-panel h4 {
+  margin: 0 0 1rem 0;
+}
+
+.debug-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.debug-inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.debug-input,
+.debug-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.debug-textarea {
+  resize: vertical;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.debug-error {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.debug-response pre {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  overflow: auto;
+  font-size: 0.75rem;
 }
 </style>
