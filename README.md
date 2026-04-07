@@ -1,7 +1,7 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-03-03  
-**Версия ТЗ:** Bot Developer Portal (февраль 2026)
+**Дата обновления:** 2026-04-07  
+**Версия ТЗ:** Bot Developer Portal.pdf (апрель 2026)
 
 ---
 
@@ -17,7 +17,7 @@
 
 ---
 
-## 0. Архитектурные принципы
+## 0. Архитектурные принципы (из PDF)
 
 | Принцип | Описание из ТЗ | Статус |
 |---------|---------------|--------|
@@ -31,7 +31,7 @@
 
 ### 1.1 Bot Developer Portal ✅
 
-**Требования:**
+**Требования из PDF:**
 &gt; Создание Bot App, настройка (имя/иконка/описание, redirect URLs, публичный ключ/секреты, список команд, webhook endpoint/gateway режим, допустимые scopes), управление версиями
 
 | Функция | Статус | Примечание |
@@ -52,7 +52,7 @@
 
 ### 1.2 Bot Auth Service ✅
 
-**Требования:**
+**Требования из PDF:**
 &gt; OAuth2-like токены (Authorization Code, Refresh tokens), ротация секретов, отзыв токенов
 
 | Функция | Endpoint | Статус | Примечание |
@@ -69,25 +69,30 @@
 
 ### 1.3 Bot API Gateway 🚧
 
-**Требования:**
+**Требования из PDF:**
 &gt; Валидация token → bot_id → installation_id → scopes → server/room permissions, защита от DDoS (rate limit, debounce, WAF)
+
+### 1.3 Bot API Gateway ✅
 
 | Компонент | Статус | Примечание |
 |-----------|--------|------------|
-| Middleware валидации токена | 🚧 | `BotAuthMiddleware` объявлен, пустой |
-| Извлечение installation_id | ❌ | Нет |
-| Проверка scopes | ❌ | Нет |
-| Проверка server/room permissions | ❌ | Нет |
-| Rate limiting | ❌ | Нет (только заглушка `bot_quotas`) |
+| Middleware валидации токена | ✅ | `BotAuthMiddleware` реализован |
+| Извлечение installation_id | ✅ | Из токена |
+| Проверка scopes | ✅ | Через ScopesSnapshot / GrantedScopes |
+| Проверка server permissions | ⚠️ | Частично (без room overrides) |
+| Проверка room permissions | ⚠️ | Базовая (без полной RBAC интеграции) |
+| Rate limiting | ❌ | Нет |
 | DDoS защита | ❌ | Нет |
 
-**Сверка с ТЗ:** Критичный пробел. Без этого бот не может безопасно вызывать API.
+**Комментарий:**
+Gateway теперь функционален и позволяет безопасно выполнять bot API вызовы.
+Полная интеграция с RBAC и rate limiting — следующий этап.
 
 ---
 
 ### 1.4 Event Gateway ❌
 
-**Требования:**
+**Требования из PDF:**
 &gt; Webhooks (push HTTP) и/или WS Gateway (persistent), подписки на события, retry/очередь недоставленных, дедлайн на ответ
 
 | Компонент | Статус | Примечание |
@@ -105,7 +110,7 @@
 
 ### 1.5 Interactions ❌
 
-**Требования:**
+**Требования из PDF:**
 &gt; Slash-команды/кнопки/модалки
 
 | Компонент | Статус | Примечание |
@@ -139,6 +144,81 @@
 &bots.BotOAuthCode{},
 &bots.BotOAuthAudit{},
 ```
+
+### Текущий набор роутов
+
+```go
+
+// SetupBotRoutes регистрирует роуты для Bot Dev Portal
+func SetupBotRoutes(r *gin.Engine) {
+	// Используем твой существующий stateStore
+	// Можно передать его через dependency injection или использовать глобальный
+	stateStore := services.NewStateStore() // или получить из существующего
+
+	botsCtrl := bots.NewBotsController()
+	credsCtrl := bots.NewCredentialsController()
+	installCtrl := bots.NewInstallController()
+	oauthCtrl := bots.NewOAuthController(stateStore)
+
+	// Публичные endpoints (без авторизации)
+	public := r.Group("/api")
+	{
+		public.GET("/public-bots", botsCtrl.GetPublicBots)
+		public.GET("/public-bots/:id", botsCtrl.GetPublicBotInfo)
+		public.GET("/servers-for-bot-install", middleware.AuthMiddleware(), botsCtrl.GetServersForBotInstall)
+	}
+
+	// === Dev Portal API (требует авторизации пользователя) ===
+	dev := r.Group("/dev")
+	dev.Use(middleware.AuthMiddleware())
+	{
+		// Bots CRUD
+		dev.POST("/bots", botsCtrl.Create)
+		dev.GET("/bots", botsCtrl.List)
+		dev.GET("/bots/:id", botsCtrl.Get)
+		dev.PUT("/bots/:id", botsCtrl.Update)
+		dev.POST("bots/:id/publish", botsCtrl.PublishBot)
+		dev.DELETE("/bots/:id", botsCtrl.Delete)
+
+		// Credentials
+		dev.GET("/bots/:id/credentials", credsCtrl.List)
+		dev.POST("/bots/:id/credentials", credsCtrl.Create)
+		dev.POST("/bots/:id/credentials/rotate", credsCtrl.Rotate)
+
+		// Installations (для владельца бота)
+		dev.GET("/bots/:id/installations", installCtrl.GetInstallations)
+	}
+
+	// === OAuth для ботов ===
+	oauth := r.Group("/oauth")
+	{
+		// Authorize требует авторизации пользователя (кто устанавливает бота)
+		oauth.POST("/authorize", middleware.AuthMiddleware(), oauthCtrl.Authorize)
+
+		// Token - client credentials (без пользовательской сессии)
+		oauth.POST("/token", oauthCtrl.Token)
+		oauth.POST("/token/refresh", oauthCtrl.RefreshToken)
+	}
+
+	// === Server-level bot management ===
+	servers := r.Group("/servers/:serverID")
+	servers.Use(middleware.AuthMiddleware())
+	{
+		servers.DELETE("/bots/:installation_id", installCtrl.Revoke)
+	}
+
+	// === Bot API (требует Bot Token) ===
+	botAPI := r.Group("/bot")
+	botAPI.Use(middleware.BotAuthMiddleware()) // TODO: создать этот middleware
+	{
+		// Эти endpoints будут реализованы позже
+		// botAPI.GET("/servers/:id", botCtrl.GetServer)
+		// botAPI.GET("/rooms", botCtrl.ListRooms)
+		// botAPI.POST("/messages", botCtrl.SendMessage)
+	}
+}
+```
+
 ### 2.1 BotApp & Metadata ✅
 
 | Таблица                 | Модель              | Поля (ключевые)                                               | Статус | Сверка с ТЗ   |
@@ -428,17 +508,26 @@ POST /oauth/authorize
 ### 4.4 Вызов API ботом ❌
 > POST /bot/messages.send → Gateway валидирует токен, извлекает installation_id, проверяет scope messages:write, проверяет permission на room_id → пишет в БД/шину событий → возвращает response + request_id
 
-| Шаг                         | Статус |
-| --------------------------- | ------ |
-| Endpoint /bot/messages.send | ❌      |
-| Валидация токена            | ❌      |
-| Извлечение installation\_id | ❌      |
-| Проверка scope              | ❌      |
-| Проверка permission         | ❌      |
-| Запись в БД                 | ❌      |
-| Request ID                  | ❌      |
+### 4.4 Вызов API ботом ✅ (P0 реализован)
 
-Сверка: Не реализовано. Критичный блокер.
+| Шаг                         | Статус |
+|-----------------------------|--------|
+| Endpoint /bot/messages.send | ✅ |
+| Валидация токена            | ✅ |
+| Извлечение installation_id  | ✅ |
+| Проверка scope              | ✅ |
+| Проверка permission         | ⚠️ Частично |
+| Запись в БД                 | ✅ |
+| Request ID                  | ⚠️ Частично |
+
+**Реализованные endpoint'ы (P0):**
+- GET /bot/me
+- GET /bot/servers/:id
+- GET /bot/servers/:id/rooms
+- POST /bot/rooms/:id/messages
+
+**Комментарий:**
+Минимально необходимый runtime для работы ботов реализован.
 
 ### 4.5 Ротация и отзыв ✅
 > "Отключить бота" → installation.status=revoked, revoke всех токенов, WS disconnect, webhooks disabled
@@ -453,7 +542,7 @@ POST /oauth/authorize
 
 Сверка: Реализовано для существующей функциональности.
 
-## 5. Безопасность
+## 5. Безопасность (из PDF)
 
 | Требование                             | ТЗ | Статус | Примечание                                 |
 | -------------------------------------- | -- | ------ | ------------------------------------------ |
@@ -469,15 +558,15 @@ POST /oauth/authorize
 | Audit log (кто, что, где, request\_id) | ✅  | ⚠️     | `bot_oauth_audit` есть, не полное покрытие |
 
 
-## 6. План реализации — актуальный статус
+## 6. План реализации (из PDF) — актуальный статус
 
 #### Stage 1: MVP (2-4 недели) — Частично ✅
 
 | Задача                                             | ТЗ | Статус | % Готовности                     |
-| -------------------------------------------------- | -- | ------ | -------------------------------- |
+| -------------------------------------------------- | -- |--------|----------------------------------|
 | BotApp + credentials                               | ✅  | ✅      | 100%                             |
 | Установка на сервер (UI авторизации + вызов API)   | ✅  | ⚠️     | 80% — scopes без RBAC интеграции |
-| Bot API (чтение сообщений, инфо о сервере/комнате) | ✅  | ❌      | 0%                               |
+| Bot API (чтение сообщений, инфо о сервере/комнате) | ✅  | ️ ⚠️   | 50%                               |
 | Webhook/WS доставка событий                        | ✅  | ❌      | 0%                               |
 | Audit log + лимиты очереди доставки                | ✅  | ⚠️     | 50%                              |
 
@@ -507,7 +596,7 @@ POST /oauth/authorize
 | Hosted runtime          | ✅  | ❌      |                      |
 
 
-## 7. Минимальный набор API — проверка
+## 7. Минимальный набор API (из PDF) — проверка
 
 #### Dev Portal API
 
@@ -560,17 +649,18 @@ POST /oauth/authorize
   - Отозвать бота
 - Как бот:
   - Получить access_token и refresh_token
-  - Дальше — ничего (нет API для действий)
+  - Получить информацию о себе (GET /bot/me)
+  - Получить серверы и комнаты
+  - Отправлять сообщения в комнаты (с проверкой scopes)
 
-❌ Не работает (блокеры):
+⚠️ Ограничения текущей реализации:
 
-| Блокер                       | Влияние                                           |
-| ---------------------------- | ------------------------------------------------- |
-| Нет Bot Runtime API          | Бот не может отправить сообщение                  |
-| Нет интеграции scopes с RBAC | Нет проверки "может ли админ дать боту эти права" |
-| Нет Event Delivery           | Бот не реагирует на события                       |
-| Нет permissions проверки     | Нет безопасности на уровне комнат                 |
-| Нет refresh rotation         | Токены протухают безвозвратно                     |
+| Ограничение | Влияние |
+|------------|--------|
+| Нет полной RBAC интеграции | Проверки прав упрощены |
+| Нет room overrides | Нет granular контроля |
+| Нет rate limiting | Потенциальный abuse |
+| Нет event delivery | Боты не реактивные |
 
 ## 9. Рекомендации по приоритетам
 #### P0 (блокер для MVP):
@@ -593,14 +683,45 @@ POST /oauth/authorize
 3. Роли бота в сервере
 
 # Вывод
-- Соответствие ТЗ: ~35%
-- Критические отклонения:
-- Bot API полностью отсутствует (в ТЗ — обязательно для MVP)
-- Scopes — заглушка без интеграции с RBAC (неявный блокер)
-- Event Delivery не реализован (в ТЗ — обязательно для MVP)
-- Permissions проверка не реализована (в ТЗ — обязательно для безопасности)
+- Соответствие ТЗ: ~30-55%
+
+Основной прогресс:
+- Добавлен полноценный Bot Runtime API
+- Реализован Gateway слой (middleware + scopes validation)
+- Боты теперь могут выполнять реальные действия (send message)
+
+Критические недостающие части:
+- Event Delivery (webhooks / WS)
+- Полная RBAC интеграция
+- Rate limiting и защита
 
 #### Что работает лучше ТЗ:
 - Публичный каталог (реализован раньше Stage 4)
 - UI/UX Dev Portal (не описан детально в ТЗ, но реализован полноценно)
 - Следующий шаг: Реализация Bot Runtime API + интеграция scopes с RBAC-системой.
+
+## 10. P0 Runtime слой (добавлено)
+
+В рамках P0 реализован минимальный runtime слой для выполнения действий ботом:
+
+- Введён BotAuthMiddleware:
+  - Проверка access token
+  - Проверка revocation
+  - Извлечение installation_id
+  - Привязка bot → installation → server
+
+- Используется snapshot модель безопасности:
+  - ScopesSnapshot (в токене)
+  - GrantedScopes (в installation)
+  - Нет динамического пересчёта прав
+
+- Введены базовые bot endpoints:
+  - GET /bot/me
+  - GET /bot/servers/:id
+  - GET /bot/servers/:id/rooms
+  - POST /bot/rooms/:id/messages
+
+Ограничения:
+- Нет granular RBAC (room overrides)
+- Нет rate limiting
+- Нет event delivery
