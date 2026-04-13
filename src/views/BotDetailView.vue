@@ -6,9 +6,7 @@
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
-          <Button variant="ghost" @click="$router.back()" class="back-btn">
-            ← Назад
-          </Button>
+          <Button variant="ghost" @click="$router.back()" class="back-btn"> ← Назад </Button>
           <div class="bot-title" v-if="bot">
             <div class="bot-avatar" :style="avatarStyle">
               {{ bot.name?.[0]?.toUpperCase() || '?' }}
@@ -28,12 +26,8 @@
           </div>
         </div>
         <div class="header-actions" v-if="bot">
-          <Button variant="secondary" @click="showEditModal = true">
-            Редактировать
-          </Button>
-          <Button variant="primary" @click="showCreateCredential = true">
-            + Новый Secret
-          </Button>
+          <Button variant="secondary" @click="showEditModal = true"> Редактировать </Button>
+          <Button variant="primary" @click="showCreateCredential = true"> + Новый Secret </Button>
           <Button
             v-if="bot.status === 'draft' || bot.status === 'inactive'"
             variant="success"
@@ -72,7 +66,10 @@
               </div>
 
               <!-- Пустое состояние -->
-              <div v-if="credentials.length === 0 && !freshlyCreatedSecret" class="empty-credentials">
+              <div
+                v-if="credentials.length === 0 && !freshlyCreatedSecret"
+                class="empty-credentials"
+              >
                 <p>Нет созданных credentials</p>
                 <Button variant="primary" @click="showCreateCredential = true">
                   Создать первый Secret
@@ -91,7 +88,7 @@
                   v-if="activeCredential"
                   title="Client ID"
                   :value="activeCredential.client_id"
-                hint="Используйте этот ID в вашем приложении"
+                  hint="Используйте этот ID в вашем приложении"
                 />
 
                 <!-- Client Secret -->
@@ -143,11 +140,7 @@
                   </div>
 
                   <div v-if="redirectUrls.length > 0" class="urls-list">
-                    <div
-                      v-for="(url, index) in redirectUrls"
-                      :key="index"
-                      class="url-item"
-                    >
+                    <div v-for="(url, index) in redirectUrls" :key="index" class="url-item">
                       <span>{{ url }}</span>
                       <Button
                         variant="ghost"
@@ -159,9 +152,7 @@
                       </Button>
                     </div>
                   </div>
-                  <div v-else class="empty-urls">
-                    Нет настроенных redirect URLs
-                  </div>
+                  <div v-else class="empty-urls">Нет настроенных redirect URLs</div>
                 </div>
               </div>
             </Card>
@@ -177,17 +168,10 @@
                 <div class="scopes-block">
                   <h4>Разрешенные Scopes</h4>
                   <div class="tags-list">
-                    <Badge
-                      v-for="scope in allowedScopes"
-                      :key="scope"
-                      variant="primary"
-                      size="sm"
-                    >
+                    <Badge v-for="scope in allowedScopes" :key="scope" variant="primary" size="sm">
                       {{ scope }}
                     </Badge>
-                    <span v-if="!allowedScopes.length" class="empty-tags">
-                      Нет ограничений
-                    </span>
+                    <span v-if="!allowedScopes.length" class="empty-tags"> Нет ограничений </span>
                   </div>
                 </div>
 
@@ -202,9 +186,7 @@
                     >
                       {{ event }}
                     </Badge>
-                    <span v-if="!allowedEvents.length" class="empty-tags">
-                      Нет ограничений
-                    </span>
+                    <span v-if="!allowedEvents.length" class="empty-tags"> Нет ограничений </span>
                   </div>
                 </div>
               </div>
@@ -232,9 +214,132 @@
                 <div v-else class="empty-installations">
                   <div class="empty-icon">📭</div>
                   <p>Бот еще не установлен ни на один сервер</p>
-                  <p class="empty-hint">
-                    Используйте OAuth flow для установки бота
+                  <p class="empty-hint">Используйте OAuth flow для установки бота</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card v-if="installations.length > 0" class="section-card">
+              <div class="section-header">
+                <h2>🧪 Bot Runtime Test</h2>
+                <p class="section-desc">Тестовая отправка сообщения от имени установленного бота</p>
+              </div>
+
+              <div class="test-runtime-section">
+                <div class="form-group">
+                  <label>Установка</label>
+                  <select
+                    v-model="selectedInstallationId"
+                    class="form-select"
+                    @change="((selectedRoomId = ''), (testRooms = []))"
+                  >
+                    <option value="">Выберите установку</option>
+                    <option
+                      v-for="installation in activeInstallationsList"
+                      :key="installation.id"
+                      :value="String(installation.id)"
+                    >
+                      #{{ installation.id }} —
+                      {{ installation.server_name || `Server ${installation.server_id}` }}
+                    </option>
+                  </select>
+                </div>
+                <div class="test-actions">
+                  <Button
+                    variant="secondary"
+                    :loading="isLoadingTestRooms"
+                    :disabled="!selectedInstallationId || !testBotToken"
+                    @click="loadTestRooms"
+                  >
+                    Загрузить комнаты
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    :loading="isRefreshingToken"
+                    :disabled="!canRefreshToken"
+                    @click="refreshToken"
+                  >
+                    Обновить токен
+                  </Button>
+                </div>
+                <Button variant="secondary" @click="refreshToken"> Обновить токен </Button>
+                <div class="form-group">
+                  <label>Bot Access Token</label>
+                  <textarea
+                    v-model.trim="testBotToken"
+                    class="form-textarea"
+                    rows="3"
+                    placeholder="Вставьте access token бота"
+                  />
+                  <p class="field-hint">
+                    Токен хранится только в памяти страницы и не сохраняется.
                   </p>
+                </div>
+
+                <div class="form-group">
+                  <label>Refresh Token</label>
+                  <textarea
+                    v-model.trim="testRefreshToken"
+                    class="form-textarea"
+                    rows="3"
+                    placeholder="Вставьте refresh token бота"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Client ID</label>
+                  <input
+                    v-model.trim="testClientId"
+                    class="form-input"
+                    type="text"
+                    placeholder="Введите client_id"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Client Secret</label>
+                  <input
+                    v-model.trim="testClientSecret"
+                    class="form-input"
+                    type="text"
+                    placeholder="Введите client_secret"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Комната</label>
+                  <select
+                    v-model="selectedRoomId"
+                    class="form-select"
+                    :disabled="!selectedInstallationId || isLoadingTestRooms"
+                  >
+                    <option value="">Выберите комнату</option>
+                    <option v-for="room in testRooms" :key="room.id" :value="String(room.id)">
+                      {{ room.name }} (ID: {{ room.id }})
+                    </option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>Сообщение</label>
+                  <textarea
+                    v-model.trim="testMessage"
+                    class="form-textarea"
+                    rows="4"
+                    placeholder="Введите тестовое сообщение"
+                  />
+                </div>
+
+                <div class="test-actions">
+                  <Button
+                    variant="primary"
+                    :loading="isSendingTestMessage"
+                    :disabled="!canSendTestMessage"
+                    @click="sendTestMessage"
+                  >
+                    Отправить тестовое сообщение
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -268,9 +373,7 @@
                     <h4>Удалить бота</h4>
                     <p>Это действие нельзя отменить. Все данные будут удалены.</p>
                   </div>
-                  <Button variant="error" @click="handleDeleteBot">
-                    Удалить
-                  </Button>
+                  <Button variant="error" @click="handleDeleteBot"> Удалить </Button>
                 </div>
               </div>
             </Card>
@@ -297,20 +400,22 @@
     <!-- Create Credential Confirmation -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showCreateCredential" class="modal-overlay" @click.self="showCreateCredential = false">
+        <div
+          v-if="showCreateCredential"
+          class="modal-overlay"
+          @click.self="showCreateCredential = false"
+        >
           <div class="modal-content confirm-modal">
             <div class="modal-header">
               <h2>Создать новый Client Secret?</h2>
             </div>
             <div class="modal-body">
               <p>
-                Создание нового секрета немедленно отзовет все существующие секреты.
-                Все приложения, использующие старые секреты, перестанут работать.
+                Создание нового секрета немедленно отзовет все существующие секреты. Все приложения,
+                использующие старые секреты, перестанут работать.
               </p>
               <div class="modal-actions">
-                <Button variant="ghost" @click="showCreateCredential = false">
-                  Отмена
-                </Button>
+                <Button variant="ghost" @click="showCreateCredential = false"> Отмена </Button>
                 <Button
                   variant="primary"
                   :loading="isCreatingCredential"
@@ -341,31 +446,89 @@ import InstallationCard from '@/components/bots/InstallationCard.vue'
 import EditBotModal from '@/components/bots/EditBotModal.vue'
 import AddRedirectModal from '@/components/bots/AddRedirectModal.vue'
 import type { BotApp, BotCredential } from '@/types'
-import type {BotInstallation} from "@/api/bots.ts";
+import { type BotInstallation, botsApi } from '@/api/bots.ts'
 
 const route = useRoute()
 const router = useRouter()
 const botsStore = useBotsStore()
 const toastStore = useToastStore()
 
+type BotRuntimeRoom = {
+  id: number
+  name: string
+  type: string
+  server_id: number
+  category_id?: number | null
+  position?: number
+  is_dialog?: boolean
+}
+
+const selectedInstallationId = ref<string>('')
+const selectedRoomId = ref<string>('')
+const testBotToken = ref('')
+const testMessage = ref('')
+const testRooms = ref<BotRuntimeRoom[]>([])
+const isLoadingTestRooms = ref(false)
+const isSendingTestMessage = ref(false)
+
+const testRefreshToken = ref('')
+const testClientId = ref('')
+const testClientSecret = ref('')
+const isRefreshingToken = ref(false)
+
+const canRefreshToken = computed(() => {
+  return !!testRefreshToken.value && !!testClientId.value && !!testClientSecret.value
+})
+
+const activeInstallationsList = computed(() => {
+  return installations.value.filter((i) => i.status === 'active')
+})
+
+const selectedInstallation = computed(() => {
+  return (
+    activeInstallationsList.value.find(
+      (i) => String(i.id) === String(selectedInstallationId.value),
+    ) || null
+  )
+})
+
+const canSendTestMessage = computed(() => {
+  return (
+    !!selectedInstallation.value &&
+    !!selectedRoomId.value &&
+    !!testBotToken.value &&
+    !!testMessage.value
+  )
+})
+
 const botId = computed(() => route.params.id as string)
 const statusBadgeVariant = computed(() => {
   switch (bot.value?.status) {
-    case 'active': return 'success'
-    case 'draft': return 'warning'
-    case 'inactive': return 'secondary'
-    case 'suspended': return 'error'
-    default: return 'secondary'
+    case 'active':
+      return 'success'
+    case 'draft':
+      return 'warning'
+    case 'inactive':
+      return 'secondary'
+    case 'suspended':
+      return 'error'
+    default:
+      return 'secondary'
   }
 })
 
 const statusLabel = computed(() => {
   switch (bot.value?.status) {
-    case 'active': return bot.value?.is_public ? 'Публичный' : 'Активный'
-    case 'draft': return 'Черновик'
-    case 'inactive': return 'Неактивен'
-    case 'suspended': return 'Приостановлен'
-    default: return bot.value?.status
+    case 'active':
+      return bot.value?.is_public ? 'Публичный' : 'Активный'
+    case 'draft':
+      return 'Черновик'
+    case 'inactive':
+      return 'Неактивен'
+    case 'suspended':
+      return 'Приостановлен'
+    default:
+      return bot.value?.status
   }
 })
 
@@ -379,8 +542,8 @@ const isUpdating = ref(false)
 const isCreatingCredential = ref(false)
 const error = ref<string | null>(null)
 const freshlyCreatedSecret = ref<{
-  client_id: string,
-  client_secret: string,
+  client_id: string
+  client_secret: string
   createdAt: string
 } | null>(null)
 const isPublishing = ref(false)
@@ -402,7 +565,7 @@ const avatarStyle = computed(() => {
 })
 
 const activeInstallations = computed(() => {
-  return installations.value.filter(i => i.status === 'active').length
+  return installations.value.filter((i) => i.status === 'active').length
 })
 
 const allowedScopes = computed(() => {
@@ -414,10 +577,104 @@ const allowedEvents = computed(() => {
 })
 
 const activeCredential = computed(() => {
-  return credentials.value.find(c => c.is_active) || null
+  return credentials.value.find((c) => c.is_active) || null
 })
 
 // Methods
+const refreshToken = async () => {
+  if (!testRefreshToken.value) {
+    toastStore.error('Введите refresh token')
+    return
+  }
+
+  if (!testClientId.value) {
+    toastStore.error('Введите client_id')
+    return
+  }
+
+  if (!testClientSecret.value) {
+    toastStore.error('Введите client_secret')
+    return
+  }
+
+  isRefreshingToken.value = true
+
+  try {
+    const response = await botsApi.refreshBotToken({
+      grant_type: 'refresh_token',
+      refresh_token: testRefreshToken.value,
+      client_id: testClientId.value,
+      client_secret: testClientSecret.value,
+    })
+
+    testBotToken.value = response.access_token
+
+    if (response.refresh_token) {
+      testRefreshToken.value = response.refresh_token
+    }
+
+    toastStore.success('Токен успешно обновлен')
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось обновить токен')
+  } finally {
+    isRefreshingToken.value = false
+  }
+}
+
+const loadTestRooms = async () => {
+  if (!selectedInstallation.value) return
+  if (!testBotToken.value) {
+    toastStore.error('Сначала вставьте bot access token')
+    return
+  }
+
+  isLoadingTestRooms.value = true
+  try {
+    const serverId = selectedInstallation.value.server_id
+    const data = await botsApi.botRooms(testBotToken.value, serverId)
+    testRooms.value = data.data || []
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось загрузить комнаты')
+  } finally {
+    isLoadingTestRooms.value = false
+  }
+}
+
+const sendTestMessage = async () => {
+  if (!selectedInstallation.value) {
+    toastStore.error('Выберите установку')
+    return
+  }
+
+  if (!selectedRoomId.value) {
+    toastStore.error('Выберите комнату')
+    return
+  }
+
+  if (!testBotToken.value) {
+    toastStore.error('Введите bot access token')
+    return
+  }
+
+  if (!testMessage.value) {
+    toastStore.error('Введите сообщение')
+    return
+  }
+
+  isSendingTestMessage.value = true
+
+  try {
+    await botsApi.botSendMessage(testBotToken.value, selectedRoomId.value, testMessage.value)
+
+    toastStore.success('Тестовое сообщение успешно отправлено')
+    testMessage.value = ''
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось отправить сообщение')
+  } finally {
+    isSendingTestMessage.value = false
+  }
+}
+
 const loadBot = async () => {
   isLoading.value = true
   error.value = null
@@ -475,7 +732,7 @@ const handleCreateCredential = async () => {
     freshlyCreatedSecret.value = {
       client_id: newCred.client_id,
       client_secret: newCred.client_secret,
-      createdAt: newCred.created_at
+      createdAt: newCred.created_at,
     }
 
     await loadBot()
@@ -492,7 +749,7 @@ const handleCreateCredential = async () => {
 const handleRevokeInstallation = async (installationId: string) => {
   try {
     await botsStore.revokeInstallation(botId.value, installationId)
-    installations.value = installations.value.filter(i => i.id !== installationId)
+    installations.value = installations.value.filter((i) => i.id !== installationId)
     toastStore.success('Доступ отозван')
   } catch (err: any) {
     toastStore.error('Ошибка отзыва доступа: ' + err.message)
@@ -556,6 +813,48 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.test-runtime-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.form-select,
+.form-textarea {
+  width: 100%;
+  border: 1px solid #dcdfe6;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.test-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .bot-detail {
   padding: 100px 0 60px;
   min-height: 100vh;
@@ -860,7 +1159,9 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-icon {
