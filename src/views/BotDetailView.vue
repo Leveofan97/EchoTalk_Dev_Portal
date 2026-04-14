@@ -627,7 +627,12 @@ import InstallationCard from '@/components/bots/InstallationCard.vue'
 import EditBotModal from '@/components/bots/EditBotModal.vue'
 import AddRedirectModal from '@/components/bots/AddRedirectModal.vue'
 import type { BotApp, BotCredential } from '@/types'
-import { type BotInstallation, botsApi } from '@/api/bots.ts'
+import {
+  type BotEventDelivery,
+  type BotInstallation,
+  type InstallationWebhookConfig,
+  botsApi,
+} from '@/api/bots.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -915,10 +920,14 @@ const refreshToken = async () => {
       client_secret: testClientSecret.value,
     })
 
-    testBotToken.value = response.access_token
+    if (response.error || !response.data) {
+      throw new Error(response.error || 'Не удалось обновить токен')
+    }
 
-    if (response.refresh_token) {
-      testRefreshToken.value = response.refresh_token
+    testBotToken.value = response.data.access_token
+
+    if (response.data.refresh_token) {
+      testRefreshToken.value = response.data.refresh_token
     }
 
     toastStore.success('Токен успешно обновлен')
@@ -939,8 +948,13 @@ const loadTestRooms = async () => {
   isLoadingTestRooms.value = true
   try {
     const serverId = selectedInstallation.value.server_id
-    const data = await botsApi.botRooms(testBotToken.value, serverId)
-    testRooms.value = data.data || []
+    const response = await botsApi.botRooms(testBotToken.value, serverId)
+
+    if (response.error) {
+      throw new Error(response.error)
+    }
+
+    testRooms.value = response.data || []
   } catch (err: any) {
     toastStore.error(err.message || 'Не удалось загрузить комнаты')
   } finally {
@@ -972,7 +986,15 @@ const sendTestMessage = async () => {
   isSendingTestMessage.value = true
 
   try {
-    await botsApi.botSendMessage(testBotToken.value, selectedRoomId.value, testMessage.value)
+    const response = await botsApi.botSendMessage(
+      testBotToken.value,
+      selectedRoomId.value,
+      testMessage.value,
+    )
+
+    if (response.error) {
+      throw new Error(response.error)
+    }
 
     toastStore.success('Тестовое сообщение успешно отправлено')
     testMessage.value = ''
@@ -1063,10 +1085,22 @@ const handleCreateCredential = async () => {
   }
 }
 
-const handleRevokeInstallation = async (installationId: string) => {
+const handleRevokeInstallation = async (installationId: string | number) => {
   try {
     await botsStore.revokeInstallation(installationId)
-    installations.value = installations.value.filter((i) => i.id !== installationId)
+    installations.value = installations.value.filter((i) => String(i.id) !== String(installationId))
+
+    if (String(selectedWebhookInstallationId.value) === String(installationId)) {
+      selectedWebhookInstallationId.value = ''
+      installationWebhook.value = null
+      installationDeliveries.value = []
+      webhookForm.value = {
+        enabled: false,
+        webhook_url: '',
+        subscribed_events: [],
+      }
+    }
+
     toastStore.success('Доступ отозван')
   } catch (err: any) {
     toastStore.error('Ошибка отзыва доступа: ' + err.message)
@@ -1114,10 +1148,6 @@ const publishBot = async () => {
   } finally {
     isPublishing.value = false
   }
-}
-
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('ru-RU')
 }
 
 const dismissFreshSecret = () => {
