@@ -14,6 +14,9 @@ export const useBotsStore = defineStore('bots', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
+  const currentInstallationWebhook = ref<InstallationWebhookConfig | null>(null)
+  const currentInstallationDeliveries = ref<BotEventDelivery[]>([])
+
   const availableScopes = ref<BotAvailableScope[]>([])
 
   const serversForInstall = ref<ServerForInstall[]>([])
@@ -104,6 +107,64 @@ export const useBotsStore = defineStore('bots', () => {
       return null
     } finally {
       isLoading.value = false
+    }
+  }
+
+  const fetchInstallationWebhook = async (installationId: string | number) => {
+    try {
+      const response = await botsApi.getInstallationWebhook(installationId)
+      if (response.error) {
+        throw new Error(response.error)
+      }
+      currentInstallationWebhook.value = response.data || null
+      return currentInstallationWebhook.value
+    } catch (err: any) {
+      error.value = err.message
+      return null
+    }
+  }
+
+  const updateInstallationWebhook = async (
+    installationId: string | number,
+    payload: { webhook_url: string; subscribed_events: string[]; enabled: boolean },
+  ) => {
+    try {
+      const response = await botsApi.updateInstallationWebhook(installationId, payload)
+      if (response.error) {
+        throw new Error(response.error)
+      }
+      currentInstallationWebhook.value = response.data || null
+      return currentInstallationWebhook.value
+    } catch (err: any) {
+      error.value = err.message
+      throw err
+    }
+  }
+
+  const rotateInstallationWebhookSecret = async (installationId: string | number) => {
+    try {
+      const response = await botsApi.rotateInstallationWebhookSecret(installationId)
+      if (response.error) {
+        throw new Error(response.error)
+      }
+      return response.data?.secret || null
+    } catch (err: any) {
+      error.value = err.message
+      throw err
+    }
+  }
+
+  const fetchInstallationDeliveries = async (installationId: string | number, limit = 20) => {
+    try {
+      const response = await botsApi.getInstallationDeliveries(installationId, limit)
+      if (response.error) {
+        throw new Error(response.error)
+      }
+      currentInstallationDeliveries.value = response.data || []
+      return currentInstallationDeliveries.value
+    } catch (err: any) {
+      error.value = err.message
+      return []
     }
   }
 
@@ -393,5 +454,11 @@ export const useBotsStore = defineStore('bots', () => {
     fetchServersForInstall,
     authorizeBotInstallation,
     clearAuthCode,
+    currentInstallationWebhook,
+    currentInstallationDeliveries,
+    fetchInstallationWebhook,
+    updateInstallationWebhook,
+    rotateInstallationWebhookSecret,
+    fetchInstallationDeliveries,
   }
 })

@@ -82,6 +82,57 @@ export interface RefreshTokenPayload {
   client_secret: string
 }
 
+export interface InstallationWebhookConfig {
+  installation_id: number
+  webhook_url: string
+  event_delivery: string
+  subscribed_events: string[]
+  last_delivery_at?: string
+  last_delivery_error?: string
+  enabled: boolean
+}
+
+export interface BotEventDelivery {
+  id: string
+  event_type: string
+  status: string
+  attempt_count: number
+  max_attempts: number
+  next_attempt_at: string
+  last_error?: string
+  last_response_code?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface InstallationWebhookConfig {
+  installation_id: number
+  webhook_url: string
+  event_delivery: string
+  subscribed_events: string[]
+  last_delivery_at?: string | null
+  last_delivery_error?: string
+  enabled: boolean
+}
+
+export interface BotEventDelivery {
+  id: string
+  installation_id: number
+  bot_app_id: number
+  server_id: number
+  event_id: string
+  event_type: string
+  event_version: number
+  status: string
+  attempt_count: number
+  max_attempts: number
+  next_attempt_at: string
+  last_error?: string
+  last_response_code?: number
+  created_at: string
+  updated_at: string
+}
+
 export const botsApi = {
   // === ПУБЛИЧНЫЕ (без авторизации) ===
   getPublicBots: () => api.get<PublicBotInfo[]>('/api/public-bots'),
@@ -156,6 +207,22 @@ export const botsApi = {
       method: 'POST',
       body: { content },
     }),
+
+  getInstallationWebhook: (installationId: string | number) =>
+    api.get<InstallationWebhookConfig>(`/dev/installations/${installationId}/webhook`),
+
+  updateInstallationWebhook: (
+    installationId: string | number,
+    data: { webhook_url: string; subscribed_events: string[]; enabled: boolean },
+  ) => api.put<InstallationWebhookConfig>(`/dev/installations/${installationId}/webhook`, data),
+
+  rotateInstallationWebhookSecret: (installationId: string | number) =>
+    api.post<{ installation_id: number; secret: string }>(
+      `/dev/installations/${installationId}/webhook/rotate-secret`,
+    ),
+
+  getInstallationDeliveries: (installationId: string | number, limit = 20) =>
+    api.get<BotEventDelivery[]>(`/dev/installations/${installationId}/deliveries?limit=${limit}`),
 }
 
 const fetchBotApi = <T = any>(

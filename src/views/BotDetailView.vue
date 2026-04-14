@@ -221,6 +221,187 @@
 
             <Card v-if="installations.length > 0" class="section-card">
               <div class="section-header">
+                <h2>🪝 Webhook Delivery</h2>
+                <p class="section-desc">
+                  Настройка webhook и история доставок по конкретной установке
+                </p>
+              </div>
+
+              <div class="test-runtime-section">
+                <div class="form-group">
+                  <label>Установка</label>
+                  <select
+                    v-model="selectedWebhookInstallationId"
+                    class="form-select"
+                    @change="handleSelectWebhookInstallation"
+                  >
+                    <option value="">Выберите установку</option>
+                    <option
+                      v-for="installation in activeInstallationsList"
+                      :key="installation.id"
+                      :value="String(installation.id)"
+                    >
+                      #{{ installation.id }} —
+                      {{ installation.server_name || `Server ${installation.server_id}` }}
+                    </option>
+                  </select>
+                </div>
+
+                <div v-if="selectedWebhookInstallation">
+                  <div v-if="isLoadingWebhook" class="empty-installations">
+                    <p>Загрузка webhook конфигурации...</p>
+                  </div>
+
+                  <template v-else>
+                    <div class="form-group">
+                      <label class="checkbox-line">
+                        <input v-model="webhookForm.enabled" type="checkbox" />
+                        <span>Включить webhook доставку</span>
+                      </label>
+                    </div>
+
+                    <div class="form-group">
+                      <label>Webhook URL</label>
+                      <input
+                        v-model.trim="webhookForm.webhook_url"
+                        class="form-input"
+                        type="text"
+                        placeholder="https://your-bot.example.com/webhook"
+                      />
+                    </div>
+
+                    <div class="form-group">
+                      <label>События</label>
+                      <div class="webhook-events-list">
+                        <label
+                          v-for="eventName in availableWebhookEvents"
+                          :key="eventName"
+                          class="checkbox-line"
+                        >
+                          <input
+                            v-model="webhookForm.subscribed_events"
+                            type="checkbox"
+                            :value="eventName"
+                          />
+                          <span>{{ eventName }}</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="test-actions">
+                      <Button
+                        variant="primary"
+                        :loading="isSavingWebhook"
+                        @click="handleSaveWebhook"
+                      >
+                        Сохранить webhook
+                      </Button>
+
+                      <Button
+                        variant="secondary"
+                        :loading="isRotatingWebhookSecret"
+                        @click="handleRotateWebhookSecret"
+                      >
+                        Rotate Secret
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        :loading="isLoadingDeliveries"
+                        @click="loadInstallationDeliveries"
+                      >
+                        Обновить доставки
+                      </Button>
+                    </div>
+
+                    <div v-if="revealedWebhookSecret" class="fresh-secret-banner">
+                      <div class="secret-warning">
+                        <strong>⚠️ Скопируйте webhook secret сейчас!</strong>
+                        <p>Он показывается только один раз.</p>
+                      </div>
+
+                      <CredentialCard
+                        title="Webhook Secret"
+                        :value="revealedWebhookSecret"
+                        :is-new="true"
+                        show-reveal
+                        hint="Используйте его для проверки X-EchoTalk-Signature"
+                      />
+
+                      <Button variant="secondary" @click="revealedWebhookSecret = null">
+                        Я сохранил secret
+                      </Button>
+                    </div>
+
+                    <div v-if="installationWebhook" class="field-hint">
+                      <div>
+                        Последняя ошибка:
+                        <strong>{{ installationWebhook.last_delivery_error || 'нет' }}</strong>
+                      </div>
+                      <div>
+                        Последняя доставка:
+                        <strong>{{ installationWebhook.last_delivery_at || '—' }}</strong>
+                      </div>
+                    </div>
+
+                    <div class="deliveries-block">
+                      <h4>Последние доставки</h4>
+
+                      <div v-if="isLoadingDeliveries" class="empty-urls">Загрузка доставок...</div>
+
+                      <div v-else-if="installationDeliveries.length === 0" class="empty-urls">
+                        Пока нет доставок
+                      </div>
+
+                      <div v-else class="deliveries-list">
+                        <div
+                          v-for="delivery in installationDeliveries"
+                          :key="delivery.id"
+                          class="delivery-item"
+                        >
+                          <div class="delivery-top">
+                            <strong>{{ delivery.event_type }}</strong>
+                            <Badge
+                              :variant="
+                                delivery.status === 'success'
+                                  ? 'success'
+                                  : delivery.status === 'failed'
+                                    ? 'error'
+                                    : 'warning'
+                              "
+                              size="sm"
+                            >
+                              {{ delivery.status }}
+                            </Badge>
+                          </div>
+
+                          <div class="delivery-meta">
+                            <span
+                              >attempts: {{ delivery.attempt_count }}/{{
+                                delivery.max_attempts
+                              }}</span
+                            >
+                            <span>HTTP: {{ delivery.last_response_code ?? '—' }}</span>
+                          </div>
+
+                          <div v-if="delivery.last_error" class="delivery-error">
+                            {{ delivery.last_error }}
+                          </div>
+
+                          <div class="delivery-dates">
+                            <span>created: {{ delivery.created_at }}</span>
+                            <span>next: {{ delivery.next_attempt_at }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </Card>
+
+            <Card v-if="installations.length > 0" class="section-card">
+              <div class="section-header">
                 <h2>🧪 Bot Runtime Test</h2>
                 <p class="section-desc">Тестовая отправка сообщения от имени установленного бота</p>
               </div>
@@ -476,6 +657,30 @@ const testClientId = ref('')
 const testClientSecret = ref('')
 const isRefreshingToken = ref(false)
 
+const selectedWebhookInstallationId = ref<string>('')
+const installationWebhook = ref<InstallationWebhookConfig | null>(null)
+const installationDeliveries = ref<BotEventDelivery[]>([])
+const isLoadingWebhook = ref(false)
+const isSavingWebhook = ref(false)
+const isRotatingWebhookSecret = ref(false)
+const isLoadingDeliveries = ref(false)
+const revealedWebhookSecret = ref<string | null>(null)
+
+const webhookForm = ref({
+  enabled: false,
+  webhook_url: '',
+  subscribed_events: [] as string[],
+})
+
+const availableWebhookEvents = ['message.created', 'message.updated', 'message.deleted']
+
+const selectedWebhookInstallation = computed(() => {
+  return (
+    installations.value.find((i) => String(i.id) === String(selectedWebhookInstallationId.value)) ||
+    null
+  )
+})
+
 const canRefreshToken = computed(() => {
   return !!testRefreshToken.value && !!testClientId.value && !!testClientSecret.value
 })
@@ -581,6 +786,109 @@ const activeCredential = computed(() => {
 })
 
 // Methods
+const loadInstallationWebhook = async () => {
+  if (!selectedWebhookInstallationId.value) {
+    installationWebhook.value = null
+    installationDeliveries.value = []
+    webhookForm.value = {
+      enabled: false,
+      webhook_url: '',
+      subscribed_events: [],
+    }
+    return
+  }
+
+  isLoadingWebhook.value = true
+  try {
+    const data = await botsStore.fetchInstallationWebhook(selectedWebhookInstallationId.value)
+    installationWebhook.value = data
+
+    webhookForm.value = {
+      enabled: !!data?.enabled,
+      webhook_url: data?.webhook_url || '',
+      subscribed_events: Array.isArray(data?.subscribed_events) ? [...data.subscribed_events] : [],
+    }
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось загрузить webhook конфигурацию')
+  } finally {
+    isLoadingWebhook.value = false
+  }
+}
+
+const loadInstallationDeliveries = async () => {
+  if (!selectedWebhookInstallationId.value) {
+    installationDeliveries.value = []
+    return
+  }
+
+  isLoadingDeliveries.value = true
+  try {
+    const rows = await botsStore.fetchInstallationDeliveries(
+      selectedWebhookInstallationId.value,
+      20,
+    )
+    installationDeliveries.value = rows || []
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось загрузить доставки')
+  } finally {
+    isLoadingDeliveries.value = false
+  }
+}
+
+const handleSelectWebhookInstallation = async () => {
+  revealedWebhookSecret.value = null
+  await loadInstallationWebhook()
+  await loadInstallationDeliveries()
+}
+
+const handleSaveWebhook = async () => {
+  if (!selectedWebhookInstallationId.value) {
+    toastStore.error('Сначала выберите установку')
+    return
+  }
+
+  isSavingWebhook.value = true
+  try {
+    await botsStore.updateInstallationWebhook(selectedWebhookInstallationId.value, {
+      enabled: webhookForm.value.enabled,
+      webhook_url: webhookForm.value.webhook_url,
+      subscribed_events: webhookForm.value.subscribed_events,
+    })
+
+    await loadInstallationWebhook()
+    await loadInstallationDeliveries()
+    toastStore.success('Webhook конфигурация сохранена')
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось сохранить webhook конфигурацию')
+  } finally {
+    isSavingWebhook.value = false
+  }
+}
+
+const handleRotateWebhookSecret = async () => {
+  if (!selectedWebhookInstallationId.value) {
+    toastStore.error('Сначала выберите установку')
+    return
+  }
+
+  if (!confirm('Сгенерировать новый webhook secret? Старый перестанет работать.')) {
+    return
+  }
+
+  isRotatingWebhookSecret.value = true
+  try {
+    const secret = await botsStore.rotateInstallationWebhookSecret(
+      selectedWebhookInstallationId.value,
+    )
+    revealedWebhookSecret.value = secret || null
+    toastStore.success('Новый webhook secret сгенерирован')
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось ротировать webhook secret')
+  } finally {
+    isRotatingWebhookSecret.value = false
+  }
+}
+
 const refreshToken = async () => {
   if (!testRefreshToken.value) {
     toastStore.error('Введите refresh token')
@@ -697,6 +1005,15 @@ const loadBot = async () => {
     const instData = await botsStore.fetchBotInstallations(botId.value)
     installations.value = instData || []
 
+    if (!selectedWebhookInstallationId.value) {
+      const firstActiveInstallation = (instData || []).find((i) => i.status === 'active')
+      if (firstActiveInstallation) {
+        selectedWebhookInstallationId.value = String(firstActiveInstallation.id)
+        await loadInstallationWebhook()
+        await loadInstallationDeliveries()
+      }
+    }
+
     redirectUrls.value = bot.value.redirect_uris || []
   } catch (err: any) {
     error.value = err.message || 'Ошибка загрузки данных'
@@ -748,7 +1065,7 @@ const handleCreateCredential = async () => {
 
 const handleRevokeInstallation = async (installationId: string) => {
   try {
-    await botsStore.revokeInstallation(botId.value, installationId)
+    await botsStore.revokeInstallation(installationId)
     installations.value = installations.value.filter((i) => i.id !== installationId)
     toastStore.success('Доступ отозван')
   } catch (err: any) {
@@ -1244,5 +1561,77 @@ onMounted(() => {
     flex-direction: column;
     text-align: center;
   }
+}
+
+.form-input {
+  width: 100%;
+  border: 1px solid #dcdfe6;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.webhook-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deliveries-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deliveries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delivery-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.delivery-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.delivery-meta {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.delivery-error {
+  margin-top: 8px;
+  color: #b91c1c;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.delivery-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
 }
 </style>
