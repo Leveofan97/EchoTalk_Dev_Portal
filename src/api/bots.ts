@@ -87,29 +87,6 @@ export interface InstallationWebhookConfig {
   webhook_url: string
   event_delivery: string
   subscribed_events: string[]
-  last_delivery_at?: string
-  last_delivery_error?: string
-  enabled: boolean
-}
-
-export interface BotEventDelivery {
-  id: string
-  event_type: string
-  status: string
-  attempt_count: number
-  max_attempts: number
-  next_attempt_at: string
-  last_error?: string
-  last_response_code?: number
-  created_at: string
-  updated_at: string
-}
-
-export interface InstallationWebhookConfig {
-  installation_id: number
-  webhook_url: string
-  event_delivery: string
-  subscribed_events: string[]
   last_delivery_at?: string | null
   last_delivery_error?: string
   enabled: boolean
@@ -131,6 +108,18 @@ export interface BotEventDelivery {
   last_response_code?: number
   created_at: string
   updated_at: string
+}
+
+export interface BotEventDeliveryAttempt {
+  id: string
+  delivery_id: string
+  attempt_no: number
+  request_url: string
+  response_status?: number
+  duration_ms: number
+  error_text?: string
+  response_body_excerpt?: string
+  created_at: string
 }
 
 export const botsApi = {
@@ -223,6 +212,11 @@ export const botsApi = {
 
   getInstallationDeliveries: (installationId: string | number, limit = 20) =>
     api.get<BotEventDelivery[]>(`/dev/installations/${installationId}/deliveries?limit=${limit}`),
+
+  getDeliveryAttempts: (installationId: string | number, deliveryId: string) =>
+    api.get<BotEventDeliveryAttempt[]>(
+      `/dev/installations/${installationId}/deliveries/${deliveryId}/attempts`,
+    ),
 }
 
 const fetchBotApi = <T = any>(

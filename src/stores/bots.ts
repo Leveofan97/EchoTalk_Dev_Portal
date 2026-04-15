@@ -3,7 +3,13 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { botsApi } from '@/api/bots'
 import type { BotApp, CreateBotPayload, BotInstallation, ServerForInstall } from '@/types'
-import type { CreateCredentialsResponse, BotAvailableScope } from '@/api/bots'
+import type {
+  CreateCredentialsResponse,
+  BotAvailableScope,
+  InstallationWebhookConfig,
+  BotEventDelivery,
+  BotEventDeliveryAttempt,
+} from '@/api/bots'
 
 export const useBotsStore = defineStore('bots', () => {
   // State
@@ -11,6 +17,8 @@ export const useBotsStore = defineStore('bots', () => {
   const currentBot = ref<BotApp | null>(null)
   const currentBotCredentials = ref<CreateCredentialsResponse[]>([])
   const currentBotInstallations = ref<BotInstallation[]>([])
+  const currentDeliveryAttempts = ref<BotEventDeliveryAttempt[]>([])
+
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
@@ -162,6 +170,21 @@ export const useBotsStore = defineStore('bots', () => {
       }
       currentInstallationDeliveries.value = response.data || []
       return currentInstallationDeliveries.value
+    } catch (err: any) {
+      error.value = err.message
+      return []
+    }
+  }
+
+  const fetchDeliveryAttempts = async (installationId: string | number, deliveryId: string) => {
+    try {
+      const response = await botsApi.getDeliveryAttempts(installationId, deliveryId)
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      currentDeliveryAttempts.value = response.data || []
+      return currentDeliveryAttempts.value
     } catch (err: any) {
       error.value = err.message
       return []
@@ -460,5 +483,7 @@ export const useBotsStore = defineStore('bots', () => {
     updateInstallationWebhook,
     rotateInstallationWebhookSecret,
     fetchInstallationDeliveries,
+    currentDeliveryAttempts,
+    fetchDeliveryAttempts,
   }
 })
