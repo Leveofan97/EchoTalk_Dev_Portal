@@ -123,40 +123,6 @@
               </div>
             </Card>
 
-            <!-- OAuth Configuration -->
-            <Card class="section-card">
-              <div class="section-header">
-                <h2>🔗 OAuth2 Configuration</h2>
-                <p class="section-desc">Настройте URL для авторизации и callback</p>
-              </div>
-
-              <div class="oauth-section">
-                <div class="redirect-urls">
-                  <div class="redirect-header">
-                    <label>Redirect URLs</label>
-                    <Button variant="ghost" size="sm" @click="showAddRedirect = true">
-                      + Добавить
-                    </Button>
-                  </div>
-
-                  <div v-if="redirectUrls.length > 0" class="urls-list">
-                    <div v-for="(url, index) in redirectUrls" :key="index" class="url-item">
-                      <span>{{ url }}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        class="delete-btn"
-                        @click="removeRedirectUrl(index)"
-                      >
-                        Удалить
-                      </Button>
-                    </div>
-                  </div>
-                  <div v-else class="empty-urls">Нет настроенных redirect URLs</div>
-                </div>
-              </div>
-            </Card>
-
             <!-- Scopes & Events -->
             <Card class="section-card">
               <div class="section-header">
@@ -503,12 +469,6 @@
       @submit="handleUpdateBot"
     />
 
-    <AddRedirectModal
-      :is-open="showAddRedirect"
-      @close="showAddRedirect = false"
-      @submit="handleAddRedirect"
-    />
-
     <!-- Create Credential Confirmation -->
     <Teleport to="body">
       <Transition name="modal">
@@ -556,7 +516,6 @@ import ToastContainer from '@/components/ui/ToastContainer.vue'
 import CredentialCard from '@/components/bots/CredentialCard.vue'
 import InstallationCard from '@/components/bots/InstallationCard.vue'
 import EditBotModal from '@/components/bots/EditBotModal.vue'
-import AddRedirectModal from '@/components/bots/AddRedirectModal.vue'
 import type { BotApp, BotCredential } from '@/types'
 import {
   type BotEventDeliveryAttempt,
@@ -642,7 +601,6 @@ const statusLabel = computed(() => {
 const bot = ref<BotApp | null>(null)
 const installations = ref<BotInstallation[]>([])
 const credentials = ref<BotCredential[]>([])
-const redirectUrls = ref<string[]>([])
 const isLoading = ref(true)
 const isUpdating = ref(false)
 const isCreatingCredential = ref(false)
@@ -656,7 +614,6 @@ const isPublishing = ref(false)
 
 // Modals
 const showEditModal = ref(false)
-const showAddRedirect = ref(false)
 const showCreateCredential = ref(false)
 
 // Computed
@@ -854,8 +811,6 @@ const loadBot = async () => {
         await loadInstallationDeliveries()
       }
     }
-
-    redirectUrls.value = bot.value.redirect_uris || []
   } catch (err: any) {
     error.value = err.message || 'Ошибка загрузки данных'
     toastStore.error('Не удалось загрузить данные бота')
@@ -926,19 +881,6 @@ const handleRevokeInstallation = async (installationId: string | number) => {
   } catch (err: any) {
     toastStore.error('Ошибка отзыва доступа: ' + err.message)
   }
-}
-
-const handleAddRedirect = (url: string) => {
-  redirectUrls.value.push(url)
-  // TODO: API call to save
-  toastStore.success('Redirect URL добавлен')
-  showAddRedirect.value = false
-}
-
-const removeRedirectUrl = (index: number) => {
-  redirectUrls.value.splice(index, 1)
-  // TODO: API call to save
-  toastStore.success('Redirect URL удален')
 }
 
 const handleDeleteBot = async () => {
