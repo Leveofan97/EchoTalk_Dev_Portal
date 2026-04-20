@@ -2,7 +2,13 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { botsApi } from '@/api/bots'
-import type { BotApp, CreateBotPayload, BotInstallation, ServerForInstall } from '@/types'
+import type {
+  BotApp,
+  CreateBotPayload,
+  BotInstallation,
+  ServerForInstall,
+  BotCommand,
+} from '@/types'
 import type {
   CreateCredentialsResponse,
   BotAvailableScope,
@@ -18,6 +24,7 @@ export const useBotsStore = defineStore('bots', () => {
   const currentBotCredentials = ref<CreateCredentialsResponse[]>([])
   const currentBotInstallations = ref<BotInstallation[]>([])
   const currentDeliveryAttempts = ref<BotEventDeliveryAttempt[]>([])
+  const currentBotCommands = ref<BotCommand[]>([])
 
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -134,7 +141,12 @@ export const useBotsStore = defineStore('bots', () => {
 
   const updateInstallationWebhook = async (
     installationId: string | number,
-    payload: { webhook_url: string; subscribed_events: string[]; enabled: boolean },
+    payload: {
+      webhook_url: string
+      command_base_url: string
+      subscribed_events: string[]
+      enabled: boolean
+    },
   ) => {
     try {
       const response = await botsApi.updateInstallationWebhook(installationId, payload)
@@ -426,10 +438,6 @@ export const useBotsStore = defineStore('bots', () => {
     }
   }
 
-  const clearAuthCode = () => {
-    authCode.value = null
-  }
-
   const fetchAvailableScopes = async () => {
     const response = await botsApi.getAvailableScopes()
     if (response.error) {
@@ -439,6 +447,110 @@ export const useBotsStore = defineStore('bots', () => {
 
     availableScopes.value = response.data || []
     return availableScopes.value
+  }
+
+  const fetchBotCommands = async (botId: string | number) => {
+    try {
+      const response = await botsApi.getCommands(botId)
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      currentBotCommands.value = response.data || []
+      return currentBotCommands.value
+    } catch (err: any) {
+      error.value = err.message
+      return []
+    }
+  }
+
+  const createBotCommand = async (
+    botId: string | number,
+    payload: {
+      name: string
+      description: string
+      is_enabled: boolean
+    },
+  ) => {
+    try {
+      const response = await botsApi.createCommand(botId, payload)
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      const created = response.data || response
+      if (created) {
+        currentBotCommands.value.unshift(created as BotCommand)
+      }
+
+      return created as BotCommand
+    } catch (err: any) {
+      error.value = err.message
+      throw err
+    }
+  }
+
+  const updateBotCommand = async (
+    botId: string | number,
+    commandId: string | number,
+    payload: {
+      name?: string
+      description?: string
+      is_enabled?: boolean
+    },
+  ) => {
+    try {
+      const response = await botsApi.updateCommand(botId, commandId, payload)
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      const updated = response.data || response
+
+      const index = currentBotCommands.value.findIndex((cmd) => cmd.id === Number(commandId))
+      if (index !== -1) {
+        currentBotCommands.value[index] = updated as BotCommand
+      } else {
+        await fetchBotCommands(botId)
+      }
+
+      return updated as BotCommand
+    } catch (err: any) {
+      error.value = err.message
+      throw err
+    }
+  }
+
+  const deleteBotCommand = async (botId: string | number, commandId: string | number) => {
+    try {
+      const response = await botsApi.deleteCommand(botId, commandId)
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      currentBotCommands.value = currentBotCommands.value.filter(
+        (cmd) => cmd.id !== Number(commandId),
+      )
+    } catch (err: any) {
+      error.value = err.message
+      throw err
+    }
+  }
+
+  const toggleBotCommand = async (
+    botId: string | number,
+    commandId: string | number,
+    isEnabled: boolean,
+  ) => {
+    return updateBotCommand(botId, commandId, { is_enabled: isEnabled })
+  }
+
+  const clearAuthCode = () => {
+    authCode.value = null
   }
 
   const clearError = () => {
@@ -454,6 +566,7 @@ export const useBotsStore = defineStore('bots', () => {
     isLoading,
     error,
     availableScopes,
+    currentBotCommands,
     // Getters
     activeBotsCount,
     // Actions
@@ -485,5 +598,10 @@ export const useBotsStore = defineStore('bots', () => {
     fetchInstallationDeliveries,
     currentDeliveryAttempts,
     fetchDeliveryAttempts,
+    fetchBotCommands,
+    createBotCommand,
+    updateBotCommand,
+    deleteBotCommand,
+    toggleBotCommand,
   }
 })

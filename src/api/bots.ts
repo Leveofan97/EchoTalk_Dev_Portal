@@ -85,6 +85,7 @@ export interface RefreshTokenPayload {
 export interface InstallationWebhookConfig {
   installation_id: number
   webhook_url: string
+  command_base_url: string
   event_delivery: string
   subscribed_events: string[]
   last_delivery_at?: string | null
@@ -122,6 +123,28 @@ export interface BotEventDeliveryAttempt {
   created_at: string
 }
 
+export interface BotCommand {
+  id: number
+  bot_app_id: number
+  name: string
+  description: string
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateBotCommandPayload {
+  name: string
+  description: string
+  is_enabled: boolean
+}
+
+export interface UpdateBotCommandPayload {
+  name?: string
+  description?: string
+  is_enabled?: boolean
+}
+
 export const botsApi = {
   // === ПУБЛИЧНЫЕ (без авторизации) ===
   getPublicBots: () => api.get<PublicBotInfo[]>('/api/public-bots'),
@@ -148,6 +171,18 @@ export const botsApi = {
 
   rotateCredentials: (id: string | number) =>
     api.post<CreateCredentialsResponse>(`/dev/bots/${id}/credentials/rotate`),
+
+  // Commands
+  getCommands: (id: string | number) => api.get<BotCommand[]>(`/dev/bots/${id}/commands`),
+
+  createCommand: (id: string | number, data: CreateBotCommandPayload) =>
+    api.post<BotCommand>(`/dev/bots/${id}/commands`, data),
+
+  updateCommand: (id: string | number, commandId: string | number, data: UpdateBotCommandPayload) =>
+    api.put<BotCommand>(`/dev/bots/${id}/commands/${commandId}`, data),
+
+  deleteCommand: (id: string | number, commandId: string | number) =>
+    api.delete(`/dev/bots/${id}/commands/${commandId}`),
 
   // Installations
   getInstallations: (id: string | number) =>
@@ -202,7 +237,12 @@ export const botsApi = {
 
   updateInstallationWebhook: (
     installationId: string | number,
-    data: { webhook_url: string; subscribed_events: string[]; enabled: boolean },
+    data: {
+      webhook_url: string
+      command_base_url: string
+      subscribed_events: string[]
+      enabled: boolean
+    },
   ) => api.put<InstallationWebhookConfig>(`/dev/installations/${installationId}/webhook`, data),
 
   rotateInstallationWebhookSecret: (installationId: string | number) =>

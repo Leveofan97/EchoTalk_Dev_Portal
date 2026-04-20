@@ -2,7 +2,7 @@
 export type BotStatus = 'draft' | 'active' | 'suspended' | 'inactive'
 
 export interface BotApp {
-  id: number  // Бэкенд возвращает number (uint)
+  id: number // Бэкенд возвращает number (uint)
   owner_id: number
   name: string
   description: string | null
@@ -59,14 +59,48 @@ export interface ServerForInstall {
   has_bot: boolean
 }
 
-export type Theme = 'darkNight' | 'lightDay' | 'retroGame' | 'cosmicNeon' |
-  'goldDust' | 'deepDepth' | 'purpleDragon' | 'softWarm'
+export type Theme =
+  | 'darkNight'
+  | 'lightDay'
+  | 'retroGame'
+  | 'cosmicNeon'
+  | 'goldDust'
+  | 'deepDepth'
+  | 'purpleDragon'
+  | 'softWarm'
 
 export const AVAILABLE_SCOPES = [
   { value: 'bot', label: 'Базовые функции бота', description: 'Необходим для работы любого бота' },
-  { value: 'messages:read', label: 'Чтение сообщений', description: 'Бот может читать сообщения в каналах' },
-  { value: 'messages:write', label: 'Отправка сообщений', description: 'Бот может отправлять сообщения' },
-  { value: 'members:read', label: 'Просмотр участников', description: 'Доступ к списку участников сервера' },
+  {
+    value: 'messages:read',
+    label: 'Чтение сообщений',
+    description: 'Бот может читать сообщения в каналах',
+  },
+  {
+    value: 'messages:write',
+    label: 'Отправка сообщений',
+    description: 'Бот может отправлять сообщения',
+  },
+  {
+    value: 'members:read',
+    label: 'Просмотр участников',
+    description: 'Доступ к списку участников сервера',
+  },
   { value: 'rooms:read', label: 'Просмотр комнат', description: 'Доступ к списку комнат' },
-  { value: 'server:manage', label: 'Управление сервером', description: 'Изменение настроек сервера (только для админ-ботов)' },
+  {
+    value: 'server:manage',
+    label: 'Управление сервером',
+    description: 'Изменение настроек сервера (только для админ-ботов)',
+  },
 ] as const
+
+export interface BotCommand {
+  id: number
+  bot_app_id: number
+  name: string
+  description: string
+  endpoint_path: string
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}

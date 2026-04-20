@@ -157,6 +157,124 @@
                 </div>
               </div>
             </Card>
+
+            <!-- Slash Commands -->
+            <Card class="section-card">
+              <div class="section-header">
+                <h2>⚔️ Slash Commands</h2>
+                <p class="section-desc">Настройка slash-команд для вызова бота из чата</p>
+              </div>
+
+              <div class="commands-section">
+                <div class="command-form">
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label>Имя команды</label>
+                      <div class="command-name-input">
+                        <span>/</span>
+                        <input
+                          v-model.trim="commandForm.name"
+                          class="form-input"
+                          type="text"
+                          placeholder="help"
+                          maxlength="32"
+                        />
+                      </div>
+                    </div>
+
+                    <div class="form-group">
+                      <label>Command Base URL</label>
+                      <input
+                        v-model.trim="webhookForm.command_base_url"
+                        class="form-input"
+                        type="text"
+                        placeholder="https://bot.example.com/echotalk/commands"
+                      />
+                      <p class="field-help">
+                        EchoTalk будет вызывать slash-команды по шаблону: POST
+                        {command_base_url}/{command_name}
+                      </p>
+                    </div>
+
+                    <div class="form-group form-group-full">
+                      <label>Описание</label>
+                      <input
+                        v-model.trim="commandForm.description"
+                        class="form-input"
+                        type="text"
+                        placeholder="Показать список доступных команд"
+                        maxlength="100"
+                      />
+                    </div>
+
+                    <div class="form-group">
+                      <label class="checkbox-line">
+                        <input v-model="commandForm.is_enabled" type="checkbox" />
+                        <span>Команда включена</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="test-actions">
+                    <Button variant="primary" :loading="isSavingCommand" @click="handleSaveCommand">
+                      {{ editingCommandId ? 'Сохранить команду' : 'Создать команду' }}
+                    </Button>
+
+                    <Button v-if="editingCommandId" variant="secondary" @click="resetCommandForm">
+                      Отменить редактирование
+                    </Button>
+                  </div>
+                </div>
+
+                <div class="deliveries-block">
+                  <h4>Список команд</h4>
+
+                  <div v-if="isLoadingCommands" class="empty-urls">Загрузка команд...</div>
+
+                  <div v-else-if="commands.length === 0" class="empty-urls">
+                    Команды пока не созданы
+                  </div>
+
+                  <div v-else class="deliveries-list">
+                    <div v-for="command in commands" :key="command.id" class="delivery-item">
+                      <div class="delivery-top">
+                        <strong>/{{ command.name }}</strong>
+
+                        <div class="delivery-actions">
+                          <Badge :variant="command.is_enabled ? 'success' : 'secondary'" size="sm">
+                            {{ command.is_enabled ? 'enabled' : 'disabled' }}
+                          </Badge>
+
+                          <Button variant="ghost" size="sm" @click="startEditCommand(command)">
+                            Редактировать
+                          </Button>
+
+                          <Button variant="ghost" size="sm" @click="handleToggleCommand(command)">
+                            {{ command.is_enabled ? 'Выключить' : 'Включить' }}
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            @click="handleDeleteCommand(command.id)"
+                          >
+                            Удалить
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div class="delivery-meta">
+                        <span>{{ command.description }}</span>
+                      </div>
+
+                      <div class="delivery-dates">
+                        <span>updated: {{ command.updated_at }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
 
           <!-- Right Column -->
@@ -516,7 +634,7 @@ import ToastContainer from '@/components/ui/ToastContainer.vue'
 import CredentialCard from '@/components/bots/CredentialCard.vue'
 import InstallationCard from '@/components/bots/InstallationCard.vue'
 import EditBotModal from '@/components/bots/EditBotModal.vue'
-import type { BotApp, BotCredential } from '@/types'
+import type { BotApp, BotCredential, BotCommand } from '@/types'
 import {
   type BotEventDeliveryAttempt,
   type BotEventDelivery,
@@ -543,10 +661,22 @@ const isRotatingWebhookSecret = ref(false)
 const isLoadingDeliveries = ref(false)
 const revealedWebhookSecret = ref<string | null>(null)
 
+const commands = ref<BotCommand[]>([])
+const isLoadingCommands = ref(false)
+const isSavingCommand = ref(false)
+const editingCommandId = ref<number | null>(null)
+
+const commandForm = ref({
+  name: '',
+  description: '',
+  is_enabled: true,
+})
+
 const webhookForm = ref({
-  enabled: false,
   webhook_url: '',
-  subscribed_events: [] as string[],
+  command_base_url: '',
+  subscribed_events: [],
+  enabled: false,
 })
 
 const availableWebhookEvents = ['message.created', 'message.updated', 'message.deleted']
@@ -650,6 +780,7 @@ const loadInstallationWebhook = async () => {
     webhookForm.value = {
       enabled: false,
       webhook_url: '',
+      command_base_url: config.command_base_url || '',
       subscribed_events: [],
     }
     return
@@ -663,6 +794,7 @@ const loadInstallationWebhook = async () => {
     webhookForm.value = {
       enabled: !!data?.enabled,
       webhook_url: data?.webhook_url || '',
+      command_base_url: webhookForm.value.command_base_url.trim(),
       subscribed_events: Array.isArray(data?.subscribed_events) ? [...data.subscribed_events] : [],
     }
   } catch (err: any) {
@@ -803,6 +935,9 @@ const loadBot = async () => {
     const instData = await botsStore.fetchBotInstallations(botId.value)
     installations.value = instData || []
 
+    const commandsData = await botsStore.fetchBotCommands(botId.value)
+    commands.value = commandsData || []
+
     if (!selectedWebhookInstallationId.value) {
       const firstActiveInstallation = (instData || []).find((i) => i.status === 'active')
       if (firstActiveInstallation) {
@@ -915,6 +1050,123 @@ const publishBot = async () => {
 
 const dismissFreshSecret = () => {
   freshlyCreatedSecret.value = null
+}
+
+const resetCommandForm = () => {
+  commandForm.value = {
+    name: '',
+    description: '',
+    is_enabled: true,
+  }
+  editingCommandId.value = null
+}
+
+const validateCommandForm = () => {
+  const name = commandForm.value.name.trim().toLowerCase()
+  const description = commandForm.value.description.trim()
+
+  if (!/^[a-z0-9_-]{2,32}$/.test(name)) {
+    toastStore.error(
+      'Имя команды должно содержать 2-32 символа: строчные латинские буквы, цифры, "_" или "-"',
+    )
+    return false
+  }
+
+  if (!description) {
+    toastStore.error('Введите описание команды')
+    return false
+  }
+
+  if (description.length > 100) {
+    toastStore.error('Описание не должно превышать 100 символов')
+    return false
+  }
+
+  return true
+}
+
+const loadCommands = async () => {
+  isLoadingCommands.value = true
+  try {
+    const rows = await botsStore.fetchBotCommands(botId.value)
+    commands.value = rows || []
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось загрузить команды')
+  } finally {
+    isLoadingCommands.value = false
+  }
+}
+
+const startEditCommand = (command: BotCommand) => {
+  editingCommandId.value = command.id
+  commandForm.value = {
+    name: command.name,
+    description: command.description,
+    is_enabled: command.is_enabled,
+  }
+}
+
+const handleSaveCommand = async () => {
+  if (!validateCommandForm()) {
+    return
+  }
+
+  isSavingCommand.value = true
+  try {
+    const payload = {
+      name: commandForm.value.name.trim().toLowerCase(),
+      description: commandForm.value.description.trim(),
+      is_enabled: commandForm.value.is_enabled,
+    }
+
+    if (editingCommandId.value) {
+      await botsStore.updateBotCommand(botId.value, editingCommandId.value, payload)
+      toastStore.success('Команда обновлена')
+    } else {
+      await botsStore.createBotCommand(botId.value, payload)
+      toastStore.success('Команда создана')
+    }
+
+    await loadCommands()
+    resetCommandForm()
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось сохранить команду')
+  } finally {
+    isSavingCommand.value = false
+  }
+}
+
+const handleDeleteCommand = async (commandId: number) => {
+  if (!confirm('Удалить slash-команду?')) {
+    return
+  }
+
+  try {
+    await botsStore.deleteBotCommand(botId.value, commandId)
+    commands.value = commands.value.filter((cmd) => cmd.id !== commandId)
+
+    if (editingCommandId.value === commandId) {
+      resetCommandForm()
+    }
+
+    toastStore.success('Команда удалена')
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось удалить команду')
+  }
+}
+
+const handleToggleCommand = async (command: BotCommand) => {
+  try {
+    await botsStore.toggleBotCommand(botId.value, command.id, !command.is_enabled)
+    await loadCommands()
+    toastStore.success(
+      command.is_enabled
+        ? `Команда /${command.name} выключена`
+        : `Команда /${command.name} включена`,
+    )
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось изменить состояние команды')
+  }
 }
 
 onMounted(() => {
@@ -1474,5 +1726,70 @@ onMounted(() => {
   color: #374151;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.form-input {
+  width: 100%;
+  border: 1px solid #dcdfe6;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group-full {
+  grid-column: 1 / -1;
+}
+
+.commands-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.command-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.command-name-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid #dcdfe6;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 12px;
+}
+
+.command-name-input span {
+  color: #6b7280;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.command-name-input input {
+  border: none;
+  outline: none;
+  width: 100%;
+  padding: 10px 0;
+  font-size: 14px;
+  background: transparent;
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group-full {
+    grid-column: auto;
+  }
 }
 </style>
