@@ -181,21 +181,6 @@
                         />
                       </div>
                     </div>
-
-                    <div class="form-group">
-                      <label>Command Base URL</label>
-                      <input
-                        v-model.trim="webhookForm.command_base_url"
-                        class="form-input"
-                        type="text"
-                        placeholder="https://bot.example.com/echotalk/commands"
-                      />
-                      <p class="field-help">
-                        EchoTalk будет вызывать slash-команды по шаблону: POST
-                        {command_base_url}/{command_name}
-                      </p>
-                    </div>
-
                     <div class="form-group form-group-full">
                       <label>Описание</label>
                       <input
@@ -352,6 +337,20 @@
                         type="text"
                         placeholder="https://your-bot.example.com/webhook"
                       />
+                    </div>
+
+                    <div class="form-group">
+                      <label>Command Base URL</label>
+                      <input
+                        v-model.trim="webhookForm.command_base_url"
+                        class="form-input"
+                        type="text"
+                        placeholder="https://your-bot.example.com/commands"
+                      />
+                      <p class="field-help">
+                        EchoTalk будет вызывать slash-команды по шаблону:
+                        <strong>POST {command_base_url}/{command_name}</strong>
+                      </p>
                     </div>
 
                     <div class="form-group">
@@ -780,7 +779,7 @@ const loadInstallationWebhook = async () => {
     webhookForm.value = {
       enabled: false,
       webhook_url: '',
-      command_base_url: config.command_base_url || '',
+      command_base_url: '',
       subscribed_events: [],
     }
     return
@@ -794,7 +793,7 @@ const loadInstallationWebhook = async () => {
     webhookForm.value = {
       enabled: !!data?.enabled,
       webhook_url: data?.webhook_url || '',
-      command_base_url: webhookForm.value.command_base_url.trim(),
+      command_base_url: data?.command_base_url || '',
       subscribed_events: Array.isArray(data?.subscribed_events) ? [...data.subscribed_events] : [],
     }
   } catch (err: any) {
@@ -876,7 +875,8 @@ const handleSaveWebhook = async () => {
   try {
     await botsStore.updateInstallationWebhook(selectedWebhookInstallationId.value, {
       enabled: webhookForm.value.enabled,
-      webhook_url: webhookForm.value.webhook_url,
+      webhook_url: webhookForm.value.webhook_url.trim(),
+      command_base_url: webhookForm.value.command_base_url.trim(),
       subscribed_events: webhookForm.value.subscribed_events,
     })
 
@@ -1008,6 +1008,7 @@ const handleRevokeInstallation = async (installationId: string | number) => {
       webhookForm.value = {
         enabled: false,
         webhook_url: '',
+        command_base_url: '',
         subscribed_events: [],
       }
     }
