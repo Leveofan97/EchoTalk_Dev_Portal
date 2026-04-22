@@ -86,7 +86,7 @@ export interface InstallationWebhookConfig {
   installation_id: number
   webhook_url: string
   command_base_url: string
-  event_delivery: string
+  event_delivery: 'webhook' | 'websocket'
   subscribed_events: string[]
   last_delivery_at?: string | null
   last_delivery_error?: string
@@ -240,6 +240,7 @@ export const botsApi = {
     data: {
       webhook_url: string
       command_base_url: string
+      event_delivery: 'webhook' | 'websocket'
       subscribed_events: string[]
       enabled: boolean
     },

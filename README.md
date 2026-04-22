@@ -20,39 +20,36 @@
 ## 0. Итоговый статус на текущий момент
 
 **P0 закрыт.**  
-Пройден end-to-end smoke test полного install/runtime цикла:
+**P1.1 и P1.1.1 закрыты.**  
+**P1.2 закрыт.**
 
-- создание и редактирование Bot App через Dev Portal
-- получение допустимых scopes с backend
-- публикация бота в публичный каталог
-- установка бота на сервер через `/oauth/authorize`
-- обмен `authorization_code` на `access_token` / `refresh_token` через `/oauth/token`
-- успешная аутентификация через `BotAuthMiddleware`
-- рабочие runtime endpoint'ы:
-  - `GET /bot/me`
-  - `GET /bot/servers/:serverID`
-  - `GET /bot/servers/:serverID/rooms`
-  - `POST /bot/rooms/:roomID/messages`
-- тестовое сообщение реально доставляется в комнату от bot user
+Пройден end-to-end runtime test:
 
-**P1.1 и P1.1.1 закрыты.**
+### Commands
+- регистрация команд через Dev Portal
+- CRUD команд
+- slash commands из чата (на тестовом боте созданы и зарегистрированы команды `/help`, `/random`, `/today`, `/info`)
+- invoke через HTTP (`command_base_url`)
+- бот отвечает в чат
+- обработка ошибок:
+  - disabled command → `command not found`
+  - unknown command → `command not found`
+  - endpoint 500 → корректная ошибка runtime
+  - дубли команд → корректно отклоняются
 
-Дополнительно реализовано:
+### Events
+- `message.created` → доставляется
+- `message.updated` → доставляется
+- `message.deleted` → доставляется
+- webhook delivery + retry + attempts работают стабильно
 
-- webhook delivery (HTTP)
-- retry механизм с backoff
-- delivery attempts логирование
-- webhook signing (HMAC)
-- Dev Portal UI для webhook:
-  - настройка URL
-  - подписка на события
-  - rotate secret
-  - просмотр deliveries
-  - просмотр attempts
-- cleanup worker:
-  - автоочистка attempts / deliveries
+### Runtime config
+- разделение:
+  - `webhook_url` → события
+  - `command_base_url` → команды
+- корректная настройка через Dev Portal
 
-**Следующий этап:** P1.2 — расширение runtime событий и command system
+➡️ **Следующий этап: P2 — interactions + расширенный runtime**
 
 ---
 
@@ -80,7 +77,9 @@
 | Публичный каталог | ✅ | `GET /api/public-bots`, `GET /api/public-bots/:id` |
 | Допустимые scopes | ✅ | `GET /dev/bots/available-scopes`, данные приходят с backend |
 | UI install flow | ✅ | сервер → scopes → confirm → code |
-| Список команд | 🚧 | модель есть, API нет |
+| Список команд | ✅ | CRUD реализован |
+| Slash commands UI | ✅ | создание/редактирование/включение |
+| Command Base URL | ✅ | настройка на уровне installation |
 | Webhook/Gateway настройка | ❌ | нет |
 | Версии / релизы | ❌ | нет |
 
@@ -124,14 +123,14 @@
 | WebSocket Gateway | ❌ | не реализован |
 | Deadline/ack | ❌ | нет |
 
-### 2.5 Interactions ❌
+### 2.5 Interactions ⚠️
 
 | Компонент | Статус | Примечание |
 |-----------|--------|------------|
-| Команды | 🚧 | модель `bot_commands` есть |
-| Slash commands API | ❌ | нет |
-| Buttons / message components | ❌ | нет |
-| Modals / interactions | ❌ | нет |
+| Slash commands | ✅ | полностью реализованы |
+| HTTP command invoke | ✅ | sync model |
+| Buttons / message components | ❌ | не реализованы |
+| Modals / interactions | ❌ | не реализованы |
 
 ---
 
@@ -179,69 +178,84 @@
 ## 4. Текущий набор роутов
 
 ```go
+// SetupBotRoutes регистрирует роуты для Bot Dev Portal
 func SetupBotRoutes(r *gin.Engine) {
+	
 	stateStore := services.NewStateStore()
-
 	botsCtrl := bots.NewBotsController()
 	credsCtrl := bots.NewCredentialsController()
 	installCtrl := bots.NewInstallController()
+	webhookCtrl := bots.NewWebhookController()
 	oauthCtrl := bots.NewOAuthController(stateStore)
 	scopesCtrl := bots.NewScopesController()
 	runtimeCtrl := bots.NewRuntimeController()
+	commandsCtrl := bots.NewCommandsController()
 
-	public := r.Group("/api")
-	{
-		public.GET("/public-bots", botsCtrl.GetPublicBots)
-		public.GET("/public-bots/:id", botsCtrl.GetPublicBotInfo)
-		public.GET("/servers-for-bot-install", middleware.AuthMiddleware(), botsCtrl.GetServersForBotInstall)
-	}
+// Публичные endpoints (без авторизации)
+public := r.Group("/api")
+{
+    public.GET("/public-bots", botsCtrl.GetPublicBots)  
+    public.GET("/public-bots/:id", botsCtrl.GetPublicBotInfo)
+    public.GET("/servers-for-bot-install", middleware.AuthMiddleware(), botsCtrl.GetServersForBotInstall)
+}
 
-	dev := r.Group("/dev")
-	dev.Use(middleware.AuthMiddleware())
-	{
-		dev.POST("/bots", botsCtrl.Create)
-		dev.GET("/bots", botsCtrl.List)
-		dev.GET("/bots/:id", botsCtrl.Get)
-		dev.PUT("/bots/:id", botsCtrl.Update)
-		dev.POST("/bots/:id/publish", botsCtrl.PublishBot)
-		dev.DELETE("/bots/:id", botsCtrl.Delete)
+// === Dev Portal API (требует авторизации пользователя) ===
+dev := r.Group("/dev")
+dev.Use(middleware.AuthMiddleware())
+{
+// Bots CRUD
+    dev.POST("/bots", botsCtrl.Create)
+    dev.GET("/bots", botsCtrl.List)
+    dev.GET("/bots/:id", botsCtrl.Get)
+    dev.PUT("/bots/:id", botsCtrl.Update)
+    dev.POST("/bots/:id/publish", botsCtrl.PublishBot)
+    dev.DELETE("/bots/:id", botsCtrl.Delete)
 
-		dev.GET("/bots/available-scopes", scopesCtrl.List)
+    dev.GET("/bots/available-scopes", scopesCtrl.List)
 
-		dev.GET("/bots/:id/credentials", credsCtrl.List)
-		dev.POST("/bots/:id/credentials", credsCtrl.Create)
-		dev.POST("/bots/:id/credentials/rotate", credsCtrl.Rotate)
+    dev.GET("/bots/:id/credentials", credsCtrl.List)
+    dev.POST("/bots/:id/credentials", credsCtrl.Create)
+    dev.POST("/bots/:id/credentials/rotate", credsCtrl.Rotate)
 
-		dev.GET("/bots/:id/installations", installCtrl.GetInstallations)
+    // Installations (для владельца бота)
+    dev.GET("/bots/:id/installations", installCtrl.GetInstallations)
 
-                dev.GET("/installations/:installationID/webhook", webhookCtrl.GetInstallationWebhook)
-                dev.PUT("/installations/:installationID/webhook", webhookCtrl.UpdateInstallationWebhook)
-                dev.POST("/installations/:installationID/webhook/rotate-secret", webhookCtrl.RotateInstallationSecret)
-                dev.GET("/installations/:installationID/deliveries", webhookCtrl.ListInstallationDeliveries)
-                dev.GET("/installations/:installationID/deliveries/:deliveryID/attempts", webhookCtrl.ListDeliveryAttempts)
-	}
+    // Webhooks
+    dev.GET("/installations/:installationID/webhook", webhookCtrl.GetInstallationWebhook)
+    dev.PUT("/installations/:installationID/webhook", webhookCtrl.UpdateInstallationWebhook)
+    dev.POST("/installations/:installationID/webhook/rotate-secret", webhookCtrl.RotateInstallationSecret)
+    dev.GET("/installations/:installationID/deliveries", webhookCtrl.ListInstallationDeliveries)
+    dev.GET("/installations/:installationID/deliveries/:deliveryID/attempts", webhookCtrl.ListDeliveryAttempts)
 
-	oauth := r.Group("/oauth")
-	{
-		oauth.POST("/authorize", middleware.AuthMiddleware(), oauthCtrl.Authorize)
-		oauth.POST("/token", oauthCtrl.Token)
-		oauth.POST("/token/refresh", oauthCtrl.RefreshToken)
-	}
+    // Commands
+    dev.GET("/bots/:id/commands", commandsCtrl.List)
+    dev.POST("/bots/:id/commands", commandsCtrl.Create)
+    dev.PUT("/bots/:id/commands/:commandID", commandsCtrl.Update)
+    dev.DELETE("/bots/:id/commands/:commandID", commandsCtrl.Delete)
+}
 
-	servers := r.Group("/servers/:serverID")
-	servers.Use(middleware.AuthMiddleware())
-	{
-		servers.DELETE("/bots/:installation_id", installCtrl.Revoke)
-	}
+oauth := r.Group("/oauth")
+{
+    oauth.POST("/authorize", middleware.AuthMiddleware(), oauthCtrl.Authorize)
+    oauth.POST("/token", oauthCtrl.Token)
+    oauth.POST("/token/refresh", oauthCtrl.RefreshToken)
+}
 
-	botAPI := r.Group("/bot")
-	botAPI.Use(middleware.BotAuthMiddleware())
-	{
-		botAPI.GET("/me", runtimeCtrl.Me)
-		botAPI.GET("/servers/:serverID", runtimeCtrl.GetServer)
-		botAPI.GET("/servers/:serverID/rooms", runtimeCtrl.ListRooms)
-		botAPI.POST("/rooms/:roomID/messages", runtimeCtrl.SendMessage)
-	}
+servers := r.Group("/servers/:serverID")
+servers.Use(middleware.AuthMiddleware())
+{
+    servers.DELETE("/bots/:installation_id", installCtrl.Revoke)
+}
+
+// === Bot API (требует Bot Token) ===
+botAPI := r.Group("/bot")
+botAPI.Use(middleware.BotAuthMiddleware())
+    {
+        botAPI.GET("/me", runtimeCtrl.Me)
+        botAPI.GET("/servers/:serverID", runtimeCtrl.GetServer)
+        botAPI.GET("/servers/:serverID/rooms", runtimeCtrl.ListRooms)
+        botAPI.POST("/rooms/:roomID/messages", runtimeCtrl.SendMessage)
+    }
 }
 ```
 
@@ -324,6 +338,17 @@ func SetupBotRoutes(r *gin.Engine) {
 | Webhook signing | ✅ |
 | WS / Gateway | ❌ |
 
+### 6.5 Slash Commands ✅
+
+| Шаг | Статус |
+|-----|--------|
+| Регистрация команды | ✅ |
+| Хранение в bot_commands | ✅ |
+| Вызов из чата `/command` | ✅ |
+| Runtime resolve команды | ✅ |
+| HTTP invoke в бота | ✅ |
+| Ответ бота → сообщение в чат | ✅ |
+
 ---
 
 ## 7. Безопасность — текущее состояние
@@ -357,7 +382,11 @@ func SetupBotRoutes(r *gin.Engine) {
 - получать install code
 - настроить webhook endpoint
 - подписаться на события
-- получать webhook события (message.created)
+- создавать и управлять slash-командами
+- вызывать команды из чата (`/название_команды`)
+- получать ответ бота как сообщение
+- обрабатывать runtime ошибки команд
+- получать webhook события (message.created, message.edited, message.deleted)
 - обрабатывать retry delivery
 - проверять подпись webhook
 - видеть deliveries и attempts в Dev Portal
@@ -380,17 +409,16 @@ func SetupBotRoutes(r *gin.Engine) {
 
 ## 9. Что не реализовано
 
-- webhook delivery
 - WS/gateway delivery
-- event subscriptions
-- commands/interactions
+- event subscriptions [требуется расширение событий]
 - rate limiting
 - полная room override / advanced RBAC модель
 - metrics / analytics / quotas
 - hosted runtime / billing / releases
-- commands/interactions
 - event versioning (частично)
 - idempotency гарантия
+- buttons / message components
+- modals / interactions
 
 ---
 
@@ -416,20 +444,23 @@ P1.1 — webhook delivery ✅
 
 P1.1.1 — retries / cleanup / UI ✅
 
-P1.2 — следующий этап:
-1. message.updated
-2. message.deleted
-3. стабильный event envelope
-4. commands system
-5. расширение runtime API
+P1.2 — завершён ✅
 
-### P2+
+Реализовано:
+- message.updated
+- message.deleted
+- стабильный event delivery
+- command system (slash commands)
+- command runtime (HTTP invoke)
+- разделение webhook / command base URL
 
-- webhook / WS gateway
-- commands / interactions
-- расширенный RBAC для ботов
-- rate limits / quotas / delivery retry
+### P2 — следующий этап
 
+- interactions (buttons, components, modals)
+- расширенный runtime API
+- улучшение error handling UX
+- rate limiting / quotas
+- возможный WS runtime для ботов
 ---
 
 ## 11. Вывод
@@ -444,4 +475,4 @@ P1.2 — следующий этап:
 
 Следующий этап:
 
-➡️ **P1.2 — расширение runtime (events + commands)**
+➡️ **P2 — interactions + расширение bot runtime**

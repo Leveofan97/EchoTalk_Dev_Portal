@@ -55,7 +55,6 @@ export const useBotsStore = defineStore('bots', () => {
         return
       }
 
-      // Ответ от Go — это напрямую массив или объект с data
       const botsData = Array.isArray(response.data)
         ? response.data
         : Array.isArray(response)
@@ -84,7 +83,6 @@ export const useBotsStore = defineStore('bots', () => {
         return null
       }
 
-      // Go возвращает объект напрямую
       const newBot = response.data || response
 
       if (!newBot?.id) {
@@ -144,6 +142,7 @@ export const useBotsStore = defineStore('bots', () => {
     payload: {
       webhook_url: string
       command_base_url: string
+      event_delivery: string
       subscribed_events: string[]
       enabled: boolean
     },

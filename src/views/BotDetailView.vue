@@ -330,6 +330,21 @@
                     </div>
 
                     <div class="form-group">
+                      <label>Transport</label>
+                      <select v-model="webhookForm.event_delivery" class="form-select">
+                        <option value="webhook">Webhook</option>
+                        <option value="websocket">WebSocket Gateway</option>
+                      </select>
+                      <p v-if="isWebhookTransport" class="field-help">
+                        Webhook — события доставляются HTTP POST запросами.
+                      </p>
+                      <p v-if="isWebsocketTransport" class="field-help">
+                        WebSocket Gateway — бот сам держит постоянное соединение и получает события
+                        в realtime.
+                      </p>
+                    </div>
+
+                    <div v-if="isWebhookTransport" class="form-group">
                       <label>Webhook URL</label>
                       <input
                         v-model.trim="webhookForm.webhook_url"
@@ -377,10 +392,11 @@
                         :loading="isSavingWebhook"
                         @click="handleSaveWebhook"
                       >
-                        Сохранить webhook
+                        Сохранить настройки доставки
                       </Button>
 
                       <Button
+                        v-if="isWebhookTransport"
                         variant="secondary"
                         :loading="isRotatingWebhookSecret"
                         @click="handleRotateWebhookSecret"
@@ -397,7 +413,10 @@
                       </Button>
                     </div>
 
-                    <div v-if="revealedWebhookSecret" class="fresh-secret-banner">
+                    <div
+                      v-if="isWebhookTransport && revealedWebhookSecret"
+                      class="fresh-secret-banner"
+                    >
                       <div class="secret-warning">
                         <strong>⚠️ Скопируйте webhook secret сейчас!</strong>
                         <p>Он показывается только один раз.</p>
@@ -427,7 +446,7 @@
                       </div>
                     </div>
 
-                    <div class="deliveries-block">
+                    <div v-if="isWebhookTransport" class="deliveries-block">
                       <h4>Последние доставки</h4>
 
                       <div v-if="isLoadingDeliveries" class="empty-urls">Загрузка доставок...</div>
@@ -622,7 +641,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBotsStore } from '@/stores/bots'
 import { useToastStore } from '@/stores/toast'
@@ -671,14 +690,22 @@ const commandForm = ref({
   is_enabled: true,
 })
 
-const webhookForm = ref({
+type EventDeliveryType = 'webhook' | 'websocket'
+
+const createDefaultWebhookForm = () => ({
   webhook_url: '',
   command_base_url: '',
-  subscribed_events: [],
+  subscribed_events: [] as string[],
+  event_delivery: 'webhook' as EventDeliveryType,
   enabled: false,
 })
 
+const webhookForm = ref(createDefaultWebhookForm())
+
 const availableWebhookEvents = ['message.created', 'message.updated', 'message.deleted']
+
+const isWebhookTransport = computed(() => webhookForm.value.event_delivery === 'webhook')
+const isWebsocketTransport = computed(() => webhookForm.value.event_delivery === 'websocket')
 
 const selectedWebhookInstallation = computed(() => {
   return (
@@ -776,12 +803,7 @@ const loadInstallationWebhook = async () => {
     installationDeliveries.value = []
     deliveryAttempts.value = {}
     expandedDeliveryId.value = null
-    webhookForm.value = {
-      enabled: false,
-      webhook_url: '',
-      command_base_url: '',
-      subscribed_events: [],
-    }
+    webhookForm.value = createDefaultWebhookForm()
     return
   }
 
@@ -795,6 +817,7 @@ const loadInstallationWebhook = async () => {
       webhook_url: data?.webhook_url || '',
       command_base_url: data?.command_base_url || '',
       subscribed_events: Array.isArray(data?.subscribed_events) ? [...data.subscribed_events] : [],
+      event_delivery: data?.event_delivery === 'websocket' ? 'websocket' : 'webhook',
     }
   } catch (err: any) {
     toastStore.error(err.message || 'Не удалось загрузить webhook конфигурацию')
@@ -873,18 +896,27 @@ const handleSaveWebhook = async () => {
 
   isSavingWebhook.value = true
   try {
-    await botsStore.updateInstallationWebhook(selectedWebhookInstallationId.value, {
-      enabled: webhookForm.value.enabled,
-      webhook_url: webhookForm.value.webhook_url.trim(),
+    const payload = {
+      webhook_url:
+        webhookForm.value.event_delivery === 'webhook' ? webhookForm.value.webhook_url.trim() : '',
       command_base_url: webhookForm.value.command_base_url.trim(),
-      subscribed_events: webhookForm.value.subscribed_events,
-    })
+      event_delivery: webhookForm.value.event_delivery,
+      subscribed_events: [...webhookForm.value.subscribed_events],
+      enabled: webhookForm.value.enabled,
+    }
+
+    await botsStore.updateInstallationWebhook(selectedWebhookInstallationId.value, payload)
 
     await loadInstallationWebhook()
     await loadInstallationDeliveries()
-    toastStore.success('Webhook конфигурация сохранена')
+
+    toastStore.success(
+      webhookForm.value.event_delivery === 'websocket'
+        ? 'WebSocket Gateway конфигурация сохранена'
+        : 'Webhook конфигурация сохранена',
+    )
   } catch (err: any) {
-    toastStore.error(err.message || 'Не удалось сохранить webhook конфигурацию')
+    toastStore.error(err.message || 'Не удалось сохранить runtime конфигурацию')
   } finally {
     isSavingWebhook.value = false
   }
@@ -1005,12 +1037,7 @@ const handleRevokeInstallation = async (installationId: string | number) => {
       installationDeliveries.value = []
       deliveryAttempts.value = {}
       expandedDeliveryId.value = null
-      webhookForm.value = {
-        enabled: false,
-        webhook_url: '',
-        command_base_url: '',
-        subscribed_events: [],
-      }
+      webhookForm.value = createDefaultWebhookForm()
     }
 
     toastStore.success('Доступ отозван')
@@ -1169,6 +1196,16 @@ const handleToggleCommand = async (command: BotCommand) => {
     toastStore.error(err.message || 'Не удалось изменить состояние команды')
   }
 }
+
+watch(
+  () => webhookForm.value.event_delivery,
+  (newValue) => {
+    if (newValue === 'websocket') {
+      webhookForm.value.webhook_url = ''
+      revealedWebhookSecret.value = null
+    }
+  },
+)
 
 onMounted(() => {
   loadBot()
