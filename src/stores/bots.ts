@@ -142,7 +142,7 @@ export const useBotsStore = defineStore('bots', () => {
     payload: {
       webhook_url: string
       command_base_url: string
-      event_delivery: string
+      event_delivery: 'webhook' | 'websocket'
       subscribed_events: string[]
       enabled: boolean
     },

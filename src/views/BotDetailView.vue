@@ -290,9 +290,9 @@
 
             <Card v-if="installations.length > 0" class="section-card">
               <div class="section-header">
-                <h2>🪝 Webhook Delivery</h2>
+                <h2>Настройка Runtime доставки</h2>
                 <p class="section-desc">
-                  Настройка webhook и история доставок по конкретной установке
+                  Настройка доставки событий бота и transport для конкретной установки
                 </p>
               </div>
 
@@ -325,22 +325,23 @@
                     <div class="form-group">
                       <label class="checkbox-line">
                         <input v-model="webhookForm.enabled" type="checkbox" />
-                        <span>Включить webhook доставку</span>
+                        <span>Включить доставку событий</span>
                       </label>
                     </div>
 
                     <div class="form-group">
-                      <label>Transport</label>
+                      <label>Способ доставки</label>
                       <select v-model="webhookForm.event_delivery" class="form-select">
                         <option value="webhook">Webhook</option>
                         <option value="websocket">WebSocket Gateway</option>
                       </select>
                       <p v-if="isWebhookTransport" class="field-help">
-                        Webhook — события доставляются HTTP POST запросами.
+                        EchoTalk будет отправлять события HTTP POST запросами на указанный Webhook
+                        URL.
                       </p>
-                      <p v-if="isWebsocketTransport" class="field-help">
-                        WebSocket Gateway — бот сам держит постоянное соединение и получает события
-                        в realtime.
+                      <p v-else class="field-help">
+                        EchoTalk будет доставлять события через постоянное WebSocket соединение
+                        бота.
                       </p>
                     </div>
 
@@ -368,7 +369,7 @@
                       </p>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" :class="{ 'is-disabled-block': !webhookForm.enabled }">
                       <label>События</label>
                       <div class="webhook-events-list">
                         <label
@@ -384,6 +385,10 @@
                           <span>{{ eventName }}</span>
                         </label>
                       </div>
+                      <p v-if="!webhookForm.enabled" class="field-help">
+                        События сохранены в конфигурации, но не будут доставляться, пока доставка
+                        выключена.
+                      </p>
                     </div>
 
                     <div class="test-actions">
@@ -396,7 +401,7 @@
                       </Button>
 
                       <Button
-                        v-if="isWebhookTransport"
+                        v-if="isWebhookTransport && webhookForm.enabled"
                         variant="secondary"
                         :loading="isRotatingWebhookSecret"
                         @click="handleRotateWebhookSecret"
@@ -414,7 +419,7 @@
                     </div>
 
                     <div
-                      v-if="isWebhookTransport && revealedWebhookSecret"
+                      v-if="isWebhookTransport && webhookForm.enabled && revealedWebhookSecret"
                       class="fresh-secret-banner"
                     >
                       <div class="secret-warning">
@@ -446,7 +451,7 @@
                       </div>
                     </div>
 
-                    <div v-if="isWebhookTransport" class="deliveries-block">
+                    <div v-if="isWebhookTransport && webhookForm.enabled" class="deliveries-block">
                       <h4>Последние доставки</h4>
 
                       <div v-if="isLoadingDeliveries" class="empty-urls">Загрузка доставок...</div>
@@ -898,7 +903,9 @@ const handleSaveWebhook = async () => {
   try {
     const payload = {
       webhook_url:
-        webhookForm.value.event_delivery === 'webhook' ? webhookForm.value.webhook_url.trim() : '',
+        webhookForm.value.event_delivery === 'webhook' && webhookForm.value.enabled
+          ? webhookForm.value.webhook_url.trim()
+          : '',
       command_base_url: webhookForm.value.command_base_url.trim(),
       event_delivery: webhookForm.value.event_delivery,
       subscribed_events: [...webhookForm.value.subscribed_events],
@@ -908,12 +915,19 @@ const handleSaveWebhook = async () => {
     await botsStore.updateInstallationWebhook(selectedWebhookInstallationId.value, payload)
 
     await loadInstallationWebhook()
-    await loadInstallationDeliveries()
+
+    if (webhookForm.value.event_delivery === 'webhook' && webhookForm.value.enabled) {
+      await loadInstallationDeliveries()
+    } else {
+      installationDeliveries.value = []
+      deliveryAttempts.value = {}
+      expandedDeliveryId.value = null
+    }
 
     toastStore.success(
-      webhookForm.value.event_delivery === 'websocket'
-        ? 'WebSocket Gateway конфигурация сохранена'
-        : 'Webhook конфигурация сохранена',
+      webhookForm.value.enabled
+        ? `Настройки доставки сохранены (${webhookForm.value.event_delivery === 'websocket' ? 'WebSocket Gateway' : 'Webhook'})`
+        : 'Доставка событий отключена',
     )
   } catch (err: any) {
     toastStore.error(err.message || 'Не удалось сохранить runtime конфигурацию')
@@ -1203,6 +1217,19 @@ watch(
     if (newValue === 'websocket') {
       webhookForm.value.webhook_url = ''
       revealedWebhookSecret.value = null
+    }
+  },
+)
+
+watch(
+  () => webhookForm.value.event_delivery,
+  (newValue) => {
+    if (newValue === 'websocket') {
+      webhookForm.value.webhook_url = ''
+      revealedWebhookSecret.value = null
+      installationDeliveries.value = []
+      deliveryAttempts.value = {}
+      expandedDeliveryId.value = null
     }
   },
 )
