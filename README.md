@@ -120,8 +120,30 @@
 | Delivery attempts | ✅ | таблица attempts |
 | Webhook signing (HMAC) | ✅ | X-EchoTalk-Signature |
 | Cleanup worker | ✅ | env configurable |
-| WebSocket Gateway | ❌ | не реализован |
+| WebSocket Gateway | ✅ | realtime доставка через persistent connection |
+| Gateway reconnect | ⚠️ | базово есть, требует доработки (backoff/ack) |
+| Event streaming | ✅ | message.created / updated / deleted |
+| Runtime switch (webhook/ws) | ✅ | через installation config |
 | Deadline/ack | ❌ | нет |
+
+### Runtime configuration (installation-level)
+
+| Поле | Назначение | Статус |
+|------|------------|--------|
+| RuntimeEnabled | включает/выключает доставку событий | ✅ |
+| EventDelivery | transport (`webhook` / `websocket`) | ✅ |
+| WebhookURL | endpoint для webhook | ✅ |
+| CommandBaseURL | endpoint для slash commands | ✅ |
+| SubscribedEvents | список событий | ✅ |
+
+### Логика
+
+- RuntimeEnabled = false → события НЕ доставляются ни по одному транспорту
+- RuntimeEnabled = true → используется выбранный transport
+- EventDelivery:
+  - `webhook` → HTTP POST
+  - `websocket` → realtime gateway
+- transport **всегда один активный**
 
 ### 2.5 Interactions ⚠️
 
@@ -409,8 +431,7 @@ botAPI.Use(middleware.BotAuthMiddleware())
 
 ## 9. Что не реализовано
 
-- WS/gateway delivery
-- event subscriptions [требуется расширение событий]
+- event subscriptions [4 базовые события реализованы, требуется расширение событий]
 - rate limiting
 - полная room override / advanced RBAC модель
 - metrics / analytics / quotas
@@ -446,6 +467,21 @@ P1.1.1 — retries / cleanup / UI ✅
 
 P1.2 — завершён ✅
 
+P2.1 — WebSocket Gateway runtime ✅
+
+### Ограничение текущей модели
+
+- В каждый момент времени активен только один transport:
+  - либо webhook
+  - либо websocket
+
+- Одновременная доставка в оба transport НЕ поддерживается
+
+Причины:
+- упрощение модели
+- исключение дублирования событий
+- предсказуемость runtime поведения
+
 Реализовано:
 - message.updated
 - message.deleted
@@ -456,11 +492,16 @@ P1.2 — завершён ✅
 
 ### P2 — следующий этап
 
-- interactions (buttons, components, modals)
-- расширенный runtime API
-- улучшение error handling UX
-- rate limiting / quotas
-- возможный WS runtime для ботов
+P2.2 — Gateway reliability
+- ack / resume
+- duplicate protection
+- reconnect backoff
+- last_seen / connection state
+
+P2.3 — Interactions
+- buttons
+- components
+- modals
 ---
 
 ## 11. Вывод
@@ -470,9 +511,10 @@ P1.2 — завершён ✅
 - **P0 завершён**
 - **P1.1 завершён (webhook delivery)**
 - **P1.1.1 завершён (retry, cleanup, UI)**
-- реализована полноценная webhook-based event система
+- **P2.1 завершён (webSocket gateway runtime)
+
 - Dev Portal предоставляет полный контроль над delivery
 
 Следующий этап:
 
-➡️ **P2 — interactions + расширение bot runtime**
+➡️ **P2.2 — interactions + расширение bot runtime**

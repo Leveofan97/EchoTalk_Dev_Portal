@@ -323,26 +323,43 @@
 
                   <template v-else>
                     <div class="form-group">
-                      <label class="checkbox-line">
-                        <input v-model="webhookForm.enabled" type="checkbox" />
-                        <span>Включить доставку событий</span>
-                      </label>
-                    </div>
-
-                    <div class="form-group">
-                      <label>Способ доставки</label>
-                      <select v-model="webhookForm.event_delivery" class="form-select">
-                        <option value="webhook">Webhook</option>
-                        <option value="websocket">WebSocket Gateway</option>
-                      </select>
-                      <p v-if="isWebhookTransport" class="field-help">
-                        EchoTalk будет отправлять события HTTP POST запросами на указанный Webhook
+                      <label>Режим доставки событий</label>
+                      <p class="section-desc">
+                        Выберите один способ, которым EchoTalk будет отправлять события
+                        установленному боту. Slash-команды настраиваются отдельно через Command Base
                         URL.
                       </p>
-                      <p v-else class="field-help">
-                        EchoTalk будет доставлять события через постоянное WebSocket соединение
-                        бота.
-                      </p>
+
+                      <div class="delivery-mode-list">
+                        <label class="delivery-mode-card">
+                          <input v-model="deliveryMode" type="radio" value="disabled" />
+                          <div>
+                            <strong>Выключено</strong>
+                            <p>EchoTalk не будет отправлять события этому боту.</p>
+                          </div>
+                        </label>
+
+                        <label class="delivery-mode-card">
+                          <input v-model="deliveryMode" type="radio" value="webhook" />
+                          <div>
+                            <strong>Webhook</strong>
+                            <p>
+                              EchoTalk будет отправлять события HTTP POST запросами на Webhook URL.
+                            </p>
+                          </div>
+                        </label>
+
+                        <label class="delivery-mode-card">
+                          <input v-model="deliveryMode" type="radio" value="websocket" />
+                          <div>
+                            <strong>WebSocket Gateway</strong>
+                            <p>
+                              Бот сам держит постоянное WebSocket соединение и получает события в
+                              realtime.
+                            </p>
+                          </div>
+                        </label>
+                      </div>
                     </div>
 
                     <div v-if="isWebhookTransport" class="form-group">
@@ -369,8 +386,12 @@
                       </p>
                     </div>
 
-                    <div class="form-group" :class="{ 'is-disabled-block': !webhookForm.enabled }">
+                    <div
+                      class="form-group"
+                      :class="{ 'is-disabled-block': deliveryMode === 'disabled' }"
+                    >
                       <label>События</label>
+
                       <div class="webhook-events-list">
                         <label
                           v-for="eventName in availableWebhookEvents"
@@ -385,9 +406,10 @@
                           <span>{{ eventName }}</span>
                         </label>
                       </div>
-                      <p v-if="!webhookForm.enabled" class="field-help">
-                        События сохранены в конфигурации, но не будут доставляться, пока доставка
-                        выключена.
+
+                      <p v-if="deliveryMode === 'disabled'" class="field-help">
+                        Список событий сохранится, но события не будут доставляться, пока режим
+                        доставки выключен.
                       </p>
                     </div>
 
@@ -410,6 +432,7 @@
                       </Button>
 
                       <Button
+                        v-if="isWebhookTransport && webhookForm.enabled"
                         variant="ghost"
                         :loading="isLoadingDeliveries"
                         @click="loadInstallationDeliveries"
@@ -706,11 +729,10 @@ const createDefaultWebhookForm = () => ({
 })
 
 const webhookForm = ref(createDefaultWebhookForm())
-
+type DeliveryMode = 'disabled' | 'webhook' | 'websocket'
 const availableWebhookEvents = ['message.created', 'message.updated', 'message.deleted']
 
 const isWebhookTransport = computed(() => webhookForm.value.event_delivery === 'webhook')
-const isWebsocketTransport = computed(() => webhookForm.value.event_delivery === 'websocket')
 
 const selectedWebhookInstallation = computed(() => {
   return (
@@ -802,6 +824,30 @@ const activeCredential = computed(() => {
 })
 
 // Methods
+const deliveryMode = computed<DeliveryMode>({
+  get() {
+    if (!webhookForm.value.enabled) return 'disabled'
+    return webhookForm.value.event_delivery
+  },
+  set(value) {
+    if (value === 'disabled') {
+      webhookForm.value.enabled = false
+      return
+    }
+
+    webhookForm.value.enabled = true
+    webhookForm.value.event_delivery = value
+
+    if (value === 'websocket') {
+      webhookForm.value.webhook_url = ''
+      revealedWebhookSecret.value = null
+      installationDeliveries.value = []
+      deliveryAttempts.value = {}
+      expandedDeliveryId.value = null
+    }
+  },
+})
+
 const loadInstallationWebhook = async () => {
   if (!selectedWebhookInstallationId.value) {
     installationWebhook.value = null
