@@ -325,9 +325,8 @@
                     <div class="form-group">
                       <label>Режим доставки событий</label>
                       <p class="section-desc">
-                        Выберите один способ, которым EchoTalk будет отправлять события
-                        установленному боту. Slash-команды настраиваются отдельно через Command Base
-                        URL.
+                        Выберите, как EchoTalk будет отправлять события установленному боту.
+                        Slash-команды работают отдельно через Command Base URL.
                       </p>
 
                       <div class="delivery-mode-list">
