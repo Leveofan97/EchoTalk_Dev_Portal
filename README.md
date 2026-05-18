@@ -124,7 +124,10 @@
 | Gateway reconnect | ⚠️ | базово есть, требует доработки (backoff/ack) |
 | Event streaming | ✅ | message.created / updated / deleted |
 | Runtime switch (webhook/ws) | ✅ | через installation config |
-| Deadline/ack | ❌ | нет |
+| Interaction ACK lifecycle | ✅ | pending / acked / responded / expired |
+| Interaction timeout worker | ✅ | auto-expire interactions |
+| Callback timeout | ✅ | configurable |
+| Gateway cleanup workers | ✅ | interaction/webhook/gateway cleanup |
 
 ### Runtime configuration (installation-level)
 
@@ -145,14 +148,22 @@
   - `websocket` → realtime gateway
 - transport **всегда один активный**
 
-### 2.5 Interactions ⚠️
+### 2.5 Interactions ✅
 
 | Компонент | Статус | Примечание |
 |-----------|--------|------------|
 | Slash commands | ✅ | полностью реализованы |
 | HTTP command invoke | ✅ | sync model |
-| Buttons / message components | ❌ | не реализованы |
-| Modals / interactions | ❌ | не реализованы |
+| Buttons / message components | ✅ | реализованы |
+| Interaction create flow | ✅ | `/api/messages/:messageID/interactions` |
+| Interaction ACK | ✅ | `/bot/interactions/:interactionID/ack` |
+| Interaction callback | ✅ | `/bot/interactions/:interactionID/callback` |
+| Interaction lifecycle | ✅ | pending / acked / responded / expired |
+| Ephemeral responses | ✅ | websocket-only private delivery |
+| Interaction persistence | ✅ | `bot_interactions` + `bot_interaction_responses` |
+| Frontend ephemeral UI | ✅ | system-line overlay |
+| Modals | ❌ | не реализованы |
+| Select menus | ❌ | не реализованы |
 
 ---
 
@@ -175,6 +186,10 @@
 &bots.BotOAuthAudit{},
 &bots.BotEventDelivery{},
 &bots.BotEventDeliveryAttempt{},
+&bots.BotGatewayState{},
+&bots.BotGatewayEvent{},
+&bots.BotInteraction{},
+&bots.BotInteractionResponse{},
 ```
 ### Дополнительно (P1.1)
 
@@ -202,81 +217,77 @@
 ```go
 // SetupBotRoutes регистрирует роуты для Bot Dev Portal
 func SetupBotRoutes(r *gin.Engine) {
+    stateStore := services.NewStateStore()
+
+    botsCtrl := bots.NewBotsController()
+    credsCtrl := bots.NewCredentialsController()
+    installCtrl := bots.NewInstallController()
+    webhookCtrl := bots.NewWebhookController()
+    oauthCtrl := bots.NewOAuthController(stateStore)
+    scopesCtrl := bots.NewScopesController()
+    runtimeCtrl := bots.NewRuntimeController()
+    commandsCtrl := bots.NewCommandsController()
+    gatewayCtrl := bots.NewGatewayController()
+
+    interactionDeps := NewBotInteractionDeps()
+
+    public := r.Group("/api") {
+        public.GET("/public-bots", botsCtrl.GetPublicBots)
+        public.GET("/public-bots/:id", botsCtrl.GetPublicBotInfo)
+        public.GET("/servers-for-bot-install", middleware.AuthMiddleware(), botsCtrl.GetServersForBotInstall)
+    }
+
+    dev := r.Group("/dev")
+    dev.Use(middleware.AuthMiddleware()) {
+        dev.POST("/bots", botsCtrl.Create)
+        dev.GET("/bots", botsCtrl.List)
+        dev.GET("/bots/:id", botsCtrl.Get)
+        dev.PUT("/bots/:id", botsCtrl.Update)
+        dev.POST("/bots/:id/publish", botsCtrl.PublishBot)
+        dev.DELETE("/bots/:id", botsCtrl.Delete)
+		dev.GET("/bots/available-scopes", scopesCtrl.List)
+        dev.GET("/bots/:id/credentials", credsCtrl.List)
+        dev.POST("/bots/:id/credentials", credsCtrl.Create)
+        dev.POST("/bots/:id/credentials/rotate", credsCtrl.Rotate)
+        dev.GET("/bots/:id/installations", installCtrl.GetInstallations)
+        dev.GET("/installations/:installationID/webhook", webhookCtrl.GetInstallationWebhook)
+        dev.PUT("/installations/:installationID/webhook", webhookCtrl.UpdateInstallationWebhook)
+        dev.POST("/installations/:installationID/webhook/rotate-secret", webhookCtrl.RotateInstallationSecret)
+        dev.GET("/installations/:installationID/deliveries", webhookCtrl.ListInstallationDeliveries)
+        dev.GET("/installations/:installationID/deliveries/:deliveryID/attempts", webhookCtrl.ListDeliveryAttempts)
+        dev.GET("/bots/:id/commands", commandsCtrl.List)
+        dev.POST("/bots/:id/commands", commandsCtrl.Create)
+        dev.PUT("/bots/:id/commands/:commandID", commandsCtrl.Update)
+        dev.DELETE("/bots/:id/commands/:commandID", commandsCtrl.Delete)
+    }
+
+    oauth := r.Group("/oauth"){
+        oauth.POST("/authorize", middleware.AuthMiddleware(), oauthCtrl.Authorize)
+        oauth.POST("/token", oauthCtrl.Token)
+        oauth.POST("/token/refresh", oauthCtrl.RefreshToken)
+    }
+
+    servers := r.Group("/servers/:serverID")
+    servers.Use(middleware.AuthMiddleware()) { 
+		servers.DELETE("/bots/:installation_id", installCtrl.Revoke) 
+	}
 	
-	stateStore := services.NewStateStore()
-	botsCtrl := bots.NewBotsController()
-	credsCtrl := bots.NewCredentialsController()
-	installCtrl := bots.NewInstallController()
-	webhookCtrl := bots.NewWebhookController()
-	oauthCtrl := bots.NewOAuthController(stateStore)
-	scopesCtrl := bots.NewScopesController()
-	runtimeCtrl := bots.NewRuntimeController()
-	commandsCtrl := bots.NewCommandsController()
+	botAPI := r.Group("/bot") {
+        rest := botAPI.Group("")
+        rest.Use(middleware.BotAuthMiddleware(modelbots.TokenTypeAccess)) {
+                rest.GET("/me", runtimeCtrl.Me)
+                rest.GET("/servers/:serverID", runtimeCtrl.GetServer)
+                rest.GET("/servers/:serverID/rooms", runtimeCtrl.ListRooms)
+                rest.POST("/rooms/:roomID/messages", runtimeCtrl.SendMessage)
+                rest.POST("/interactions/:interactionID/callback", interactionDeps.BotInteractionsCtrl.Callback)
+                rest.POST("/interactions/:interactionID/ack", interactionDeps.BotInteractionsCtrl.Ack)
+                rest.POST("/gateway/session", gatewayCtrl.CreateSession)
+        }
 
-// Публичные endpoints (без авторизации)
-public := r.Group("/api")
-{
-    public.GET("/public-bots", botsCtrl.GetPublicBots)  
-    public.GET("/public-bots/:id", botsCtrl.GetPublicBotInfo)
-    public.GET("/servers-for-bot-install", middleware.AuthMiddleware(), botsCtrl.GetServersForBotInstall)
-}
-
-// === Dev Portal API (требует авторизации пользователя) ===
-dev := r.Group("/dev")
-dev.Use(middleware.AuthMiddleware())
-{
-// Bots CRUD
-    dev.POST("/bots", botsCtrl.Create)
-    dev.GET("/bots", botsCtrl.List)
-    dev.GET("/bots/:id", botsCtrl.Get)
-    dev.PUT("/bots/:id", botsCtrl.Update)
-    dev.POST("/bots/:id/publish", botsCtrl.PublishBot)
-    dev.DELETE("/bots/:id", botsCtrl.Delete)
-
-    dev.GET("/bots/available-scopes", scopesCtrl.List)
-
-    dev.GET("/bots/:id/credentials", credsCtrl.List)
-    dev.POST("/bots/:id/credentials", credsCtrl.Create)
-    dev.POST("/bots/:id/credentials/rotate", credsCtrl.Rotate)
-
-    // Installations (для владельца бота)
-    dev.GET("/bots/:id/installations", installCtrl.GetInstallations)
-
-    // Webhooks
-    dev.GET("/installations/:installationID/webhook", webhookCtrl.GetInstallationWebhook)
-    dev.PUT("/installations/:installationID/webhook", webhookCtrl.UpdateInstallationWebhook)
-    dev.POST("/installations/:installationID/webhook/rotate-secret", webhookCtrl.RotateInstallationSecret)
-    dev.GET("/installations/:installationID/deliveries", webhookCtrl.ListInstallationDeliveries)
-    dev.GET("/installations/:installationID/deliveries/:deliveryID/attempts", webhookCtrl.ListDeliveryAttempts)
-
-    // Commands
-    dev.GET("/bots/:id/commands", commandsCtrl.List)
-    dev.POST("/bots/:id/commands", commandsCtrl.Create)
-    dev.PUT("/bots/:id/commands/:commandID", commandsCtrl.Update)
-    dev.DELETE("/bots/:id/commands/:commandID", commandsCtrl.Delete)
-}
-
-oauth := r.Group("/oauth")
-{
-    oauth.POST("/authorize", middleware.AuthMiddleware(), oauthCtrl.Authorize)
-    oauth.POST("/token", oauthCtrl.Token)
-    oauth.POST("/token/refresh", oauthCtrl.RefreshToken)
-}
-
-servers := r.Group("/servers/:serverID")
-servers.Use(middleware.AuthMiddleware())
-{
-    servers.DELETE("/bots/:installation_id", installCtrl.Revoke)
-}
-
-// === Bot API (требует Bot Token) ===
-botAPI := r.Group("/bot")
-botAPI.Use(middleware.BotAuthMiddleware())
-    {
-        botAPI.GET("/me", runtimeCtrl.Me)
-        botAPI.GET("/servers/:serverID", runtimeCtrl.GetServer)
-        botAPI.GET("/servers/:serverID/rooms", runtimeCtrl.ListRooms)
-        botAPI.POST("/rooms/:roomID/messages", runtimeCtrl.SendMessage)
+        gateway := botAPI.Group("")
+        gateway.Use(middleware.BotAuthMiddleware(modelbots.TokenTypeSession)) {
+                gateway.GET("/gateway/ws", gatewayCtrl.Connect)
+		}
     }
 }
 ```
@@ -358,7 +369,9 @@ botAPI.Use(middleware.BotAuthMiddleware())
 | Attempts логирование | ✅ |
 | Подписки на события | ✅ |
 | Webhook signing | ✅ |
-| WS / Gateway | ❌ |
+| WS / Gateway | ✅ |
+| Interaction runtime events | ✅ |
+| interaction.created | ✅ |
 
 ### 6.5 Slash Commands ✅
 
@@ -370,6 +383,20 @@ botAPI.Use(middleware.BotAuthMiddleware())
 | Runtime resolve команды | ✅ |
 | HTTP invoke в бота | ✅ |
 | Ответ бота → сообщение в чат | ✅ |
+
+### 6.6 Interactions ✅
+
+| Шаг | Статус |
+|-----|--------|
+| Button components в сообщениях | ✅ |
+| Runtime interaction create | ✅ |
+| interaction.created event | ✅ |
+| ACK endpoint | ✅ |
+| Callback endpoint | ✅ |
+| Interaction timeout lifecycle | ✅ |
+| Interaction persistence | ✅ |
+| Ephemeral responses | ✅ |
+| Frontend ephemeral rendering | ✅ |
 
 ---
 
@@ -389,6 +416,8 @@ botAPI.Use(middleware.BotAuthMiddleware())
 | Webhook signing | ✅ | HMAC signature |
 | Idempotency/request_id | ⚠️ | delivery_id используется, но строгой гарантии нет |
 | Retry защита | ✅ | backoff + max_attempts |
+| Interaction replay protection | ✅ | interaction lifecycle validation |
+| Interaction expiration | ✅ | background timeout worker |
 
 ---
 
@@ -412,6 +441,12 @@ botAPI.Use(middleware.BotAuthMiddleware())
 - обрабатывать retry delivery
 - проверять подпись webhook
 - видеть deliveries и attempts в Dev Portal
+- отправлять bot messages с buttons/components
+- получать interaction.created
+- ACK interaction
+- callback response
+- ephemeral responses
+- private ephemeral websocket delivery
 
 ### Как пользователь/администратор сервера
 - открыть публичную карточку бота
@@ -438,8 +473,11 @@ botAPI.Use(middleware.BotAuthMiddleware())
 - hosted runtime / billing / releases
 - event versioning (частично)
 - idempotency гарантия
-- buttons / message components
-- modals / interactions
+- modals
+- select menus
+- multi-step interaction flows
+- interaction editing/update API
+- ephemeral persistence cleanup policy
 
 ---
 
@@ -490,18 +528,24 @@ P2.1 — WebSocket Gateway runtime ✅
 - command runtime (HTTP invoke)
 - разделение webhook / command base URL
 
-### P2 — следующий этап
+P2.2 — Interactions MVP ✅ partially completed
 
-P2.2 — Gateway reliability
-- ack / resume
-- duplicate protection
-- reconnect backoff
-- last_seen / connection state
-
-P2.3 — Interactions
+Реализовано:
 - buttons
-- components
+- message components
+- interaction runtime
+- interaction ACK/callback lifecycle
+- ephemeral responses
+- interaction persistence
+- websocket ephemeral delivery
+
+Осталось:
 - modals
+- select menus
+- deferred interaction updates
+- interaction editing
+- advanced interaction state machine
+
 ---
 
 ## 11. Вывод
@@ -512,9 +556,19 @@ P2.3 — Interactions
 - **P1.1 завершён (webhook delivery)**
 - **P1.1.1 завершён (retry, cleanup, UI)**
 - **P2.1 завершён (webSocket gateway runtime)
+- **P2.2 завершён (Interactions)
 
 - Dev Portal предоставляет полный контроль над delivery
 
-Следующий этап:
+➡️ Следующий этап:
 
-➡️ **P2.2 — interactions + расширение bot runtime**
+P2.2 continuation:
+- modals
+- select menus
+- interaction editing/update flow
+
+P2.3:
+- gateway reliability hardening
+- resume/ack synchronization
+- duplicate protection
+- reconnect backoff
