@@ -15,49 +15,49 @@
 
     <div v-else-if="status" class="gateway-grid">
       <div class="gateway-row">
-        <span>Status</span>
+        <span>Статус подключения</span>
         <Badge :variant="statusBadgeVariant" size="sm">
-          {{ status.status }}
+          {{ humanStatus }}
         </Badge>
       </div>
 
       <div class="gateway-row">
-        <span>Backlog</span>
+        <span>Событий в очереди</span>
         <strong>{{ status.backlog_count ?? 0 }}</strong>
       </div>
 
       <div class="gateway-row">
-        <span>Last issued seq</span>
-        <strong>{{ status.last_issued_seq ?? 0 }}</strong>
+        <span>Последнее отправленное событие</span>
+        <strong>#{{ status.last_issued_seq ?? 0 }}</strong>
       </div>
 
       <div class="gateway-row">
-        <span>Last acked seq</span>
-        <strong>{{ status.last_acked_seq ?? 0 }}</strong>
+        <span>Последнее подтверждённое событие</span>
+        <strong>#{{ status.last_acked_seq ?? 0 }}</strong>
       </div>
 
       <div class="gateway-row">
-        <span>Last seen</span>
+        <span>Последняя активность</span>
         <strong>{{ formatDate(status.last_seen_at) }}</strong>
       </div>
 
       <div class="gateway-row">
-        <span>Last acked</span>
+        <span>Последнее подтверждение доставки</span>
         <strong>{{ formatDate(status.last_acked_at) }}</strong>
       </div>
 
       <div class="gateway-row">
-        <span>Connected</span>
+        <span>Подключение установлено</span>
         <strong>{{ formatDate(status.last_connected_at) }}</strong>
       </div>
 
       <div class="gateway-row">
-        <span>Disconnected</span>
+        <span>Последний раз отключался</span>
         <strong>{{ formatDate(status.last_disconnected_at) }}</strong>
       </div>
 
       <div class="gateway-connection-id">
-        <span>Connection ID</span>
+        <span>ID подключения Gateway</span>
         <code>{{ status.last_connection_id || '—' }}</code>
       </div>
     </div>
@@ -91,6 +91,19 @@ const statusBadgeVariant = computed(() => {
   }
 })
 
+const humanStatus = computed(() => {
+  switch (status.value?.status) {
+    case 'connected':
+      return 'Подключен'
+
+    case 'disconnected':
+      return 'Отключен'
+
+    default:
+      return 'Нет подключения'
+  }
+})
+
 const formatDate = (value?: string | null) => {
   if (!value) return '—'
   return new Date(value).toLocaleString()
@@ -103,8 +116,9 @@ const load = async () => {
   error.value = null
 
   try {
-    const data = await botsApi.getInstallationGatewayStatus(props.installationId)
-    status.value = data
+    const response = await botsApi.getInstallationGatewayStatus(props.installationId)
+
+    status.value = response?.data ?? response
   } catch (err: any) {
     error.value = err.message || 'Не удалось загрузить Gateway Status'
   } finally {

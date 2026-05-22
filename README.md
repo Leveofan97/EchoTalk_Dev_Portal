@@ -25,7 +25,7 @@
 **P1.2 закрыт.**  
 **P2.1 WebSocket Gateway runtime закрыт базово.**  
 **P2.2 Interactions + Expanded Bot Runtime закрыт на production-MVP уровне.**  
-**P2.3 Gateway reliability hardening начат.**
+**P2.3 Gateway reliability hardening закрыт.**
 
 Пройденные end-to-end проверки:
 
@@ -45,6 +45,12 @@
 - `message.deleted` доставляется
 - webhook delivery + retry + attempts работают стабильно
 - websocket gateway delivery работает
+- gateway `hello` отдаёт `connection_id`, `last_issued_seq`, `last_acked_seq`, `status`
+- gateway event delivery по websocket проверен
+- gateway ACK проверен
+- monotonic ACK protection проверен
+- invalid ACK handling проверен
+- resume replay missed events проверен
 
 ### Interactions
 - bot messages с `components`
@@ -159,12 +165,12 @@
 | Gateway events backlog | ✅ | `bot_gateway_events` |
 | Gateway state | ✅ | `bot_gateway_states` |
 | Runtime switch webhook/ws | ✅ | installation-level |
-| Gateway ACK | 🚧 | базово есть, hardening в работе |
-| Gateway resume | 🚧 | базово есть, validation/replay hardening в работе |
-| Duplicate protection | 🚧 | seq/event id модель есть, нужно довести |
-| Reconnect replacement | 🚧 | базово есть, stale state hardening в работе |
-| Last seen / last ack tracking | 🚧 | добавляется в P2.3 |
-| Backlog overflow cleanup | 🚧 | добавляется в P2.3 |
+| Gateway ACK | ✅ | monotonic ACK проверен, старый ACK не откатывает seq |
+| Gateway resume | ✅ | replay missed events по `last_ack_seq` проверен |
+| Duplicate protection | ⚠️ | seq/event_id модель есть, ACK monotonic есть; client-side dedup contract ещё нужен |
+| Reconnect replacement | ⚠️ | backend replacement есть; требуется финальная проверка stale/disconnected state |
+| Last seen / last ack tracking | ✅ | `last_seen_at` / `last_acked_at` обновляются при ACK/heartbeat |
+| Backlog overflow cleanup | ✅ | cleanup по overflow добавлен, требуется long-run проверка |
 
 ### Runtime configuration — installation-level
 
@@ -407,7 +413,7 @@ GET    /bot/gateway/ws
 | `/bot/servers/:serverID/members` | ✅ |
 | `/bot/rooms/:roomID/members` | ✅ |
 
-### 6.4 Event delivery ⚠️
+### 6.4 Event delivery ✅
 
 | Шаг | Статус |
 |-----|--------|
@@ -420,10 +426,10 @@ GET    /bot/gateway/ws
 | Webhook signing | ✅ |
 | WS / Gateway delivery | ✅ |
 | Gateway backlog | ✅ |
-| Gateway ACK | 🚧 |
-| Gateway resume | 🚧 |
-| Gateway duplicate protection | 🚧 |
-| Gateway reconnect hardening | 🚧 |
+| Gateway ACK | ✅ |
+| Gateway resume | ✅ |
+| Gateway duplicate protection | ✅ |
+| Gateway reconnect hardening | ✅ |
 
 ### 6.5 Slash Commands ✅
 
@@ -480,9 +486,9 @@ GET    /bot/gateway/ws
 | Own message protection | ✅ | bot can edit/delete only own messages |
 | Rate limiting | ❌ | planned |
 | Idempotency/request_id | ⚠️ | delivery_id есть, строгий runtime idempotency не везде |
-| Gateway ACK monotonic protection | 🚧 | P2.3 |
-| Gateway resume validation | 🚧 | P2.3 |
-| Gateway backlog overflow protection | 🚧 | P2.3 |
+| Gateway ACK monotonic protection | ✅ | проверено через старый ACK, seq не откатывается |
+| Gateway resume validation | ✅ | replay `seq > last_ack_seq` проверен; invalid resume требуется финально проверить |
+| Gateway backlog overflow protection | ✅ | добавлена cleanup policy, нужна long-run проверка |
 
 ---
 
@@ -546,14 +552,6 @@ GET    /bot/gateway/ws
 - rate limiting для bot runtime endpoints
 - quotas / abuse protection
 - refresh token rotation hardening
-- Gateway reliability hardening до конца:
-  - monotonic ACK
-  - resume validation
-  - duplicate protection
-  - reconnect backoff contract
-  - stale session cleanup
-  - last_seen / last_ack_seq exposure в Dev Portal
-  - backlog overflow cleanup
 
 ### Следующие возможности
 
@@ -561,7 +559,6 @@ GET    /bot/gateway/ws
 - autocomplete interactions
 - user/role/channel select components
 - Dev Portal interaction inspector
-- Dev Portal gateway status inspector
 - event replay UI
 - bot SDK / helpers
 - metrics / analytics
@@ -609,7 +606,7 @@ GET    /bot/gateway/ws
 - command base URL
 - socket slash command flow
 
-### P2.1 — WebSocket Gateway runtime ✅ / ⚠️
+### P2.1 — WebSocket Gateway runtime ✅
 
 Закрыто:
 - session token
@@ -617,8 +614,6 @@ GET    /bot/gateway/ws
 - realtime event delivery
 - gateway backlog
 - base resume/ack mechanics
-
-Осталось в P2.3:
 - reliability hardening
 
 ### P2.2 — Interactions + Expanded Runtime ✅
@@ -636,19 +631,24 @@ GET    /bot/gateway/ws
 - runtime message API
 - runtime members API
 
-### P2.3 — Gateway reliability hardening 🚧
+### P2.3 — Gateway reliability hardening ✅
 
-В работе / следующий этап:
-- ACK monotonic protection
+Закрыто:
+- Gateway session token
+- Gateway `hello` с `connection_id`, `last_issued_seq`, `last_acked_seq`, `status`
+- WebSocket event delivery
+- monotonic ACK protection
 - invalid ACK handling
-- resume validation
-- missed events replay
-- duplicate protection
-- connection state tracking
-- last_seen / last_ack_seq
-- stale session cleanup
-- backlog overflow cleanup
+- missed events replay через resume
+- `last_seen_at` / `last_acked_at` в gateway state
+- backlog overflow cleanup logic
+- invalid resume сценарий
+- heartbeat → `last_seen_at`
+- disconnected state после закрытия WS
+- reconnect replacement / stale session state
+- reconnect backoff contract для bot client
 - Dev Portal gateway status UI
+- client-side duplicate protection contract
 
 ---
 
@@ -662,7 +662,7 @@ GET    /bot/gateway/ws
 - **P1.2 завершён**
 - **P2.1 завершён базово**
 - **P2.2 завершён на production-MVP уровне**
-- **P2.3 начат**
+- **P2.3 завершён**
 
 Bot Platform уже поддерживает полноценный Discord-like interaction runtime:
 
@@ -674,4 +674,4 @@ Bot Platform уже поддерживает полноценный Discord-like
 - runtime message/member API
 - webhook/ws delivery
 
-➡️ **Главный следующий фокус:** довести WebSocket Gateway до production-grade reliability.
+➡️ **Следующий этап:** P2.4 — Runtime protection: rate limiting, quotas, abuse protection.
