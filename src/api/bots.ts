@@ -145,6 +145,19 @@ export interface UpdateBotCommandPayload {
   is_enabled?: boolean
 }
 
+export interface InstallationGatewayStatus {
+  installation_id: number
+  status: 'connected' | 'disconnected' | 'not_connected'
+  last_connection_id?: string
+  last_issued_seq?: number
+  last_acked_seq?: number
+  backlog_count: number
+  last_seen_at?: string | null
+  last_acked_at?: string | null
+  last_connected_at?: string | null
+  last_disconnected_at?: string | null
+}
+
 export const botsApi = {
   // === ПУБЛИЧНЫЕ (без авторизации) ===
   getPublicBots: () => api.get<PublicBotInfo[]>('/api/public-bots'),
@@ -198,6 +211,9 @@ export const botsApi = {
     api.get<ServerForInstall[]>(`/api/servers-for-bot-install?bot_id=${botId}`),
 
   getAvailableScopes: () => api.get<BotAvailableScope[]>('/dev/bots/available-scopes'),
+
+  getInstallationGatewayStatus: (installationId: string | number) =>
+    api.get<InstallationGatewayStatus>(`/dev/installations/${installationId}/gateway/status`),
 
   authorizeBot: (data: {
     client_id: string

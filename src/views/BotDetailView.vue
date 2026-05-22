@@ -473,6 +473,13 @@
                       </div>
                     </div>
 
+                    <GatewayStatusCard
+                      v-if="
+                        selectedWebhookInstallationId && webhookForm.event_delivery === 'websocket'
+                      "
+                      :installation-id="Number(selectedWebhookInstallationId)"
+                    />
+
                     <div v-if="isWebhookTransport && webhookForm.enabled" class="deliveries-block">
                       <h4>Последние доставки</h4>
 
@@ -678,6 +685,7 @@ import Badge from '@/components/ui/Badge.vue'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
 import CredentialCard from '@/components/bots/CredentialCard.vue'
 import InstallationCard from '@/components/bots/InstallationCard.vue'
+import GatewayStatusCard from '@/components/bots/GatewayStatusCard.vue'
 import EditBotModal from '@/components/bots/EditBotModal.vue'
 import type { BotApp, BotCredential, BotCommand } from '@/types'
 import {
