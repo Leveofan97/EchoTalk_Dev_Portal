@@ -117,7 +117,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
-import { botsApi, type BotRuntimeLimit, type BotRuntimeProtectionStats } from '@/api/bots'
+import { botsApi, type BotRuntimeProtectionStats, type BotRuntimeLimits } from '@/api/bots'
 
 const props = defineProps<{
   installationId: number | string
@@ -125,7 +125,7 @@ const props = defineProps<{
 
 const loading = ref(false)
 const error = ref('')
-const limits = ref<BotRuntimeLimit | null>(null)
+const limits = ref<BotRuntimeLimits | null>(null)
 const stats = ref<BotRuntimeProtectionStats | null>(null)
 
 const humanStatus = computed(() => {
