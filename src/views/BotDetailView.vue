@@ -592,6 +592,125 @@
               </div>
             </Card>
 
+            <Card v-if="selectedWebhookInstallation" class="section-card runtime-protection-card">
+              <div class="section-header runtime-protection-header">
+                <div>
+                  <h2>🛡️ Runtime Protection</h2>
+                  <p class="section-desc">
+                    Защита runtime API от flood, burst-нагрузки и reconnect abuse. Параметры
+                    отображаются только для диагностики; ручная разблокировка владельцем бота
+                    недоступна.
+                  </p>
+                </div>
+
+                <div class="runtime-protection-actions">
+                  <Badge :variant="runtimeProtectionStatusVariant" size="sm">
+                    {{ runtimeProtectionStatusLabel }}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    :loading="isLoadingRuntimeProtection"
+                    @click="loadRuntimeProtection"
+                  >
+                    Обновить
+                  </Button>
+                </div>
+              </div>
+
+              <div v-if="runtimeProtectionError" class="runtime-protection-error">
+                {{ runtimeProtectionError }}
+              </div>
+
+              <div v-else-if="isLoadingRuntimeProtection && !runtimeLimits" class="empty-urls">
+                Загрузка Runtime Protection...
+              </div>
+
+              <template v-else-if="runtimeLimits">
+                <div v-if="runtimeStats?.blocked" class="runtime-blocked-banner">
+                  <strong>Installation временно ограничена</strong>
+                  <span>До: {{ formatDate(runtimeStats.blocked_until) }}</span>
+                  <span
+                    >Причина:
+                    {{ runtimeStats.block_reason || runtimeLimits.block_reason || '—' }}</span
+                  >
+                  <span>Retry after: {{ runtimeStats.retry_after_sec }} сек.</span>
+                </div>
+
+                <div class="runtime-protection-summary">
+                  <div class="runtime-summary-item">
+                    <span>Protection</span>
+                    <strong>{{ runtimeLimits.enabled ? 'Включено' : 'Отключено' }}</strong>
+                  </div>
+                  <div class="runtime-summary-item">
+                    <span>Violations</span>
+                    <strong>
+                      {{ runtimeStats?.violation_count ?? 0 }} /
+                      {{ runtimeStats?.violation_limit || runtimeLimits.violation_limit }}
+                    </strong>
+                    <div class="runtime-progress">
+                      <div :style="{ width: `${runtimeViolationPercent}%` }"></div>
+                    </div>
+                  </div>
+                  <div class="runtime-summary-item">
+                    <span>Violation reset</span>
+                    <strong>{{ formatDate(runtimeStats?.violation_reset_at) }}</strong>
+                  </div>
+                </div>
+
+                <div class="runtime-limits-grid">
+                  <div class="runtime-limit-row">
+                    <span>Запросов в минуту</span>
+                    <strong>{{ runtimeLimits.requests_per_minute }}</strong>
+                  </div>
+                  <div class="runtime-limit-row">
+                    <span>Сообщений в минуту</span>
+                    <strong>{{ runtimeLimits.messages_per_minute }}</strong>
+                  </div>
+                  <div class="runtime-limit-row">
+                    <span>Действий в минуту</span>
+                    <strong>{{ runtimeLimits.interactions_per_minute }}</strong>
+                  </div>
+                  <div class="runtime-limit-row">
+                    <span>Сессий в минуту</span>
+                    <strong>{{ runtimeLimits.gateway_sessions_per_minute }}</strong>
+                  </div>
+                  <div class="runtime-limit-row">
+                    <span>Поключений в минуту</span>
+                    <strong>{{ runtimeLimits.gateway_connections_per_minute }}</strong>
+                  </div>
+                  <div class="runtime-limit-row">
+                    <span>Message burst</span>
+                    <strong>
+                      {{ runtimeLimits.burst_messages_limit }} /
+                      {{ runtimeLimits.burst_messages_window_sec }} сек.
+                    </strong>
+                  </div>
+                  <div class="runtime-limit-row">
+                    <span>Interaction burst</span>
+                    <strong>
+                      {{ runtimeLimits.burst_interactions_limit }} /
+                      {{ runtimeLimits.burst_interactions_window_sec }} сек.
+                    </strong>
+                  </div>
+                  <div class="runtime-limit-row">
+                    <span>Автоматическая блокировка</span>
+                    <strong>{{ runtimeLimits.auto_block_duration_sec }} сек.</strong>
+                  </div>
+                </div>
+
+                <p class="runtime-protection-note">
+                  Разблокировка и изменение защитных лимитов должны выполняться только оператором
+                  платформы или внутренним admin tooling, чтобы бот не мог обходить abuse
+                  protection.
+                </p>
+              </template>
+
+              <div v-else class="empty-urls">
+                Выберите активную установку, чтобы увидеть Runtime Protection.
+              </div>
+            </Card>
+
             <!-- Quick Stats -->
             <Card class="section-card stats-card">
               <div class="quick-stats">
@@ -714,6 +833,11 @@ const isRotatingWebhookSecret = ref(false)
 const isLoadingDeliveries = ref(false)
 const revealedWebhookSecret = ref<string | null>(null)
 
+const runtimeLimits = ref<BotRuntimeLimits | null>(null)
+const runtimeStats = ref<BotRuntimeProtectionStats | null>(null)
+const isLoadingRuntimeProtection = ref(false)
+const runtimeProtectionError = ref<string | null>(null)
+
 const commands = ref<BotCommand[]>([])
 const isLoadingCommands = ref(false)
 const isSavingCommand = ref(false)
@@ -818,6 +942,28 @@ const activeInstallations = computed(() => {
   return installations.value.filter((i) => i.status === 'active').length
 })
 
+const runtimeProtectionStatusLabel = computed(() => {
+  if (!runtimeLimits.value) return 'Не загружено'
+  if (runtimeStats.value?.blocked) return 'Временно ограничен'
+  if (!runtimeLimits.value.enabled) return 'Отключено'
+  return 'Активно'
+})
+
+const runtimeProtectionStatusVariant = computed(() => {
+  if (!runtimeLimits.value) return 'secondary'
+  if (runtimeStats.value?.blocked) return 'error'
+  if (!runtimeLimits.value.enabled) return 'secondary'
+  return 'success'
+})
+
+const runtimeViolationPercent = computed(() => {
+  const limit = runtimeStats.value?.violation_limit || runtimeLimits.value?.violation_limit || 0
+  const count = runtimeStats.value?.violation_count || 0
+
+  if (!limit) return 0
+  return Math.min(100, Math.round((count / limit) * 100))
+})
+
 const allowedScopes = computed(() => {
   return bot.value?.scopes || []
 })
@@ -854,6 +1000,37 @@ const deliveryMode = computed<DeliveryMode>({
     }
   },
 })
+
+const clearRuntimeProtectionState = () => {
+  runtimeLimits.value = null
+  runtimeStats.value = null
+  runtimeProtectionError.value = null
+}
+
+const loadRuntimeProtection = async () => {
+  if (!selectedWebhookInstallationId.value) {
+    clearRuntimeProtectionState()
+    return
+  }
+
+  isLoadingRuntimeProtection.value = true
+  runtimeProtectionError.value = null
+
+  try {
+    const [limits, stats] = await Promise.all([
+      botsApi.getInstallationRuntimeLimits(selectedWebhookInstallationId.value),
+      botsApi.getInstallationRuntimeProtectionStats(selectedWebhookInstallationId.value),
+    ])
+
+    runtimeLimits.value = limits
+    runtimeStats.value = stats
+  } catch (err: any) {
+    runtimeProtectionError.value =
+      err?.response?.data?.error || err?.message || 'Не удалось загрузить Runtime Protection'
+  } finally {
+    isLoadingRuntimeProtection.value = false
+  }
+}
 
 const loadInstallationWebhook = async () => {
   if (!selectedWebhookInstallationId.value) {
@@ -1262,6 +1439,11 @@ const handleToggleCommand = async (command: BotCommand) => {
   } catch (err: any) {
     toastStore.error(err.message || 'Не удалось изменить состояние команды')
   }
+}
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '—'
+  return new Date(value).toLocaleString()
 }
 
 watch(

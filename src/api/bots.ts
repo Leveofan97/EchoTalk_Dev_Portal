@@ -158,6 +158,48 @@ export interface InstallationGatewayStatus {
   last_disconnected_at?: string | null
 }
 
+export interface BotRuntimeLimits {
+  id: number
+  installation_id: number
+  enabled: boolean
+
+  requests_per_minute: number
+  messages_per_minute: number
+  interactions_per_minute: number
+  gateway_sessions_per_minute: number
+  gateway_connections_per_minute: number
+
+  messages_per_day?: number
+  interactions_per_day?: number
+  gateway_events_per_day?: number
+
+  burst_messages_limit: number
+  burst_messages_window_sec: number
+  burst_interactions_limit: number
+  burst_interactions_window_sec: number
+
+  violation_limit: number
+  violation_window_sec: number
+  auto_block_duration_sec: number
+
+  blocked_until?: string | null
+  block_reason?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface BotRuntimeProtectionStats {
+  installation_id: number
+  blocked: boolean
+  blocked_until?: string | null
+  block_reason?: string
+  retry_after_sec: number
+  violation_count: number
+  violation_limit: number
+  violation_window_sec: number
+  violation_reset_at?: string
+}
+
 export const botsApi = {
   // === ПУБЛИЧНЫЕ (без авторизации) ===
   getPublicBots: () => api.get<PublicBotInfo[]>('/api/public-bots'),
@@ -214,6 +256,14 @@ export const botsApi = {
 
   getInstallationGatewayStatus: (installationId: string | number) =>
     api.get<InstallationGatewayStatus>(`/dev/installations/${installationId}/gateway/status`),
+
+  getInstallationRuntimeLimits: (installationId: string | number) =>
+    api.get<BotRuntimeLimits>(`/dev/installations/${installationId}/runtime-limits`),
+
+  getInstallationRuntimeProtectionStats: (installationId: string | number) =>
+    api.get<BotRuntimeProtectionStats>(
+      `/dev/installations/${installationId}/runtime-protection/stats`,
+    ),
 
   authorizeBot: (data: {
     client_id: string
