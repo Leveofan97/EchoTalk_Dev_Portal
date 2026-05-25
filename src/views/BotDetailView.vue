@@ -473,13 +473,6 @@
                       </div>
                     </div>
 
-                    <GatewayStatusCard
-                      v-if="
-                        selectedWebhookInstallationId && webhookForm.event_delivery === 'websocket'
-                      "
-                      :installation-id="Number(selectedWebhookInstallationId)"
-                    />
-
                     <div v-if="isWebhookTransport && webhookForm.enabled" class="deliveries-block">
                       <h4>Последние доставки</h4>
 
@@ -592,122 +585,19 @@
               </div>
             </Card>
 
-            <Card v-if="selectedWebhookInstallation" class="section-card runtime-protection-card">
-              <div class="section-header runtime-protection-header">
-                <div>
-                  <h2>🛡️ Runtime Protection</h2>
-                  <p class="section-desc">
-                    Защита runtime API от flood, burst-нагрузки и reconnect abuse. Параметры
-                    отображаются только для диагностики; ручная разблокировка владельцем бота
-                    недоступна.
-                  </p>
-                </div>
-
-                <div class="runtime-protection-actions">
-                  <Badge :variant="runtimeProtectionStatusVariant" size="sm">
-                    {{ runtimeProtectionStatusLabel }}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    :loading="isLoadingRuntimeProtection"
-                    @click="loadRuntimeProtection"
-                  >
-                    Обновить
-                  </Button>
-                </div>
+            <!-- Danger Zone -->
+            <Card class="section-card danger-card">
+              <div class="section-header">
+                <h2>🗑️ Опасная зона</h2>
               </div>
-
-              <div v-if="runtimeProtectionError" class="runtime-protection-error">
-                {{ runtimeProtectionError }}
-              </div>
-
-              <div v-else-if="isLoadingRuntimeProtection && !runtimeLimits" class="empty-urls">
-                Загрузка Runtime Protection...
-              </div>
-
-              <template v-else-if="runtimeLimits">
-                <div v-if="runtimeStats?.blocked" class="runtime-blocked-banner">
-                  <strong>Installation временно ограничена</strong>
-                  <span>До: {{ formatDate(runtimeStats.blocked_until) }}</span>
-                  <span
-                    >Причина:
-                    {{ runtimeStats.block_reason || runtimeLimits.block_reason || '—' }}</span
-                  >
-                  <span>Retry after: {{ runtimeStats.retry_after_sec }} сек.</span>
+              <div class="danger-actions">
+                <div class="danger-item">
+                  <div>
+                    <h4>Удалить бота</h4>
+                    <p>Это действие нельзя отменить. Все данные будут удалены.</p>
+                  </div>
+                  <Button variant="error" @click="handleDeleteBot"> Удалить </Button>
                 </div>
-
-                <div class="runtime-protection-summary">
-                  <div class="runtime-summary-item">
-                    <span>Protection</span>
-                    <strong>{{ runtimeLimits.enabled ? 'Включено' : 'Отключено' }}</strong>
-                  </div>
-                  <div class="runtime-summary-item">
-                    <span>Violations</span>
-                    <strong>
-                      {{ runtimeStats?.violation_count ?? 0 }} /
-                      {{ runtimeStats?.violation_limit || runtimeLimits.violation_limit }}
-                    </strong>
-                    <div class="runtime-progress">
-                      <div :style="{ width: `${runtimeViolationPercent}%` }"></div>
-                    </div>
-                  </div>
-                  <div class="runtime-summary-item">
-                    <span>Violation reset</span>
-                    <strong>{{ formatDate(runtimeStats?.violation_reset_at) }}</strong>
-                  </div>
-                </div>
-
-                <div class="runtime-limits-grid">
-                  <div class="runtime-limit-row">
-                    <span>Запросов в минуту</span>
-                    <strong>{{ runtimeLimits.requests_per_minute }}</strong>
-                  </div>
-                  <div class="runtime-limit-row">
-                    <span>Сообщений в минуту</span>
-                    <strong>{{ runtimeLimits.messages_per_minute }}</strong>
-                  </div>
-                  <div class="runtime-limit-row">
-                    <span>Действий в минуту</span>
-                    <strong>{{ runtimeLimits.interactions_per_minute }}</strong>
-                  </div>
-                  <div class="runtime-limit-row">
-                    <span>Сессий в минуту</span>
-                    <strong>{{ runtimeLimits.gateway_sessions_per_minute }}</strong>
-                  </div>
-                  <div class="runtime-limit-row">
-                    <span>Поключений в минуту</span>
-                    <strong>{{ runtimeLimits.gateway_connections_per_minute }}</strong>
-                  </div>
-                  <div class="runtime-limit-row">
-                    <span>Message burst</span>
-                    <strong>
-                      {{ runtimeLimits.burst_messages_limit }} /
-                      {{ runtimeLimits.burst_messages_window_sec }} сек.
-                    </strong>
-                  </div>
-                  <div class="runtime-limit-row">
-                    <span>Interaction burst</span>
-                    <strong>
-                      {{ runtimeLimits.burst_interactions_limit }} /
-                      {{ runtimeLimits.burst_interactions_window_sec }} сек.
-                    </strong>
-                  </div>
-                  <div class="runtime-limit-row">
-                    <span>Автоматическая блокировка</span>
-                    <strong>{{ runtimeLimits.auto_block_duration_sec }} сек.</strong>
-                  </div>
-                </div>
-
-                <p class="runtime-protection-note">
-                  Разблокировка и изменение защитных лимитов должны выполняться только оператором
-                  платформы или внутренним admin tooling, чтобы бот не мог обходить abuse
-                  protection.
-                </p>
-              </template>
-
-              <div v-else class="empty-urls">
-                Выберите активную установку, чтобы увидеть Runtime Protection.
               </div>
             </Card>
 
@@ -728,23 +618,16 @@
                 </div>
               </div>
             </Card>
-
-            <!-- Danger Zone -->
-            <Card class="section-card danger-card">
-              <div class="section-header">
-                <h2>🗑️ Опасная зона</h2>
-              </div>
-              <div class="danger-actions">
-                <div class="danger-item">
-                  <div>
-                    <h4>Удалить бота</h4>
-                    <p>Это действие нельзя отменить. Все данные будут удалены.</p>
-                  </div>
-                  <Button variant="error" @click="handleDeleteBot"> Удалить </Button>
-                </div>
-              </div>
-            </Card>
           </div>
+          <RuntimeProtectionCard
+            v-if="selectedWebhookInstallationId"
+            :installation-id="Number(selectedWebhookInstallationId)"
+          />
+
+          <GatewayStatusCard
+            v-if="selectedWebhookInstallationId && webhookForm.event_delivery === 'websocket'"
+            :installation-id="Number(selectedWebhookInstallationId)"
+          />
         </div>
       </div>
     </div>
@@ -805,6 +688,7 @@ import ToastContainer from '@/components/ui/ToastContainer.vue'
 import CredentialCard from '@/components/bots/CredentialCard.vue'
 import InstallationCard from '@/components/bots/InstallationCard.vue'
 import GatewayStatusCard from '@/components/bots/GatewayStatusCard.vue'
+import RuntimeProtectionCard from '@/components/bots/RuntimeProtectionCard.vue'
 import EditBotModal from '@/components/bots/EditBotModal.vue'
 import type { BotApp, BotCredential, BotCommand } from '@/types'
 import {
@@ -832,11 +716,6 @@ const isSavingWebhook = ref(false)
 const isRotatingWebhookSecret = ref(false)
 const isLoadingDeliveries = ref(false)
 const revealedWebhookSecret = ref<string | null>(null)
-
-const runtimeLimits = ref<BotRuntimeLimits | null>(null)
-const runtimeStats = ref<BotRuntimeProtectionStats | null>(null)
-const isLoadingRuntimeProtection = ref(false)
-const runtimeProtectionError = ref<string | null>(null)
 
 const commands = ref<BotCommand[]>([])
 const isLoadingCommands = ref(false)
@@ -942,28 +821,6 @@ const activeInstallations = computed(() => {
   return installations.value.filter((i) => i.status === 'active').length
 })
 
-const runtimeProtectionStatusLabel = computed(() => {
-  if (!runtimeLimits.value) return 'Не загружено'
-  if (runtimeStats.value?.blocked) return 'Временно ограничен'
-  if (!runtimeLimits.value.enabled) return 'Отключено'
-  return 'Активно'
-})
-
-const runtimeProtectionStatusVariant = computed(() => {
-  if (!runtimeLimits.value) return 'secondary'
-  if (runtimeStats.value?.blocked) return 'error'
-  if (!runtimeLimits.value.enabled) return 'secondary'
-  return 'success'
-})
-
-const runtimeViolationPercent = computed(() => {
-  const limit = runtimeStats.value?.violation_limit || runtimeLimits.value?.violation_limit || 0
-  const count = runtimeStats.value?.violation_count || 0
-
-  if (!limit) return 0
-  return Math.min(100, Math.round((count / limit) * 100))
-})
-
 const allowedScopes = computed(() => {
   return bot.value?.scopes || []
 })
@@ -1000,37 +857,6 @@ const deliveryMode = computed<DeliveryMode>({
     }
   },
 })
-
-const clearRuntimeProtectionState = () => {
-  runtimeLimits.value = null
-  runtimeStats.value = null
-  runtimeProtectionError.value = null
-}
-
-const loadRuntimeProtection = async () => {
-  if (!selectedWebhookInstallationId.value) {
-    clearRuntimeProtectionState()
-    return
-  }
-
-  isLoadingRuntimeProtection.value = true
-  runtimeProtectionError.value = null
-
-  try {
-    const [limits, stats] = await Promise.all([
-      botsApi.getInstallationRuntimeLimits(selectedWebhookInstallationId.value),
-      botsApi.getInstallationRuntimeProtectionStats(selectedWebhookInstallationId.value),
-    ])
-
-    runtimeLimits.value = limits
-    runtimeStats.value = stats
-  } catch (err: any) {
-    runtimeProtectionError.value =
-      err?.response?.data?.error || err?.message || 'Не удалось загрузить Runtime Protection'
-  } finally {
-    isLoadingRuntimeProtection.value = false
-  }
-}
 
 const loadInstallationWebhook = async () => {
   if (!selectedWebhookInstallationId.value) {
@@ -1513,7 +1339,6 @@ onMounted(() => {
 }
 
 .test-actions {
-  display: flex;
   justify-content: flex-start;
 }
 
@@ -1943,10 +1768,24 @@ onMounted(() => {
 }
 
 .delivery-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 12px;
-  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--glass);
+
+  backdrop-filter: blur(10px);
+
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.delivery-item:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+
+  transform: translateY(-1px);
 }
 
 .delivery-top {
