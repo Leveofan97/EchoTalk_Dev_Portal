@@ -19,18 +19,18 @@
 
 ## 0. Итоговый статус на текущий момент
 
-**P0 закрыт.**  
-**P1.1 закрыт.**  
-**P1.1.1 закрыт.**  
-**P1.2 закрыт.**  
-**P2.1 WebSocket Gateway runtime закрыт базово.**  
-**P2.2 Interactions + Expanded Bot Runtime закрыт на production-MVP уровне.**  
-**P2.3 Gateway reliability hardening закрыт.**  
-**P2.4 Runtime protection: rate limiting, abuse protection закрыт на production-MVP уровне.**
-**P3.1 Moderation Runtime закрыт на production-MVP уровне.**
-**P3.2 Roles Runtime закрыт на production-MVP уровне.**
-**P3.3 Room Permissions & Overrides Runtime закрыт на production-MVP уровне.**
-**P3.4 Room / Category Structure Runtime закрыт на production-MVP уровне.**
+- **P0 закрыт.**  
+- **P1.1 закрыт.**  
+- **P1.1.1 закрыт.**  
+- **P1.2 закрыт.**  
+- **P2.1 WebSocket Gateway runtime закрыт базово.**  
+- **P2.2 Interactions + Expanded Bot Runtime закрыт на production-MVP уровне.**  
+- **P2.3 Gateway reliability hardening закрыт.**  
+- **P2.4 Runtime protection: rate limiting, abuse protection закрыт на production-MVP уровне.**
+- **P3.1 Moderation Runtime закрыт на production-MVP уровне.**
+- **P3.2 Roles Runtime закрыт на production-MVP уровне.**
+- **P3.3 Room Permissions & Overrides Runtime закрыт на production-MVP уровне.**
+- **P3.4 Room / Category Structure Runtime закрыт на production-MVP уровне.**
 
 Пройденные end-to-end проверки:
 
