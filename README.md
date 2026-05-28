@@ -25,7 +25,12 @@
 **P1.2 закрыт.**  
 **P2.1 WebSocket Gateway runtime закрыт базово.**  
 **P2.2 Interactions + Expanded Bot Runtime закрыт на production-MVP уровне.**  
-**P2.3 Gateway reliability hardening закрыт.**
+**P2.3 Gateway reliability hardening закрыт.**  
+**P2.4 Runtime protection: rate limiting, abuse protection закрыт на production-MVP уровне.**
+**P3.1 Moderation Runtime закрыт на production-MVP уровне.**
+**P3.2 Roles Runtime закрыт на production-MVP уровне.**
+**P3.3 Room Permissions & Overrides Runtime закрыт на production-MVP уровне.**
+**P3.4 Room / Category Structure Runtime закрыт на production-MVP уровне.**
 
 Пройденные end-to-end проверки:
 
@@ -76,8 +81,38 @@
 - `DELETE /bot/messages/:messageID`
 - `/bot/servers/:serverID/members`
 - `/bot/rooms/:roomID/members`
+### Moderation Runtime
+- `/bot/servers/:serverID/bans`
+- `POST /bot/servers/:serverID/bans`
+- `DELETE /bot/servers/:serverID/bans/:userID`
+- `POST /bot/servers/:serverID/members/:userID/kick`
+- `POST /bot/servers/:serverID/members/:userID/timeout`
 
-➡️ **Текущий следующий этап: P2.3 — Gateway reliability hardening**
+### Roles Runtime
+- `/bot/servers/:serverID/roles`
+- `POST /bot/servers/:serverID/roles`
+- `PATCH /bot/servers/:serverID/roles/:roleID`
+- `DELETE /bot/servers/:serverID/roles/:roleID`
+- `POST /bot/servers/:serverID/roles/:roleID/assign/:userID`
+- `DELETE /bot/servers/:serverID/roles/:roleID/assign/:userID`
+
+### Room Overrides Runtime
+- `GET /bot/rooms/:roomID/overrides`
+- `PUT /bot/rooms/:roomID/overrides`
+
+### Room / Category Structure Runtime
+- `GET /bot/servers/:serverID/categories`
+- `POST /bot/servers/:serverID/categories`
+- `PATCH /bot/categories/:categoryID`
+- `DELETE /bot/categories/:categoryID`
+
+- `POST /bot/servers/:serverID/rooms`
+- `PATCH /bot/rooms/:roomID`
+- `DELETE /bot/rooms/:roomID`
+- `POST /bot/rooms/:roomID/move-to-category`
+
+➡️ **Текущий следующий этап: P3.5 — Server Events Runtime**
+
 
 ---
 
@@ -115,7 +150,8 @@
 | Command Base URL | ✅ | настройка на installation |
 | Transport select webhook/ws | ✅ | настройка на installation |
 | Deliveries / attempts UI | ✅ | просмотр доставок и попыток |
-| Gateway status UI | ❌ | planned for P2.3 |
+| Gateway status UI | ✅ | реализовано |
+| Runtime Protection UI | ✅ | лимиты, burst, violations, auto-block |
 | Interaction inspector | ❌ | planned |
 | Версии / релизы | ❌ | нет |
 
@@ -132,28 +168,34 @@
 
 ### 2.3 Bot API Gateway / Runtime ✅
 
-| Компонент | Статус | Примечание |
-|-----------|--------|------------|
-| `BotAuthMiddleware` | ✅ | access/session token validation |
+| Компонент | Статус | Примечание                              |
+|-----------|--------|-----------------------------------------|
+| `BotAuthMiddleware` | ✅ | access/session token validation         |
 | Installation context | ✅ | installation/bot/server scopes доступны |
-| Snapshot scopes | ✅ | granted scopes |
-| Granted permissions | ✅ | базовая проверка |
-| `GET /bot/me` | ✅ | проверено |
-| `GET /bot/servers/:serverID` | ✅ | проверено |
-| `GET /bot/servers/:serverID/rooms` | ✅ | проверено |
-| `GET /bot/rooms/:roomID/messages` | ✅ | проверено |
-| `POST /bot/rooms/:roomID/messages` | ✅ | проверено |
-| `PATCH /bot/messages/:messageID` | ✅ | own bot messages only |
-| `DELETE /bot/messages/:messageID` | ✅ | own bot messages only |
-| `GET /bot/servers/:serverID/members` | ✅ | persistent members из БД |
-| `GET /bot/rooms/:roomID/members` | ✅ | live members из socket state |
-| Rate limiting | ❌ | planned |
-| Quotas | ❌ | planned |
+| Snapshot scopes | ✅ | granted scopes                          |
+| Granted permissions | ✅ | базовая проверка                        |
+| `GET /bot/me` | ✅ | проверено                               |
+| `GET /bot/servers/:serverID` | ✅ | проверено                               |
+| `GET /bot/servers/:serverID/rooms` | ✅ | проверено                               |
+| `GET /bot/rooms/:roomID/messages` | ✅ | проверено                               |
+| `POST /bot/rooms/:roomID/messages` | ✅ | проверено                               |
+| `PATCH /bot/messages/:messageID` | ✅ | own bot messages only                   |
+| `DELETE /bot/messages/:messageID` | ✅ | own bot messages only                   |
+| `GET /bot/servers/:serverID/members` | ✅ | persistent members из БД                |
+| `GET /bot/rooms/:roomID/members` | ✅ | live members из socket state            |
+| Rate limiting | ✅ | проверено|
+| Quotas | 🚧 | planned                                 |
+| Moderation Runtime API | ✅ | bans / kick / timeout |
+| Roles Runtime API | ✅ | CRUD + assign/unassign |
+| Room Overrides Runtime API | ✅ | allow/deny overrides |
+| Room Structure Runtime API | ✅ | create/update/delete/move |
+| Category Structure Runtime API | ✅ | create/update/delete |
 
-### 2.4 Event Gateway ⚠️ / 🚧
+
+### 2.4 Event Gateway ✅
 
 | Компонент | Статус | Примечание |
-|-----------|--------|------------|
+|-----------|--------|-----------|
 | Webhook endpoint configuration | ✅ | `/dev/installations/:id/webhook` |
 | Subscribed events | ✅ | `subscribed_events` |
 | Webhook delivery worker | ✅ | polling + queue |
@@ -167,8 +209,8 @@
 | Runtime switch webhook/ws | ✅ | installation-level |
 | Gateway ACK | ✅ | monotonic ACK проверен, старый ACK не откатывает seq |
 | Gateway resume | ✅ | replay missed events по `last_ack_seq` проверен |
-| Duplicate protection | ⚠️ | seq/event_id модель есть, ACK monotonic есть; client-side dedup contract ещё нужен |
-| Reconnect replacement | ⚠️ | backend replacement есть; требуется финальная проверка stale/disconnected state |
+| Duplicate protection | ✅ | |
+| Reconnect replacement | ✅ | |
 | Last seen / last ack tracking | ✅ | `last_seen_at` / `last_acked_at` обновляются при ACK/heartbeat |
 | Backlog overflow cleanup | ✅ | cleanup по overflow добавлен, требуется long-run проверка |
 
@@ -277,6 +319,21 @@
   - persistent backlog для websocket delivery
   - resume/replay через seq
 
+### P2.4 runtime protection models
+
+- `BotRuntimeLimit`
+  - runtime protection configuration
+  - requests/messages/interactions/gateway limits
+  - burst protection
+  - violation tracking
+  - auto-block state
+
+- `BotRuntimeAuditEvent`
+  - runtime protection audit trail
+  - rate limit violations
+  - auto-block events
+  - adaptive penalty escalation
+
 ---
 
 ## 4. Текущий набор роутов
@@ -311,6 +368,10 @@ POST   /dev/bots/:id/commands
 PUT    /dev/bots/:id/commands/:commandID
 DELETE /dev/bots/:id/commands/:commandID
 
+GET    /dev/installations/:installationID/runtime-limits
+PUT    /dev/installations/:installationID/runtime-limits
+GET    /dev/installations/:installationID/runtime-protection/stats
+
 // OAuth
 POST /oauth/authorize
 POST /oauth/token
@@ -330,19 +391,59 @@ POST /api/interactions/modal-submit
 ### Bot runtime API
 
 ```go
+// Base Info Runtime
 GET    /bot/me
 GET    /bot/servers/:serverID
 GET    /bot/servers/:serverID/rooms
 GET    /bot/servers/:serverID/members
 GET    /bot/rooms/:roomID/messages
 GET    /bot/rooms/:roomID/members
+
+// Message Runtime
 POST   /bot/rooms/:roomID/messages
 PATCH  /bot/messages/:messageID
 DELETE /bot/messages/:messageID
+
+// Interactions Runtime
 POST   /bot/interactions/:interactionID/ack
 POST   /bot/interactions/:interactionID/callback
+
+// Connections Runtime
 POST   /bot/gateway/session
 GET    /bot/gateway/ws
+
+// Moderation Runtime
+GET    /bot/servers/:serverID/bans
+POST   /bot/servers/:serverID/bans
+DELETE /bot/servers/:serverID/bans/:userID
+
+POST   /bot/servers/:serverID/members/:userID/kick
+POST   /bot/servers/:serverID/members/:userID/timeout
+
+// Roles Runtime
+GET    /bot/servers/:serverID/roles
+POST   /bot/servers/:serverID/roles
+PATCH  /bot/servers/:serverID/roles/:roleID
+DELETE /bot/servers/:serverID/roles/:roleID
+
+POST   /bot/servers/:serverID/roles/:roleID/assign/:userID
+DELETE /bot/servers/:serverID/roles/:roleID/assign/:userID
+
+// Room Overrides Runtime
+GET    /bot/rooms/:roomID/overrides
+PUT    /bot/rooms/:roomID/overrides
+
+// Room / Category Structure Runtime
+GET    /bot/servers/:serverID/categories
+POST   /bot/servers/:serverID/categories
+PATCH  /bot/categories/:categoryID
+DELETE /bot/categories/:categoryID
+
+POST   /bot/servers/:serverID/rooms
+PATCH  /bot/rooms/:roomID
+DELETE /bot/rooms/:roomID
+POST   /bot/rooms/:roomID/move-to-category
+
 ```
 
 ---
@@ -357,6 +458,15 @@ GET    /bot/gateway/ws
 - `room.view`
 - `room.sendMessage`
 
+- `server.members.kick`
+- `server.members.ban`
+- `server.members.timeout`
+- `server.roles.view`
+- `server.roles.manage`
+
+
+
+
 ### Что работает
 
 - frontend получает допустимые scopes с backend
@@ -370,7 +480,8 @@ GET    /bot/gateway/ws
 - нет полной granular RBAC-интеграции по room overrides
 - нет category/channel-level grants
 - нет event-driven permissions refresh
-- нет rate limiting/quotas
+- нет distributed/global quotas
+- - нет advanced anomaly detection
 
 ---
 
@@ -462,6 +573,57 @@ GET    /bot/gateway/ws
 | Frontend ephemeral rendering | ✅ |
 | Modal persistence/hardening | ✅ |
 
+
+### 6.7 Moderation Runtime ✅
+
+| Шаг | Статус |
+|-----|--------|
+| Runtime bans API | ✅ |
+| Runtime unban API | ✅ |
+| Runtime kick API | ✅ |
+| Runtime timeout API | ✅ |
+| Scope enforcement | ✅ |
+| Audit integration | ✅ |
+
+### 6.8 Roles Runtime ✅
+
+| Шаг | Статус |
+|-----|--------|
+| Runtime roles list | ✅ |
+| Runtime role create | ✅ |
+| Runtime role update | ✅ |
+| Runtime role delete | ✅ |
+| Runtime role assign | ✅ |
+| Runtime role unassign | ✅ |
+| Scope enforcement | ✅ |
+| Audit integration | ✅ |
+
+### 6.9 Room Overrides Runtime ✅
+
+| Шаг | Статус |
+|-----|--------|
+| Runtime overrides get | ✅ |
+| Runtime overrides replace | ✅ |
+| Allow/deny sync | ✅ |
+| Scope enforcement | ✅ |
+| Audit integration | ✅ |
+
+### 6.10 Room / Category Structure Runtime ✅
+
+| Шаг | Статус |
+|-----|--------|
+| Runtime category create | ✅ |
+| Runtime category update | ✅ |
+| Runtime category delete | ✅ |
+| Runtime room create | ✅ |
+| Runtime room update | ✅ |
+| Runtime room delete | ✅ |
+| Runtime move room | ✅ |
+| Realtime structure broadcast | ✅ |
+| Audit integration | ✅ |
+| Structure services refactor | ✅ |
+
+
 ---
 
 ## 7. Безопасность — текущее состояние
@@ -484,11 +646,20 @@ GET    /bot/gateway/ws
 | Modal expiration | ✅ | TTL + worker |
 | Modal schema validation | ✅ | by persisted schema |
 | Own message protection | ✅ | bot can edit/delete only own messages |
-| Rate limiting | ❌ | planned |
+| Runtime rate limiting | ✅ | Redis-backed runtime protection |
+| Burst protection | ✅ | messages/interactions/session flood |
+| Auto-block | ✅ | adaptive penalties |
+| Adaptive penalties | ✅ | escalation ladder |
+| Runtime audit trail | ✅ | audit events + retention cleanup |
+| Prometheus metrics | ✅ | runtime metrics exported |
+| Quotas | ⚠️ | daily quotas postponed |
 | Idempotency/request_id | ⚠️ | delivery_id есть, строгий runtime idempotency не везде |
 | Gateway ACK monotonic protection | ✅ | проверено через старый ACK, seq не откатывается |
 | Gateway resume validation | ✅ | replay `seq > last_ack_seq` проверен; invalid resume требуется финально проверить |
 | Gateway backlog overflow protection | ✅ | добавлена cleanup policy, нужна long-run проверка |
+| Runtime protection middleware | ✅ | all runtime routes protected |
+| Redis block cache | ✅ | fast-path blocked installations |
+| Structured runtime logs | ✅ | production runtime diagnostics |
 
 ---
 
@@ -520,6 +691,30 @@ GET    /bot/gateway/ws
 - update source message/components
 - open modal
 - получать modal_submit values
+- видеть runtime protection limits
+- видеть violation statistics
+- видеть auto-block status
+- runtime abuse protection
+- adaptive auto-block penalties
+- Prometheus runtime metrics
+- банить участников
+- снимать баны
+- кикать участников
+- выдавать timeout
+- создавать роли
+- редактировать роли
+- удалять роли
+- выдавать роли
+- снимать роли
+- управлять room overrides
+- создавать категории
+- изменять категории
+- удалять категории
+- создавать комнаты
+- изменять комнаты
+- удалять комнаты
+- перемещать комнаты между категориями
+
 
 ### Как пользователь/администратор сервера
 
@@ -549,9 +744,10 @@ GET    /bot/gateway/ws
 
 ### Критично для production
 
-- rate limiting для bot runtime endpoints
-- quotas / abuse protection
-- refresh token rotation hardening
+- daily quotas
+- distributed/global quotas
+- advanced anomaly detection
+- ML-based abuse detection
 
 ### Следующие возможности
 
@@ -650,6 +846,84 @@ GET    /bot/gateway/ws
 - Dev Portal gateway status UI
 - client-side duplicate protection contract
 
+### P2.4 — Runtime protection / abuse protection ✅
+
+Закрыто:
+- Redis-backed runtime rate limiting
+- message/interactions/gateway flood protection
+- burst protection
+- runtime protection middleware
+- violation tracking
+- auto-block
+- Redis block cache
+- adaptive penalties
+- runtime audit trail
+- audit cleanup worker
+- Prometheus metrics
+- structured runtime logs
+- Dev Portal runtime protection UI
+- gateway flood testing
+- adaptive penalties testing
+
+Adaptive penalties:
+- 1-й autoblock → 10m
+- 2-й → 30m
+- 3-й → 3h
+- 4-й → 6h
+- 5-й → 12h
+- 6-й+ → 24h
+
+
+### P3.1 — Moderation Runtime ✅
+
+Закрыто:
+- bans runtime
+- unban runtime
+- kick runtime
+- timeout runtime
+- audit integration
+- runtime scopes
+- owner/self moderation protection
+
+### P3.2 — Roles Runtime ✅
+
+Закрыто:
+- roles CRUD runtime
+- role assignment runtime
+- role removal runtime
+- runtime RBAC integration
+- audit integration
+
+### P3.3 — Room Permissions & Overrides Runtime ✅
+
+Закрыто:
+- runtime overrides API
+- allow/deny synchronization
+- runtime override validation
+- audit integration
+
+### P3.4 — Room / Category Structure Runtime ✅
+
+Закрыто:
+- room CRUD runtime
+- category CRUD runtime
+- move room to category
+- realtime structure broadcast
+- centralized structure services
+- audit integration
+- runtime scope enforcement
+
+## Observability
+
+### Реализовано
+
+- structured runtime logs
+- Prometheus metrics
+- runtime protection audit trail
+- gateway diagnostics UI
+- runtime protection diagnostics UI
+- delivery attempts tracking
+
 ---
 
 ## 11. Вывод
@@ -663,15 +937,30 @@ GET    /bot/gateway/ws
 - **P2.1 завершён базово**
 - **P2.2 завершён на production-MVP уровне**
 - **P2.3 завершён**
+- **P2.4 завершён на production-MVP уровне**
+- **P3.1 завершён**
+- **P3.2 завершён**
+- **P3.3 завершён**
+- **P3.4 завершён**
 
-Bot Platform уже поддерживает полноценный Discord-like interaction runtime:
+
+Bot Platform уже поддерживает полноценный Discord-like server management runtime:
 
 - buttons
 - selects
 - modals
-- ephemeral
-- update callbacks
-- runtime message/member API
+- ephemeral responses
+- interaction callbacks
 - webhook/ws delivery
+- moderation runtime
+- roles runtime
+- room overrides runtime
+- room/category structure runtime
+- runtime protection
+- adaptive penalties
+- gateway reliability layer
 
-➡️ **Следующий этап:** P2.4 — Runtime protection: rate limiting, quotas, abuse protection.
+Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
+
+
+➡️ **Следующий этап:** P3.5 — Server Events Runtime.
