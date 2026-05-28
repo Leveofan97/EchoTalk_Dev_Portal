@@ -69,31 +69,6 @@ export type Theme =
   | 'purpleDragon'
   | 'softWarm'
 
-export const AVAILABLE_SCOPES = [
-  { value: 'bot', label: 'Базовые функции бота', description: 'Необходим для работы любого бота' },
-  {
-    value: 'messages:read',
-    label: 'Чтение сообщений',
-    description: 'Бот может читать сообщения в каналах',
-  },
-  {
-    value: 'messages:write',
-    label: 'Отправка сообщений',
-    description: 'Бот может отправлять сообщения',
-  },
-  {
-    value: 'members:read',
-    label: 'Просмотр участников',
-    description: 'Доступ к списку участников сервера',
-  },
-  { value: 'rooms:read', label: 'Просмотр комнат', description: 'Доступ к списку комнат' },
-  {
-    value: 'server:manage',
-    label: 'Управление сервером',
-    description: 'Изменение настроек сервера (только для админ-ботов)',
-  },
-] as const
-
 export interface BotCommand {
   id: number
   bot_app_id: number
