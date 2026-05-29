@@ -393,17 +393,24 @@
 
                       <div class="webhook-events-list">
                         <label
-                          v-for="eventName in availableWebhookEvents"
-                          :key="eventName"
+                          v-for="event in selectableEvents"
+                          :key="event.type"
                           class="checkbox-line"
                         >
                           <input
                             v-model="webhookForm.subscribed_events"
                             type="checkbox"
-                            :value="eventName"
+                            :value="event.type"
                           />
-                          <span>{{ eventName }}</span>
+                          <span>
+                            {{ event.label }}
+                            <small class="event-type">({{ event.type }})</small>
+                          </span>
                         </label>
+
+                        <p v-if="selectableEvents.length === 0" class="field-help">
+                          Нет событий, доступных для текущих scopes бота.
+                        </p>
                       </div>
 
                       <p v-if="deliveryMode === 'disabled'" class="field-help">
@@ -740,7 +747,6 @@ const createDefaultWebhookForm = () => ({
 
 const webhookForm = ref(createDefaultWebhookForm())
 type DeliveryMode = 'disabled' | 'webhook' | 'websocket'
-const availableWebhookEvents = ['message.created', 'message.updated', 'message.deleted']
 
 const isWebhookTransport = computed(() => webhookForm.value.event_delivery === 'webhook')
 
@@ -748,6 +754,14 @@ const selectedWebhookInstallation = computed(() => {
   return (
     installations.value.find((i) => String(i.id) === String(selectedWebhookInstallationId.value)) ||
     null
+  )
+})
+
+const grantedScopes = computed(() => new Set(bot.value?.scopes ?? []))
+
+const selectableEvents = computed(() => {
+  return (bot.value?.available_events ?? []).filter((event) =>
+    event.required_scopes.every((scope) => grantedScopes.value.has(scope)),
   )
 })
 
@@ -956,6 +970,13 @@ const handleSaveWebhook = async () => {
   }
 
   isSavingWebhook.value = true
+
+  const allowedEventTypes = new Set(selectableEvents.value.map((event) => event.type))
+
+  webhookForm.value.subscribed_events = webhookForm.value.subscribed_events.filter((eventType) =>
+    allowedEventTypes.has(eventType),
+  )
+
   try {
     const payload = {
       webhook_url:
@@ -1568,6 +1589,12 @@ onMounted(() => {
 .empty-hint {
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+.event-type {
+  opacity: 0.65;
+  margin-left: 6px;
+  font-size: 12px;
 }
 
 /* Stats */

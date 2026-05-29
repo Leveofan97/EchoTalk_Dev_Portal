@@ -1,8 +1,15 @@
 // Bot Types
 export type BotStatus = 'draft' | 'active' | 'suspended' | 'inactive'
 
+export interface BotAvailableEvent {
+  type: string
+  label: string
+  group: string
+  required_scopes: string[]
+}
+
 export interface BotApp {
-  id: number // Бэкенд возвращает number (uint)
+  id: number
   owner_id: number
   name: string
   description: string | null
@@ -11,8 +18,11 @@ export interface BotApp {
   status: BotStatus
   created_at: string
   updated_at: string
+
   scopes?: string[]
   events?: string[]
+  available_events?: BotAvailableEvent[]
+
   credentials?: BotCredential[]
 }
 
@@ -32,7 +42,6 @@ export interface BotCredential {
   created_at: string
   last_used_at?: string
   revoked_at?: string
-  // Важно: client_secret здесь НЕТ, он выдается только при создании
 }
 
 // User Types (обновлённые под реальный ответ)
