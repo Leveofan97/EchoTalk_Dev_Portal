@@ -200,6 +200,25 @@ export interface BotRuntimeProtectionStats {
   violation_reset_at?: string
 }
 
+export interface BotReplayEvent {
+  event_id: string
+  seq: number
+  type: string
+  version: number
+  occurred_at: string
+  payload: unknown
+}
+
+export interface BotReplayEventsResponse {
+  data: BotReplayEvent[]
+  meta: {
+    after_seq: number
+    next_after_seq: number
+    limit: number
+    has_more: boolean
+  }
+}
+
 export const botsApi = {
   // === ПУБЛИЧНЫЕ (без авторизации) ===
   getPublicBots: () => api.get<PublicBotInfo[]>('/api/public-bots'),
@@ -323,6 +342,11 @@ export const botsApi = {
   getDeliveryAttempts: (installationId: string | number, deliveryId: string) =>
     api.get<BotEventDeliveryAttempt[]>(
       `/dev/installations/${installationId}/deliveries/${deliveryId}/attempts`,
+    ),
+
+  getInstallationEvents: (installationId: string | number, afterSeq = 0, limit = 50) =>
+    api.get<BotReplayEventsResponse>(
+      `/dev/installations/${installationId}/events?after_seq=${afterSeq}&limit=${limit}`,
     ),
 }
 

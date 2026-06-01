@@ -15,6 +15,8 @@ import type {
   InstallationWebhookConfig,
   BotEventDelivery,
   BotEventDeliveryAttempt,
+  BotReplayEvent,
+  BotReplayEventsResponse,
 } from '@/api/bots'
 
 export const useBotsStore = defineStore('bots', () => {
@@ -33,6 +35,7 @@ export const useBotsStore = defineStore('bots', () => {
   const currentInstallationDeliveries = ref<BotEventDelivery[]>([])
 
   const availableScopes = ref<BotAvailableScope[]>([])
+  const currentInstallationEvents = ref<BotReplayEvent[]>([])
 
   const serversForInstall = ref<ServerForInstall[]>([])
   const isInstalling = ref(false)
@@ -120,6 +123,28 @@ export const useBotsStore = defineStore('bots', () => {
       return null
     } finally {
       isLoading.value = false
+    }
+  }
+
+  const fetchInstallationEvents = async (
+    installationId: string | number,
+    afterSeq = 0,
+    limit = 50,
+  ) => {
+    try {
+      const response = await botsApi.getInstallationEvents(installationId, afterSeq, limit)
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      const result = (response.data || response) as BotReplayEventsResponse
+      currentInstallationEvents.value = result.data || []
+
+      return result
+    } catch (err: any) {
+      error.value = err.message
+      throw err
     }
   }
 
@@ -602,5 +627,7 @@ export const useBotsStore = defineStore('bots', () => {
     updateBotCommand,
     deleteBotCommand,
     toggleBotCommand,
+    currentInstallationEvents,
+    fetchInstallationEvents,
   }
 })

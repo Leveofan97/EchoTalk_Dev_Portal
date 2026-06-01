@@ -635,6 +635,81 @@
             v-if="selectedWebhookInstallationId && webhookForm.event_delivery === 'websocket'"
             :installation-id="Number(selectedWebhookInstallationId)"
           />
+
+          <Card v-if="selectedWebhookInstallationId" class="section-card">
+            <div class="section-header">
+              <h2>Event Replay</h2>
+              <p class="section-desc">
+                Ручной запрос сохранённых Gateway events по seq для выбранной установки.
+              </p>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label>after_seq</label>
+                <input v-model.number="replayAfterSeq" class="form-input" type="number" min="0" />
+              </div>
+
+              <div class="form-group">
+                <label>limit</label>
+                <input
+                  v-model.number="replayLimit"
+                  class="form-input"
+                  type="number"
+                  min="1"
+                  max="200"
+                />
+              </div>
+            </div>
+
+            <div class="test-actions">
+              <Button variant="primary" :loading="isLoadingReplayEvents" @click="loadReplayEvents">
+                Запросить события
+              </Button>
+
+              <Button
+                v-if="replayMeta?.has_more"
+                variant="secondary"
+                :loading="isLoadingReplayEvents"
+                @click="loadNextReplayEvents"
+              >
+                Следующая пачка
+              </Button>
+            </div>
+
+            <div v-if="replayMeta" class="field-hint">
+              <div>
+                next_after_seq: <strong>{{ replayMeta.next_after_seq }}</strong>
+              </div>
+              <div>
+                has_more: <strong>{{ replayMeta.has_more ? 'yes' : 'no' }}</strong>
+              </div>
+            </div>
+
+            <div class="deliveries-block">
+              <h4>Replay events</h4>
+
+              <div v-if="isLoadingReplayEvents" class="empty-urls">Загрузка событий...</div>
+
+              <div v-else-if="replayEvents.length === 0" class="empty-urls">События не найдены</div>
+
+              <div v-else class="deliveries-list">
+                <div v-for="event in replayEvents" :key="event.event_id" class="delivery-item">
+                  <div class="delivery-top">
+                    <strong>#{{ event.seq }} — {{ event.type }}</strong>
+                    <Badge variant="secondary" size="sm">v{{ event.version }}</Badge>
+                  </div>
+
+                  <div class="delivery-dates">
+                    <span>occurred: {{ formatDate(event.occurred_at) }}</span>
+                    <span>event_id: {{ event.event_id }}</span>
+                  </div>
+
+                  <pre class="attempt-body">{{ JSON.stringify(event.payload, null, 2) }}</pre>
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
     </div>
@@ -703,6 +778,7 @@ import {
   type BotEventDelivery,
   type BotInstallation,
   type InstallationWebhookConfig,
+  type BotReplayEvent,
 } from '@/api/bots.ts'
 
 const route = useRoute()
@@ -728,6 +804,18 @@ const commands = ref<BotCommand[]>([])
 const isLoadingCommands = ref(false)
 const isSavingCommand = ref(false)
 const editingCommandId = ref<number | null>(null)
+
+const replayEvents = ref<BotReplayEvent[]>([])
+const replayMeta = ref<{
+  after_seq: number
+  next_after_seq: number
+  limit: number
+  has_more: boolean
+} | null>(null)
+
+const replayAfterSeq = ref<number>(0)
+const replayLimit = ref<number>(50)
+const isLoadingReplayEvents = ref(false)
 
 const commandForm = ref({
   name: '',
@@ -965,6 +1053,9 @@ const handleSelectWebhookInstallation = async () => {
   revealedWebhookSecret.value = null
   deliveryAttempts.value = {}
   expandedDeliveryId.value = null
+  replayEvents.value = []
+  replayMeta.value = null
+  replayAfterSeq.value = 0
   await loadInstallationWebhook()
   await loadInstallationDeliveries()
 }
@@ -1171,6 +1262,39 @@ const publishBot = async () => {
   } finally {
     isPublishing.value = false
   }
+}
+
+const loadReplayEvents = async () => {
+  if (!selectedWebhookInstallationId.value) {
+    toastStore.error('Сначала выберите установку')
+    return
+  }
+
+  isLoadingReplayEvents.value = true
+  try {
+    const result = await botsStore.fetchInstallationEvents(
+      selectedWebhookInstallationId.value,
+      replayAfterSeq.value,
+      replayLimit.value,
+    )
+
+    replayEvents.value = result.data || []
+    replayMeta.value = result.meta || null
+
+    toastStore.success(`Загружено событий: ${replayEvents.value.length}`)
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось загрузить replay events')
+  } finally {
+    isLoadingReplayEvents.value = false
+  }
+}
+
+const loadNextReplayEvents = async () => {
+  if (replayMeta.value) {
+    replayAfterSeq.value = replayMeta.value.next_after_seq
+  }
+
+  await loadReplayEvents()
 }
 
 const dismissFreshSecret = () => {
