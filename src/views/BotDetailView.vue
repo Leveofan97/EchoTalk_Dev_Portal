@@ -757,9 +757,14 @@ const selectedWebhookInstallation = computed(() => {
   )
 })
 
-const grantedScopes = computed(() => new Set(bot.value?.scopes ?? []))
+const grantedScopes = computed(() => {
+  return new Set(selectedWebhookInstallation.value?.granted_scopes ?? [])
+})
 
 const selectableEvents = computed(() => {
+  console.log(bot.value?.available_events)
+  console.log(grantedScopes.value)
+
   return (bot.value?.available_events ?? []).filter((event) =>
     event.required_scopes.every((scope) => grantedScopes.value.has(scope)),
   )
@@ -768,6 +773,7 @@ const selectableEvents = computed(() => {
 const activeInstallationsList = computed(() => {
   return installations.value.filter((i) => i.status === 'active')
 })
+
 computed(() => {
   return (
     activeInstallationsList.value.find(
