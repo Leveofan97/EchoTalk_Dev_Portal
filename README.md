@@ -19,18 +19,21 @@
 
 ## 0. Итоговый статус на текущий момент
 
-- **P0 закрыт.**  
-- **P1.1 закрыт.**  
-- **P1.1.1 закрыт.**  
-- **P1.2 закрыт.**  
-- **P2.1 WebSocket Gateway runtime закрыт базово.**  
-- **P2.2 Interactions + Expanded Bot Runtime закрыт на production-MVP уровне.**  
-- **P2.3 Gateway reliability hardening закрыт.**  
+- **P0 закрыт.**
+- **P1.1 закрыт.**
+- **P1.1.1 закрыт.**
+- **P1.2 закрыт.**
+- **P2.1 WebSocket Gateway runtime закрыт базово.**
+- **P2.2 Interactions + Expanded Bot Runtime закрыт на production-MVP уровне.**
+- **P2.3 Gateway reliability hardening закрыт.**
 - **P2.4 Runtime protection: rate limiting, abuse protection закрыт на production-MVP уровне.**
 - **P3.1 Moderation Runtime закрыт на production-MVP уровне.**
 - **P3.2 Roles Runtime закрыт на production-MVP уровне.**
 - **P3.3 Room Permissions & Overrides Runtime закрыт на production-MVP уровне.**
 - **P3.4 Room / Category Structure Runtime закрыт на production-MVP уровне.**
+- **P3.5 Server Events Runtime закрыт на production-MVP уровне.**
+
+➡️ **Текущий следующий этап: P3.6 — дальнейшее развитие Runtime и Event Ecosystem**
 
 Пройденные end-to-end проверки:
 
@@ -48,6 +51,39 @@
 - `message.created` доставляется
 - `message.updated` доставляется
 - `message.deleted` доставляется
+- `message.reaction.added` доставляется
+- `message.reaction.removed` доставляется
+- `message.pinned` доставляется
+- `message.unpinned` доставляется
+
+- `server.member.joined` доставляется
+- `server.member.left` доставляется
+
+- `room.member.joined` доставляется
+- `room.member.left` доставляется
+
+- `server.role.created` доставляется
+- `server.role.updated` доставляется
+- `server.role.deleted` доставляется
+- `server.role.assigned` доставляется
+- `server.role.unassigned` доставляется
+
+- `server.member.banned` доставляется
+- `server.member.unbanned` доставляется
+- `server.member.kicked` доставляется
+- `server.member.timed_out` доставляется
+- `server.member.timeout_removed` доставляется
+
+- `server.room.created` доставляется
+- `server.room.updated` доставляется
+- `server.room.deleted` доставляется
+- `server.room.moved` доставляется
+
+- `server.category.created` доставляется
+- `server.category.updated` доставляется
+- `server.category.deleted` доставляется
+
+- `server.room_overrides.updated` доставляется
 - webhook delivery + retry + attempts работают стабильно
 - websocket gateway delivery работает
 - gateway `hello` отдаёт `connection_id`, `last_issued_seq`, `last_acked_seq`, `status`
@@ -110,6 +146,61 @@
 - `PATCH /bot/rooms/:roomID`
 - `DELETE /bot/rooms/:roomID`
 - `POST /bot/rooms/:roomID/move-to-category`
+
+### Server Events Runtime
+
+Поддерживаются runtime события:
+
+#### Message Events
+
+- message.created
+- message.updated
+- message.deleted
+- message.reaction.added
+- message.reaction.removed
+- message.pinned
+- message.unpinned
+
+#### Membership Events
+
+- server.member.joined
+- server.member.left
+
+#### Room Activity Events
+
+- room.member.joined
+- room.member.left
+
+#### Moderation Events
+
+- server.member.banned
+- server.member.unbanned
+- server.member.kicked
+- server.member.timed_out
+- server.member.timeout_removed
+
+#### Roles Events
+
+- server.role.created
+- server.role.updated
+- server.role.deleted
+- server.role.assigned
+- server.role.unassigned
+
+#### Structure Events
+
+- server.room.created
+- server.room.updated
+- server.room.deleted
+- server.room.moved
+
+- server.category.created
+- server.category.updated
+- server.category.deleted
+
+#### Permissions Events
+
+- server.room_overrides.updated
 
 ➡️ **Текущий следующий этап: P3.5 — Server Events Runtime**
 
@@ -198,6 +289,9 @@
 |-----------|--------|-----------|
 | Webhook endpoint configuration | ✅ | `/dev/installations/:id/webhook` |
 | Subscribed events | ✅ | `subscribed_events` |
+| Available runtime events API | ✅ | backend-driven catalog |
+| Runtime event scopes validation | ✅ | event ↔ scope policy |
+| Event subscription UI | ✅ | Dev Portal использует backend catalog |
 | Webhook delivery worker | ✅ | polling + queue |
 | Retry / backoff | ✅ | exponential |
 | Delivery attempts | ✅ | attempts table |
@@ -223,6 +317,7 @@
 | WebhookURL | endpoint для webhook | ✅ |
 | CommandBaseURL | endpoint для slash commands | ✅ |
 | SubscribedEvents | список событий | ✅ |
+| AvailableEvents | backend event catalog | ✅ |
 
 Правила:
 
@@ -464,7 +559,19 @@ POST   /bot/rooms/:roomID/move-to-category
 - `server.roles.view`
 - `server.roles.manage`
 
+Важно:
 
+Scopes определяют доступ бота к Runtime API и группам событий.
+
+События не являются scopes.
+
+Пример:
+
+- room.view → чтение комнат + room/member/message events
+- server.members.view → просмотр участников + membership events
+- server.roles.manage → управление ролями через runtime API
+
+Подписка на событие дополнительно проверяется через event policy.
 
 
 ### Что работает
@@ -913,6 +1020,71 @@ Adaptive penalties:
 - audit integration
 - runtime scope enforcement
 
+### P3.5 — Server Events Runtime ✅
+
+Закрыто:
+
+#### Message Events
+
+- message.created
+- message.updated
+- message.deleted
+- message.reaction.added
+- message.reaction.removed
+- message.pinned
+- message.unpinned
+
+#### Membership Events
+
+- server.member.joined
+- server.member.left
+
+#### Room Activity Events
+
+- room.member.joined
+- room.member.left
+
+#### Moderation Events
+
+- server.member.banned
+- server.member.unbanned
+- server.member.kicked
+- server.member.timed_out
+- server.member.timeout_removed
+
+#### Roles Events
+
+- server.role.created
+- server.role.updated
+- server.role.deleted
+- server.role.assigned
+- server.role.unassigned
+
+#### Structure Events
+
+- server.room.created
+- server.room.updated
+- server.room.deleted
+- server.room.moved
+
+- server.category.created
+- server.category.updated
+- server.category.deleted
+
+#### Permissions Events
+
+- server.room_overrides.updated
+
+Дополнительно:
+
+- backend event catalog
+- event policy validation
+- runtime event subscriptions
+- webhook delivery support
+- websocket gateway delivery support
+- actor metadata
+- room metadata in room activity events
+
 ## Observability
 
 ### Реализовано
@@ -942,6 +1114,7 @@ Adaptive penalties:
 - **P3.2 завершён**
 - **P3.3 завершён**
 - **P3.4 завершён**
+- **P3.5 завершён**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -962,5 +1135,21 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
 
+
+Поддерживается полноценная event-driven модель взаимодействия.
+
+Боты могут получать события:
+
+- сообщений
+- реакций
+- закреплений
+- участников сервера
+- активности комнат
+- модерации
+- ролей
+- структуры сервера
+- permission overrides
+
+через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
 ➡️ **Следующий этап:** P3.5 — Server Events Runtime.
