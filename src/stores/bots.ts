@@ -130,22 +130,10 @@ export const useBotsStore = defineStore('bots', () => {
     installationId: string | number,
     afterSeq = 0,
     limit = 50,
-  ) => {
-    try {
-      const response = await botsApi.getInstallationEvents(installationId, afterSeq, limit)
+  ): Promise<BotReplayEvent[]> => {
+    const response = await botsApi.getInstallationEvents(installationId, afterSeq, limit)
 
-      if (response.error) {
-        throw new Error(response.error)
-      }
-
-      const result = (response.data || response) as BotReplayEventsResponse
-      currentInstallationEvents.value = result.data || []
-
-      return result
-    } catch (err: any) {
-      error.value = err.message
-      throw err
-    }
+    return Array.isArray(response.data) ? response.data : []
   }
 
   const fetchInstallationWebhook = async (installationId: string | number) => {

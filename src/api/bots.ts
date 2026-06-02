@@ -200,23 +200,34 @@ export interface BotRuntimeProtectionStats {
   violation_reset_at?: string
 }
 
+export interface BotReplayEventPayloadInner {
+  id: string
+  type: string
+  version: number
+  server_id?: number
+  room_id?: number
+  actor_user_id?: number
+  actor_type?: string
+  occurred_at: string
+  data?: Record<string, unknown>
+}
+
+export interface BotReplayEventPayload {
+  seq: number
+  type: string
+  version: number
+  event_id: string
+  occurred_at: string
+  payload: BotReplayEventPayloadInner
+}
+
 export interface BotReplayEvent {
   event_id: string
   seq: number
   type: string
   version: number
   occurred_at: string
-  payload: unknown
-}
-
-export interface BotReplayEventsResponse {
-  data: BotReplayEvent[]
-  meta: {
-    after_seq: number
-    next_after_seq: number
-    limit: number
-    has_more: boolean
-  }
+  payload: BotReplayEventPayload
 }
 
 export const botsApi = {

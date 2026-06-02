@@ -260,6 +260,142 @@
                 </div>
               </div>
             </Card>
+
+            <Card v-if="selectedWebhookInstallationId" class="section-card replay-card">
+              <div class="section-header replay-header">
+                <div>
+                  <h2>🧾 Event Replay</h2>
+                  <p class="section-desc">
+                    Просмотр сохранённых Gateway events для выбранной установки по seq.
+                  </p>
+                </div>
+
+                <div class="replay-header-badges">
+                  <Badge variant="secondary" size="sm"
+                    >Installation #{{ selectedWebhookInstallationId }}</Badge
+                  >
+                  <Badge v-if="replayEvents.length > 0" variant="primary" size="sm">
+                    {{ replayEvents.length }} events
+                  </Badge>
+                </div>
+              </div>
+
+              <div class="replay-toolbar">
+                <div class="form-group replay-input">
+                  <label>after_seq</label>
+                  <input v-model.number="replayAfterSeq" class="form-input" type="number" min="0" />
+                </div>
+
+                <div class="form-group replay-input">
+                  <label>limit</label>
+                  <input
+                    v-model.number="replayLimit"
+                    class="form-input"
+                    type="number"
+                    min="1"
+                    max="200"
+                  />
+                </div>
+
+                <div class="replay-actions">
+                  <Button
+                    variant="primary"
+                    :loading="isLoadingReplayEvents"
+                    @click="loadReplayEvents"
+                  >
+                    Запросить события
+                  </Button>
+
+                  <Button
+                    v-if="hasMoreReplayEvents"
+                    variant="secondary"
+                    :loading="isLoadingReplayEvents"
+                    @click="loadNextReplayEvents"
+                  >
+                    Следующая пачка
+                  </Button>
+                </div>
+              </div>
+
+              <div v-if="replayEvents.length > 0" class="replay-meta-line">
+                <span
+                  >Загружено: <strong>{{ replayEvents.length }}</strong></span
+                >
+                <span
+                  >Следующий after_seq: <strong>{{ nextReplayAfterSeq }}</strong></span
+                >
+              </div>
+
+              <div v-if="isLoadingReplayEvents" class="empty-urls replay-empty">
+                Загрузка событий...
+              </div>
+
+              <div v-else-if="replayEvents.length === 0" class="empty-urls replay-empty">
+                События не найдены
+              </div>
+
+              <div v-else class="replay-events-list">
+                <article
+                  v-for="event in replayEvents"
+                  :key="event.event_id"
+                  class="replay-event-card"
+                >
+                  <div class="replay-event-main">
+                    <div class="replay-event-icon">
+                      {{ getReplayEventIcon(event.type) }}
+                    </div>
+
+                    <div class="replay-event-content">
+                      <div class="replay-event-title-row">
+                        <div>
+                          <h3>{{ event.type }}</h3>
+                          <p>#{{ event.seq }} · {{ formatDate(event.occurred_at) }}</p>
+                        </div>
+
+                        <Badge variant="secondary" size="sm">v{{ event.version }}</Badge>
+                      </div>
+
+                      <div class="replay-event-meta-grid">
+                        <div>
+                          <span>server</span>
+                          <strong>{{ event.payload?.payload?.server_id ?? '—' }}</strong>
+                        </div>
+
+                        <div>
+                          <span>room</span>
+                          <strong>{{ event.payload?.payload?.room_id ?? '—' }}</strong>
+                        </div>
+
+                        <div>
+                          <span>actor</span>
+                          <strong>{{ event.payload?.payload?.actor_user_id ?? '—' }}</strong>
+                        </div>
+
+                        <div>
+                          <span>actor type</span>
+                          <strong>{{ event.payload?.payload?.actor_type ?? '—' }}</strong>
+                        </div>
+                      </div>
+
+                      <div v-if="event.payload?.payload?.data" class="replay-event-data">
+                        <div class="replay-data-title">data</div>
+                        <pre>{{ JSON.stringify(event.payload.payload.data, null, 2) }}</pre>
+                      </div>
+
+                      <details class="replay-raw">
+                        <summary>Raw payload</summary>
+                        <pre>{{ JSON.stringify(event.payload, null, 2) }}</pre>
+                      </details>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </Card>
+
+            <RuntimeProtectionCard
+              v-if="selectedWebhookInstallationId && !replayEvents.length"
+              :installation-id="Number(selectedWebhookInstallationId)"
+            />
           </div>
 
           <!-- Right Column -->
@@ -391,26 +527,49 @@
                     >
                       <label>События</label>
 
-                      <div class="webhook-events-list">
-                        <label
-                          v-for="event in selectableEvents"
-                          :key="event.type"
-                          class="checkbox-line"
-                        >
+                      <div class="event-subscription-panel">
+                        <div class="event-subscription-toolbar">
                           <input
-                            v-model="webhookForm.subscribed_events"
-                            type="checkbox"
-                            :value="event.type"
+                            v-model.trim="eventSearchQuery"
+                            class="form-input"
+                            type="text"
+                            placeholder="Поиск события: message, role, invite..."
                           />
-                          <span>
-                            {{ event.label }}
-                            <small class="event-type">({{ event.type }})</small>
-                          </span>
-                        </label>
 
-                        <p v-if="selectableEvents.length === 0" class="field-help">
-                          Нет событий, доступных для текущих scopes бота.
-                        </p>
+                          <div class="event-subscription-counter">
+                            {{ filteredSelectableEvents.length }} / {{ selectableEvents.length }}
+                          </div>
+                        </div>
+
+                        <div class="webhook-events-list scrollable-events-list">
+                          <label
+                            v-for="event in filteredSelectableEvents"
+                            :key="event.type"
+                            class="checkbox-line event-subscription-item"
+                          >
+                            <input
+                              v-model="webhookForm.subscribed_events"
+                              type="checkbox"
+                              :value="event.type"
+                            />
+
+                            <span>
+                              <strong>{{ event.label }}</strong>
+                              <small class="event-type">({{ event.type }})</small>
+                            </span>
+                          </label>
+
+                          <p v-if="selectableEvents.length === 0" class="field-help">
+                            Нет событий, доступных для текущих scopes бота.
+                          </p>
+
+                          <p
+                            v-else-if="filteredSelectableEvents.length === 0"
+                            class="field-help event-search-empty"
+                          >
+                            По запросу ничего не найдено.
+                          </p>
+                        </div>
                       </div>
 
                       <p v-if="deliveryMode === 'disabled'" class="field-help">
@@ -625,92 +784,16 @@
                 </div>
               </div>
             </Card>
+            <GatewayStatusCard
+              v-if="selectedWebhookInstallationId && webhookForm.event_delivery === 'websocket'"
+              :installation-id="Number(selectedWebhookInstallationId)"
+            />
           </div>
-          <RuntimeProtectionCard
-            v-if="selectedWebhookInstallationId"
-            :installation-id="Number(selectedWebhookInstallationId)"
-          />
-
-          <GatewayStatusCard
-            v-if="selectedWebhookInstallationId && webhookForm.event_delivery === 'websocket'"
-            :installation-id="Number(selectedWebhookInstallationId)"
-          />
-
-          <Card v-if="selectedWebhookInstallationId" class="section-card">
-            <div class="section-header">
-              <h2>Event Replay</h2>
-              <p class="section-desc">
-                Ручной запрос сохранённых Gateway events по seq для выбранной установки.
-              </p>
-            </div>
-
-            <div class="form-grid">
-              <div class="form-group">
-                <label>after_seq</label>
-                <input v-model.number="replayAfterSeq" class="form-input" type="number" min="0" />
-              </div>
-
-              <div class="form-group">
-                <label>limit</label>
-                <input
-                  v-model.number="replayLimit"
-                  class="form-input"
-                  type="number"
-                  min="1"
-                  max="200"
-                />
-              </div>
-            </div>
-
-            <div class="test-actions">
-              <Button variant="primary" :loading="isLoadingReplayEvents" @click="loadReplayEvents">
-                Запросить события
-              </Button>
-
-              <Button
-                v-if="replayMeta?.has_more"
-                variant="secondary"
-                :loading="isLoadingReplayEvents"
-                @click="loadNextReplayEvents"
-              >
-                Следующая пачка
-              </Button>
-            </div>
-
-            <div v-if="replayMeta" class="field-hint">
-              <div>
-                next_after_seq: <strong>{{ replayMeta.next_after_seq }}</strong>
-              </div>
-              <div>
-                has_more: <strong>{{ replayMeta.has_more ? 'yes' : 'no' }}</strong>
-              </div>
-            </div>
-
-            <div class="deliveries-block">
-              <h4>Replay events</h4>
-
-              <div v-if="isLoadingReplayEvents" class="empty-urls">Загрузка событий...</div>
-
-              <div v-else-if="replayEvents.length === 0" class="empty-urls">События не найдены</div>
-
-              <div v-else class="deliveries-list">
-                <div v-for="event in replayEvents" :key="event.event_id" class="delivery-item">
-                  <div class="delivery-top">
-                    <strong>#{{ event.seq }} — {{ event.type }}</strong>
-                    <Badge variant="secondary" size="sm">v{{ event.version }}</Badge>
-                  </div>
-
-                  <div class="delivery-dates">
-                    <span>occurred: {{ formatDate(event.occurred_at) }}</span>
-                    <span>event_id: {{ event.event_id }}</span>
-                  </div>
-
-                  <pre class="attempt-body">{{ JSON.stringify(event.payload, null, 2) }}</pre>
-                </div>
-              </div>
-            </div>
-          </Card>
         </div>
+        <RuntimeProtectionCard
+          v-if="selectedWebhookInstallationId && replayEvents.length"
+          :installation-id="Number(selectedWebhookInstallationId)"
+        />
       </div>
     </div>
 
@@ -806,16 +889,26 @@ const isSavingCommand = ref(false)
 const editingCommandId = ref<number | null>(null)
 
 const replayEvents = ref<BotReplayEvent[]>([])
-const replayMeta = ref<{
-  after_seq: number
-  next_after_seq: number
-  limit: number
-  has_more: boolean
-} | null>(null)
 
 const replayAfterSeq = ref<number>(0)
 const replayLimit = ref<number>(50)
 const isLoadingReplayEvents = ref(false)
+
+const eventSearchQuery = ref('')
+
+const filteredSelectableEvents = computed(() => {
+  const query = eventSearchQuery.value.trim().toLowerCase()
+
+  if (!query) return selectableEvents.value
+
+  return selectableEvents.value.filter((event) => {
+    return (
+      event.type.toLowerCase().includes(query) ||
+      event.label.toLowerCase().includes(query) ||
+      event.group?.toLowerCase().includes(query)
+    )
+  })
+})
 
 const commandForm = ref({
   name: '',
@@ -1264,6 +1357,18 @@ const publishBot = async () => {
   }
 }
 
+const hasMoreReplayEvents = computed(() => {
+  if (replayEvents.value.length < replayLimit.value) return false
+
+  const last = replayEvents.value[replayEvents.value.length - 1]
+  return Boolean(last?.seq)
+})
+
+const nextReplayAfterSeq = computed(() => {
+  const last = replayEvents.value[replayEvents.value.length - 1]
+  return last?.seq ?? replayAfterSeq.value
+})
+
 const loadReplayEvents = async () => {
   if (!selectedWebhookInstallationId.value) {
     toastStore.error('Сначала выберите установку')
@@ -1278,10 +1383,9 @@ const loadReplayEvents = async () => {
       replayLimit.value,
     )
 
-    replayEvents.value = result.data || []
-    replayMeta.value = result.meta || null
+    console.log('RESULT: ', result)
 
-    toastStore.success(`Загружено событий: ${replayEvents.value.length}`)
+    replayEvents.value = Array.isArray(result) ? result : []
   } catch (err: any) {
     toastStore.error(err.message || 'Не удалось загрузить replay events')
   } finally {
@@ -1290,10 +1394,7 @@ const loadReplayEvents = async () => {
 }
 
 const loadNextReplayEvents = async () => {
-  if (replayMeta.value) {
-    replayAfterSeq.value = replayMeta.value.next_after_seq
-  }
-
+  replayAfterSeq.value = nextReplayAfterSeq.value
   await loadReplayEvents()
 }
 
@@ -1421,6 +1522,22 @@ const handleToggleCommand = async (command: BotCommand) => {
 const formatDate = (value?: string | null) => {
   if (!value) return '—'
   return new Date(value).toLocaleString()
+}
+
+const getReplayEventIcon = (type: string) => {
+  if (type.startsWith('message.reaction')) return '💬'
+  if (type.startsWith('message.pinned') || type.startsWith('message.unpinned')) return '📌'
+  if (type.startsWith('message.')) return '✉️'
+  if (type.startsWith('server.role')) return '🎭'
+  if (type.startsWith('server.member')) return '👤'
+  if (type.startsWith('room.member')) return '🚪'
+  if (type.startsWith('server.room')) return '🏠'
+  if (type.startsWith('server.category')) return '📁'
+  if (type.startsWith('server.invite')) return '🔗'
+  if (type.startsWith('server.updated')) return '⚙️'
+  if (type.includes('overrides')) return '🔐'
+
+  return '📡'
 }
 
 watch(
@@ -2087,5 +2204,347 @@ onMounted(() => {
   .form-group-full {
     grid-column: auto;
   }
+}
+
+.event-raw-details summary {
+  cursor: pointer;
+  opacity: 0.75;
+  font-size: 13px;
+}
+
+.replay-card {
+  margin-top: 24px;
+}
+
+.replay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.replay-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.replay-toolbar {
+  display: grid;
+  grid-template-columns: 180px 140px auto;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.replay-input {
+  min-width: 0;
+}
+
+.replay-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.replay-meta-line {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.06);
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.replay-meta-line strong {
+  color: var(--text-primary);
+}
+
+.replay-empty {
+  padding: 24px;
+  border: 1px dashed var(--border-color);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.replay-events-list {
+  display: grid;
+  gap: 12px;
+}
+
+.replay-event-card {
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(14, 165, 233, 0.04)), var(--glass);
+  padding: 16px;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.replay-event-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.replay-event-main {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.replay-event-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  font-size: 20px;
+}
+
+.replay-event-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.replay-event-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.replay-event-title-row h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.replay-event-title-row p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.replay-event-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.replay-event-meta-grid > div {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.replay-event-meta-grid span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.replay-event-meta-grid strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.replay-event-data {
+  margin-top: 14px;
+}
+
+.replay-data-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.replay-event-data pre,
+.replay-raw pre {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow: auto;
+  max-height: 320px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.replay-raw {
+  margin-top: 12px;
+}
+
+.replay-raw summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+  user-select: none;
+}
+
+.replay-raw summary:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 900px) {
+  .replay-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .replay-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .replay-event-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .replay-header {
+    flex-direction: column;
+  }
+
+  .replay-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .replay-event-main {
+    flex-direction: column;
+  }
+
+  .replay-event-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.main-column,
+.side-column {
+  min-width: 0;
+}
+
+.side-column {
+  align-self: start;
+}
+
+.event-subscription-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.event-subscription-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.event-subscription-toolbar .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.event-subscription-counter {
+  flex: 0 0 auto;
+  padding: 9px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  background: var(--glass);
+}
+
+.scrollable-events-list {
+  height: 460px;
+  min-height: 460px;
+  max-height: 460px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.event-subscription-item {
+  align-items: flex-start;
+  padding: 9px 10px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.event-subscription-item:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.event-subscription-item span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.event-subscription-item strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.event-type {
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.event-search-empty {
+  padding: 16px;
+  text-align: center;
+}
+
+.replay-card-embedded {
+  margin-top: 0;
+}
+
+.replay-events-list {
+  max-height: 660px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.replay-events-list::-webkit-scrollbar,
+.scrollable-events-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.replay-events-list::-webkit-scrollbar-thumb,
+.scrollable-events-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+.replay-events-list::-webkit-scrollbar-track,
+.scrollable-events-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 </style>
