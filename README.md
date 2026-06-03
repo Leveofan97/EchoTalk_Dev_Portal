@@ -1,6 +1,6 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-05-21  
+**Дата обновления:** 2026-06-03  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)
 
 ---
@@ -32,8 +32,10 @@
 - **P3.3 Room Permissions & Overrides Runtime закрыт на production-MVP уровне.**
 - **P3.4 Room / Category Structure Runtime закрыт на production-MVP уровне.**
 - **P3.5 Server Events Runtime закрыт на production-MVP уровне.**
+- **P3.6 Invite & Server Lifecycle Events закрыт на production-MVP уровне.**
+- **P3.7 Event Replay API + Dev Portal Event Replay UI закрыт на production-MVP уровне.**
 
-➡️ **Текущий следующий этап: P3.6 — дальнейшее развитие Runtime и Event Ecosystem**
+➡️ **Текущий следующий этап: P3.8 — Bot Context / Resource Runtime API enterprise-grade**
 
 Пройденные end-to-end проверки:
 
@@ -84,6 +86,9 @@
 - `server.category.deleted` доставляется
 
 - `server.room_overrides.updated` доставляется
+- `server.updated` доставляется
+- `server.invite.created` доставляется
+- `server.invite.revoked` доставляется
 - webhook delivery + retry + attempts работают стабильно
 - websocket gateway delivery работает
 - gateway `hello` отдаёт `connection_id`, `last_issued_seq`, `last_acked_seq`, `status`
@@ -117,6 +122,8 @@
 - `DELETE /bot/messages/:messageID`
 - `/bot/servers/:serverID/members`
 - `/bot/rooms/:roomID/members`
+- `/bot/events`
+- `/dev/installations/:installationID/events`
 ### Moderation Runtime
 - `/bot/servers/:serverID/bans`
 - `POST /bot/servers/:serverID/bans`
@@ -202,6 +209,21 @@
 
 - server.room_overrides.updated
 
+### Invite & Server Lifecycle Events
+
+Поддерживаются события:
+
+- server.updated
+- server.invite.created
+- server.invite.revoked
+
+Назначение:
+
+- отслеживание изменений сервера
+- отслеживание создания invite-ссылок
+- отслеживание отзыва invite-ссылок
+- поддержка invite tracker / audit / moderation bot сценариев
+
 ➡️ **Текущий следующий этап: P3.5 — Server Events Runtime**
 
 
@@ -243,6 +265,8 @@
 | Deliveries / attempts UI | ✅ | просмотр доставок и попыток |
 | Gateway status UI | ✅ | реализовано |
 | Runtime Protection UI | ✅ | лимиты, burst, violations, auto-block |
+| Event Replay UI | ✅ | просмотр сохранённых Gateway events по installation |
+| Event subscriptions search UI | ✅ | поиск событий подписки в Dev Portal |
 | Interaction inspector | ❌ | planned |
 | Версии / релизы | ❌ | нет |
 
@@ -326,6 +350,27 @@
 - `EventDelivery = webhook` → HTTP POST
 - `EventDelivery = websocket` → Gateway delivery
 - одновременно активен только один transport
+
+### Event Replay API
+
+Реализовано:
+
+- `GET /bot/events`
+- `GET /dev/installations/:installationID/events`
+- replay по `after_seq`
+- limit protection
+- чтение из `bot_gateway_events`
+- server/installation boundary
+- Dev Portal UI для ручного просмотра событий
+- красивые карточки событий
+- поиск и прокрутка event subscriptions в Dev Portal
+
+Назначение:
+
+- восстановление состояния bot client после downtime
+- ручная диагностика событий разработчиком
+- отладка webhook / gateway сценариев
+- база для будущего Bot SDK replay helper
 
 ### 2.5 Interactions ✅
 
@@ -467,6 +512,8 @@ GET    /dev/installations/:installationID/runtime-limits
 PUT    /dev/installations/:installationID/runtime-limits
 GET    /dev/installations/:installationID/runtime-protection/stats
 
+GET    /dev/installations/:installationID/events
+
 // OAuth
 POST /oauth/authorize
 POST /oauth/token
@@ -506,6 +553,9 @@ POST   /bot/interactions/:interactionID/callback
 // Connections Runtime
 POST   /bot/gateway/session
 GET    /bot/gateway/ws
+
+// Event Replay Runtime
+GET    /bot/events
 
 // Moderation Runtime
 GET    /bot/servers/:serverID/bans
@@ -550,6 +600,7 @@ POST   /bot/rooms/:roomID/move-to-category
 - `bot`
 - `server.view`
 - `server.members.view`
+- `message.content.read`
 - `room.view`
 - `room.sendMessage`
 
@@ -862,7 +913,11 @@ Scopes определяют доступ бота к Runtime API и группа
 - autocomplete interactions
 - user/role/channel select components
 - Dev Portal interaction inspector
-- event replay UI
+- Bot Context / Resource Runtime API
+- safe resource DTOs for users / members / messages / rooms
+- message context API
+- resource access audit
+- message.content.read scope
 - bot SDK / helpers
 - metrics / analytics
 - hosted runtime / billing / releases
@@ -1085,6 +1140,63 @@ Adaptive penalties:
 - actor metadata
 - room metadata in room activity events
 
+### P3.6 — Invite & Server Lifecycle Events ✅
+
+Закрыто:
+
+- server.updated
+- server.invite.created
+- server.invite.revoked
+- delivery через webhook
+- delivery через websocket gateway
+- event catalog integration
+- event policy validation
+- Dev Portal subscription support
+
+### P3.7 — Event Replay API + Dev Portal Replay UI ✅
+
+### P3.8 — Bot Context / Resource Runtime API 🚧 planned
+
+Цель:
+
+Дать ботам безопасный способ получать расширенный контекст по ID из событий.
+
+Планируемые endpoint-ы:
+
+- `GET /bot/servers/:serverID/members/:userID`
+- `GET /bot/rooms/:roomID`
+- `GET /bot/messages/:messageID`
+- `GET /bot/messages/:messageID/context?before=5&after=5`
+- `GET /bot/servers/:serverID/members/:userID/permissions`
+- `GET /bot/rooms/:roomID/members/:userID/permissions`
+
+Enterprise requirements:
+
+- strict installation/server boundary
+- safe DTO only, no raw DB models
+- no email/password/private fields
+- room visibility checks
+- scopes enforcement
+- optional `message.content.read` scope
+- runtime audit for resource reads
+- rate limiting and abuse protection
+- OpenAPI contract
+- table-driven backend tests
+
+Закрыто:
+
+- `GET /bot/events`
+- `GET /dev/installations/:installationID/events`
+- replay по `after_seq`
+- limit до 200
+- чтение из `bot_gateway_events`
+- installation boundary для bot runtime
+- owner validation для Dev Portal
+- Dev Portal Event Replay UI
+- карточки событий с seq/type/version/actor/server/room/data/raw payload
+- прокручиваемый список replay events
+- поиск событий подписки
+
 ## Observability
 
 ### Реализовано
@@ -1152,4 +1264,4 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.5 — Server Events Runtime.
+➡️ **Следующий этап:** P3.8 — Bot Context / Resource Runtime API enterprise-grade.

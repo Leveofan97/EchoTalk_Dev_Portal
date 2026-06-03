@@ -550,6 +550,7 @@ const getScopeDescription = (scope: string) => {
     bot: 'Базовые функции бота',
     'server.view': 'Просмотр информации о сервере',
     'server.members.view': 'Просмотр участников сервера',
+    'message.content.read': 'Просмотр сообщений (контента) в комнатах',
     'room.view': 'Просмотр доступных комнат',
     'room.sendMessage': 'Отправка сообщений в комнаты',
   }
