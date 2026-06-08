@@ -1,6 +1,6 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-06-03  
+**Дата обновления:** 2026-06-08  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)
 
 ---
@@ -34,8 +34,16 @@
 - **P3.5 Server Events Runtime закрыт на production-MVP уровне.**
 - **P3.6 Invite & Server Lifecycle Events закрыт на production-MVP уровне.**
 - **P3.7 Event Replay API + Dev Portal Event Replay UI закрыт на production-MVP уровне.**
+- **P3.8.1 Resource Core Completion закрыт.**
+- **P3.8.2 Message Resource API Core закрыт.**
+- **P3.8.3 User / Member Context API Core закрыт.**
+- **P3.8.4 Room / Category Context API закрыт.**
+- **P3.8.5 Roles / Permissions API закрыт.**
+- **P3.8.6 Invite Resource API закрыт.**
+- **P3.8.7 Audit / Moderation Context API закрыт.**
+- **P3.8.8 Event Context API закрыт.**
 
-➡️ **Текущий следующий этап: P3.8 — Bot Context / Resource Runtime API enterprise-grade**
+➡️ **Текущий следующий этап: P3.8.9 — Search API**
 
 Пройденные end-to-end проверки:
 
@@ -124,6 +132,18 @@
 - `/bot/rooms/:roomID/members`
 - `/bot/events`
 - `/dev/installations/:installationID/events`
+
+### Bot Context / Resource Runtime API
+- direct lookup: member / room / message / message context
+- permissions check и batch-check
+- message reactions / replies / pin-state / pins / search / by-date
+- member profile / activity / compact context
+- category / room context / room activity / server structure / room stats
+- room effective overrides
+- role detail / role members
+- invite list/detail/uses/join-source
+- audit logs / member audit logs / moderation-state
+- event detail / event context
 ### Moderation Runtime
 - `/bot/servers/:serverID/bans`
 - `POST /bot/servers/:serverID/bans`
@@ -224,7 +244,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий следующий этап: P3.5 — Server Events Runtime**
+➡️ **Текущий следующий этап: P3.8.9 — Search API**
 
 
 ---
@@ -589,6 +609,59 @@ PATCH  /bot/rooms/:roomID
 DELETE /bot/rooms/:roomID
 POST   /bot/rooms/:roomID/move-to-category
 
+// Bot Context / Resource Runtime API — P3.8
+GET    /bot/servers/:serverID/members/:userID
+GET    /bot/rooms/:roomID
+GET    /bot/messages/:messageID
+GET    /bot/messages/:messageID/context
+GET    /bot/servers/:serverID/members/:userID/permissions
+GET    /bot/rooms/:roomID/members/:userID/permissions
+GET    /bot/permissions/check
+POST   /bot/permissions/batch-check
+
+// Message Resource API
+GET    /bot/messages/:messageID/reactions
+GET    /bot/messages/:messageID/replies
+GET    /bot/messages/:messageID/pin-state
+GET    /bot/rooms/:roomID/pins
+GET    /bot/rooms/:roomID/messages/search
+GET    /bot/rooms/:roomID/messages/by-date
+
+// User / Member Context API
+GET    /bot/servers/:serverID/members/:userID/profile
+GET    /bot/servers/:serverID/members/:userID/activity
+GET    /bot/servers/:serverID/members/:userID/context
+
+// Room / Category Context API
+GET    /bot/categories/:categoryID
+GET    /bot/categories/:categoryID/rooms
+GET    /bot/rooms/:roomID/context
+GET    /bot/rooms/:roomID/activity
+GET    /bot/servers/:serverID/resources/categories
+GET    /bot/servers/:serverID/structure
+GET    /bot/rooms/:roomID/overrides/effective
+GET    /bot/rooms/:roomID/stats
+
+// Roles / Permissions Resource API
+GET    /bot/servers/:serverID/roles/:roleID
+GET    /bot/servers/:serverID/roles/:roleID/members
+
+// Invite Resource API
+GET    /bot/servers/:serverID/resources/invites
+GET    /bot/servers/:serverID/resources/invites/:inviteID
+GET    /bot/servers/:serverID/resources/invites/:inviteID/uses
+GET    /bot/servers/:serverID/members/:userID/join-source
+
+// Audit / Moderation Context API
+GET    /bot/servers/:serverID/audit-logs
+GET    /bot/servers/:serverID/audit-logs/:auditID
+GET    /bot/servers/:serverID/members/:userID/audit-logs
+GET    /bot/servers/:serverID/members/:userID/moderation-state
+
+// Event Context API
+GET    /bot/events/:eventID
+GET    /bot/events/:eventID/context
+
 ```
 
 ---
@@ -600,30 +673,36 @@ POST   /bot/rooms/:roomID/move-to-category
 - `bot`
 - `server.view`
 - `server.members.view`
-- `message.content.read`
-- `room.view`
-- `room.sendMessage`
-
 - `server.members.kick`
 - `server.members.ban`
 - `server.members.timeout`
 - `server.roles.view`
 - `server.roles.manage`
+- `server.manageRooms`
+- `server.invites.view`
+- `server.audit.view`
+- `room.view`
+- `room.sendMessage`
+- `message.content.view`
 
 Важно:
 
-Scopes определяют доступ бота к Runtime API и группам событий.
+Scopes определяют доступ бота к Runtime API, Resource API и группам событий.
 
 События не являются scopes.
 
 Пример:
 
-- room.view → чтение комнат + room/member/message events
-- server.members.view → просмотр участников + membership events
-- server.roles.manage → управление ролями через runtime API
+- `room.view` → чтение комнат, room/member/message metadata events и room resource APIs
+- `message.content.view` → выдача содержимого сообщений и поиск по content
+- `server.members.view` → просмотр участников, member context и membership events
+- `server.roles.view` → чтение ролей и role resource APIs
+- `server.invites.view` → read-only invite resource APIs
+- `server.audit.view` → audit logs и moderation context APIs
+- `server.roles.manage` → управление ролями через runtime API
+- `server.manageRooms` → управление комнатами/категориями и чтение effective overrides
 
 Подписка на событие дополнительно проверяется через event policy.
-
 
 ### Что работает
 
@@ -631,15 +710,19 @@ Scopes определяют доступ бота к Runtime API и группа
 - install flow использует реальные scopes бота
 - authorize/token/runtime работают в одной модели строк scopes
 - runtime endpoints проверяют scopes и installation server boundary
+- Resource API использует safe DTO, server boundary и room visibility checks
+- чтение message content вынесено в отдельный scope `message.content.view`
+- invite/audit resource endpoints используют отдельные read-only scopes
+- resource read operations логируются в audit как `bot.resource.*`
 - edit/delete messages разрешены только для own bot messages по `bot_installation_id`
 
 ### Ограничения
 
-- нет полной granular RBAC-интеграции по room overrides
-- нет category/channel-level grants
 - нет event-driven permissions refresh
 - нет distributed/global quotas
-- - нет advanced anomaly detection
+- нет advanced anomaly detection
+- rich presence `current_activities` зарезервирован в API, но источник Activity пока не используется
+- invite uses сейчас восстанавливаются из audit logs, отдельной таблицы `invite_uses` нет
 
 ---
 
@@ -782,6 +865,31 @@ Scopes определяют доступ бота к Runtime API и группа
 | Structure services refactor | ✅ |
 
 
+
+### 6.11 Bot Context / Resource Runtime API ✅
+
+| Шаг | Статус |
+|-----|--------|
+| Direct member / room / message lookup | ✅ |
+| Message context lookup | ✅ |
+| Permission check / batch-check | ✅ |
+| Message reactions / replies / pin-state / pins | ✅ |
+| Message search / by-date | ✅ |
+| Member profile / activity / compact context | ✅ |
+| Category lookup / category rooms | ✅ |
+| Room context / room activity / room stats | ✅ |
+| Server resource categories / server structure | ✅ |
+| Room effective overrides | ✅ |
+| Role detail / role members | ✅ |
+| Invite list / detail / uses / member join-source | ✅ |
+| Audit logs / member audit logs / moderation-state | ✅ |
+| Event detail / event context | ✅ |
+| Safe DTO / no raw DB models | ✅ |
+| Runtime audit for resource reads | ✅ |
+| Search API | 🚧 planned next |
+| Batch Resource API | 🚧 planned |
+
+
 ---
 
 ## 7. Безопасность — текущее состояние
@@ -913,11 +1021,8 @@ Scopes определяют доступ бота к Runtime API и группа
 - autocomplete interactions
 - user/role/channel select components
 - Dev Portal interaction inspector
-- Bot Context / Resource Runtime API
-- safe resource DTOs for users / members / messages / rooms
-- message context API
-- resource access audit
-- message.content.read scope
+- Search API для глобального scoped search
+- Batch Resource API / batch-resolve
 - bot SDK / helpers
 - metrics / analytics
 - hosted runtime / billing / releases
@@ -1155,20 +1260,11 @@ Adaptive penalties:
 
 ### P3.7 — Event Replay API + Dev Portal Replay UI ✅
 
-### P3.8 — Bot Context / Resource Runtime API 🚧 planned
+### P3.8 — Bot Context / Resource Runtime API 🚧 in progress
 
 Цель:
 
-Дать ботам безопасный способ получать расширенный контекст по ID из событий.
-
-Планируемые endpoint-ы:
-
-- `GET /bot/servers/:serverID/members/:userID`
-- `GET /bot/rooms/:roomID`
-- `GET /bot/messages/:messageID`
-- `GET /bot/messages/:messageID/context?before=5&after=5`
-- `GET /bot/servers/:serverID/members/:userID/permissions`
-- `GET /bot/rooms/:roomID/members/:userID/permissions`
+Дать ботам безопасный способ получать расширенный контекст по ID из событий без раскрытия raw DB models и приватных полей.
 
 Enterprise requirements:
 
@@ -1177,25 +1273,181 @@ Enterprise requirements:
 - no email/password/private fields
 - room visibility checks
 - scopes enforcement
-- optional `message.content.read` scope
-- runtime audit for resource reads
-- rate limiting and abuse protection
-- OpenAPI contract
-- table-driven backend tests
+- отдельный scope `message.content.view` для чтения content
+- отдельные read-only scopes `server.invites.view` и `server.audit.view`
+- runtime audit для resource reads (`bot.resource.*`)
+- rate limiting and abuse protection через Runtime Protection middleware
+- OpenAPI contract planned
+- table-driven backend tests planned
 
-Закрыто:
+#### P3.8.1 — Resource Core Completion ✅
 
-- `GET /bot/events`
-- `GET /dev/installations/:installationID/events`
-- replay по `after_seq`
-- limit до 200
-- чтение из `bot_gateway_events`
-- installation boundary для bot runtime
-- owner validation для Dev Portal
-- Dev Portal Event Replay UI
-- карточки событий с seq/type/version/actor/server/room/data/raw payload
-- прокручиваемый список replay events
-- поиск событий подписки
+Закрыто и smoke-tested:
+
+- `GET /bot/servers/:serverID/members/:userID`
+- `GET /bot/rooms/:roomID`
+- `GET /bot/rooms/:roomID/members/:userID`
+- `GET /bot/messages/:messageID`
+- `GET /bot/messages/:messageID/context`
+- `GET /bot/servers/:serverID/members/:userID/permissions`
+- `GET /bot/rooms/:roomID/members/:userID/permissions`
+- `GET /bot/permissions/check`
+- `POST /bot/permissions/batch-check`
+
+Особенности:
+
+- проверка installation boundary
+- проверка server boundary
+- проверка room visibility
+- bot-visible permission whitelist
+- batch-check до 50 проверок за запрос
+- `message.content.view` управляет выдачей content
+
+#### P3.8.2 — Message Resource API Core ✅
+
+Закрыто и smoke-tested:
+
+- `GET /bot/messages/:messageID/reactions`
+- `GET /bot/messages/:messageID/replies`
+- `GET /bot/messages/:messageID/pin-state`
+- `GET /bot/rooms/:roomID/pins`
+- `GET /bot/rooms/:roomID/messages/search`
+- `GET /bot/rooms/:roomID/messages/by-date`
+
+Особенности:
+
+- search требует `message.content.view`
+- by-date поддерживает `date`, `from/to`, `after_id`, `before_id`, `limit`, `order`
+- ответы используют `content_redacted` при отсутствии content scope
+- реакции группируются по emoji/code и включают safe user DTO
+
+#### P3.8.3 — User / Member Context API Core ✅
+
+Закрыто и smoke-tested:
+
+- `GET /bot/servers/:serverID/members/:userID/profile`
+- `GET /bot/servers/:serverID/members/:userID/activity`
+- `GET /bot/servers/:serverID/members/:userID/context`
+
+Особенности:
+
+- `/profile` отдаёт safe member DTO + роли
+- `/activity` считает messages/replies/pins/reactions/audit/recent messages
+- `/context` намеренно сделан компактным snapshot, без большого audit dump
+- `current_activities` зарезервирован в контракте, но rich presence source пока не используется
+- audit meta санитизируется перед выдачей ботам
+
+#### P3.8.4 — Room / Category Context API ✅
+
+Закрыто и smoke-tested:
+
+- `GET /bot/categories/:categoryID`
+- `GET /bot/categories/:categoryID/rooms`
+- `GET /bot/rooms/:roomID/context`
+- `GET /bot/rooms/:roomID/activity`
+- `GET /bot/servers/:serverID/resources/categories`
+- `GET /bot/servers/:serverID/structure`
+- `GET /bot/rooms/:roomID/overrides/effective`
+- `GET /bot/rooms/:roomID/stats`
+
+Особенности:
+
+- `/structure` отдаёт server + categories + visible rooms + uncategorized
+- комнаты в structure фильтруются по `room.view` для bot user
+- read-only categories вынесены в `/resources/categories`, чтобы не конфликтовать с Structure Runtime route `/servers/:serverID/categories`
+- `overrides/effective` требует `server.manageRooms`
+- room activity/stats поддерживают date range
+
+#### P3.8.5 — Roles / Permissions API ✅
+
+Закрыто и smoke-tested:
+
+- `GET /bot/servers/:serverID/roles/:roleID`
+- `GET /bot/servers/:serverID/roles/:roleID/members`
+
+Уже было доступно из runtime/resource layers:
+
+- `GET /bot/servers/:serverID/roles`
+- `GET /bot/servers/:serverID/members/:userID/roles`
+- `GET /bot/permissions/check`
+- `POST /bot/permissions/batch-check`
+- `GET /bot/servers/:serverID/members/:userID/permissions`
+- `GET /bot/rooms/:roomID/members/:userID/permissions`
+- `GET /bot/rooms/:roomID/overrides/effective`
+
+Особенности:
+
+- role detail отдаёт роль + permissions
+- role members поддерживает `limit/offset`
+- server boundary и `role_not_found` проверены smoke-тестами
+
+#### P3.8.6 — Invite Resource API ✅
+
+Закрыто и smoke-tested:
+
+- `GET /bot/servers/:serverID/resources/invites`
+- `GET /bot/servers/:serverID/resources/invites/:inviteID`
+- `GET /bot/servers/:serverID/resources/invites/:inviteID/uses`
+- `GET /bot/servers/:serverID/members/:userID/join-source`
+
+Особенности:
+
+- добавлен read-only scope `server.invites.view`
+- поддерживается фильтр `status=all|active|expired|revoked|maxed`
+- list использует cursor pagination
+- `uses` восстанавливаются из `audit_logs`, так как отдельной таблицы `invite_uses` пока нет
+- `join-source` определяет invite/manual/unknown из audit meta (`via`, `method`, `invite_code`, `code`)
+
+#### P3.8.7 — Audit / Moderation Context API ✅
+
+Закрыто и smoke-tested:
+
+- `GET /bot/servers/:serverID/audit-logs`
+- `GET /bot/servers/:serverID/audit-logs/:auditID`
+- `GET /bot/servers/:serverID/members/:userID/audit-logs`
+- `GET /bot/servers/:serverID/members/:userID/moderation-state`
+
+Особенности:
+
+- добавлен read-only scope `server.audit.view`
+- audit list поддерживает `from/to`, `limit`, `cursor`, `action`, `target_type`, `actor_id`
+- moderation-state собирает active ban/timeout, counters и recent moderation events
+- audit meta санитизируется перед выдачей ботам
+- в audit feed сейчас видны `bot.resource.*`; позже можно добавить `include_bot_resource_events=false`
+
+#### P3.8.8 — Event Context API ✅
+
+Закрыто и smoke-tested:
+
+- `GET /bot/events/:eventID`
+- `GET /bot/events/:eventID/context`
+
+Особенности:
+
+- использует существующий backlog `bot_gateway_events`
+- event lookup ограничен текущей installation и `expires_at`
+- context извлекает refs из nested payload: server_id, room_id, message_id, actor_user_id, user_id, invite_id, role_id, category_id
+- context может собрать server, room, actor, member, message, invite, role, category при наличии соответствующих scopes
+- `event_not_found` проверен для неизвестного event_id
+
+#### P3.8.9 — Search API 🚧 next
+
+План:
+
+- `GET /bot/search`
+- `GET /bot/servers/:serverID/members/search`
+- `GET /bot/servers/:serverID/rooms/search`
+
+Уже реализовано в рамках Message Resource API:
+
+- `GET /bot/rooms/:roomID/messages/search`
+
+#### P3.8.10 — Batch Resource API 🚧 planned
+
+План:
+
+- `POST /bot/resources/batch-resolve`
+- расширение batch-check / batch context helpers для Bot SDK
 
 ## Observability
 
@@ -1227,6 +1479,9 @@ Enterprise requirements:
 - **P3.3 завершён**
 - **P3.4 завершён**
 - **P3.5 завершён**
+- **P3.6 завершён**
+- **P3.7 завершён**
+- **P3.8.1–P3.8.8 завершены**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -1244,6 +1499,8 @@ Bot Platform уже поддерживает полноценный Discord-like
 - runtime protection
 - adaptive penalties
 - gateway reliability layer
+- Bot Context / Resource Runtime API Core
+- safe resource DTO lookup для members / rooms / messages / roles / invites / audit / events
 
 Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
 
@@ -1264,4 +1521,4 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.8 — Bot Context / Resource Runtime API enterprise-grade.
+➡️ **Следующий этап:** P3.8.9 — Search API, затем P3.8.10 — Batch Resource API.
