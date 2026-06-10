@@ -1,6 +1,6 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-06-08  
+**Дата обновления:** 2026-06-10  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)
 
 ---
@@ -42,8 +42,10 @@
 - **P3.8.6 Invite Resource API закрыт.**
 - **P3.8.7 Audit / Moderation Context API закрыт.**
 - **P3.8.8 Event Context API закрыт.**
+- **P3.8.9 Search API отложен.**
+- **P3.8.10 Batch Resource API закрыт.**
 
-➡️ **Текущий следующий этап: P3.8.9 — Search API**
+➡️ **Текущий следующий этап: P3.8 hardening / OpenAPI / tests либо переход к P3.9 Voice / Media Bot Runtime API**
 
 Пройденные end-to-end проверки:
 
@@ -144,6 +146,7 @@
 - invite list/detail/uses/join-source
 - audit logs / member audit logs / moderation-state
 - event detail / event context
+- batch resource resolve / partial item errors
 ### Moderation Runtime
 - `/bot/servers/:serverID/bans`
 - `POST /bot/servers/:serverID/bans`
@@ -244,7 +247,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий следующий этап: P3.8.9 — Search API**
+➡️ **Текущий следующий этап: P3.8 hardening / OpenAPI / tests либо P3.9 Voice / Media Bot Runtime API**
 
 
 ---
@@ -662,6 +665,9 @@ GET    /bot/servers/:serverID/members/:userID/moderation-state
 GET    /bot/events/:eventID
 GET    /bot/events/:eventID/context
 
+// Batch Resource API
+POST   /bot/resources/batch-resolve
+
 ```
 
 ---
@@ -886,8 +892,8 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Event detail / event context | ✅ |
 | Safe DTO / no raw DB models | ✅ |
 | Runtime audit for resource reads | ✅ |
-| Search API | 🚧 planned next |
-| Batch Resource API | 🚧 planned |
+| Search API | ⏸️ postponed | Глобальный поиск отложен до появления полноценного поиска в ядре системы |
+| Batch Resource API | ✅ | `POST /bot/resources/batch-resolve`, partial success, item-level errors |
 
 
 ---
@@ -1003,6 +1009,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - удалять свои сообщения
 - подключиться к Gateway
 - получать события по webhook или websocket
+- получать пачку ресурсов одним batch-запросом через `/bot/resources/batch-resolve`
 
 ---
 
@@ -1021,8 +1028,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - autocomplete interactions
 - user/role/channel select components
 - Dev Portal interaction inspector
-- Search API для глобального scoped search
-- Batch Resource API / batch-resolve
+- Search API для глобального scoped search — отложен до появления системного поиска
 - bot SDK / helpers
 - metrics / analytics
 - hosted runtime / billing / releases
@@ -1430,9 +1436,15 @@ Enterprise requirements:
 - context может собрать server, room, actor, member, message, invite, role, category при наличии соответствующих scopes
 - `event_not_found` проверен для неизвестного event_id
 
-#### P3.8.9 — Search API 🚧 next
+#### P3.8.9 — Search API ⏸️ postponed
 
-План:
+Статус:
+
+- этап осознанно отложен;
+- полноценного глобального поиска в ядре EchoTalk пока нет;
+- пилить отдельный Bot Search API без системного search layer сейчас нецелесообразно.
+
+Потенциальный будущий план:
 
 - `GET /bot/search`
 - `GET /bot/servers/:serverID/members/search`
@@ -1442,12 +1454,43 @@ Enterprise requirements:
 
 - `GET /bot/rooms/:roomID/messages/search`
 
-#### P3.8.10 — Batch Resource API 🚧 planned
+#### P3.8.10 — Batch Resource API ✅
 
-План:
+Закрыто и smoke-tested:
 
 - `POST /bot/resources/batch-resolve`
-- расширение batch-check / batch context helpers для Bot SDK
+
+Поддерживаемые resource types:
+
+- `server`
+- `room`
+- `category`
+- `message`
+- `server_member`
+- `room_member`
+- `role`
+- `invite`
+- `event`
+- `permission_check`
+
+Особенности:
+
+- максимум 50 ресурсов за один batch-запрос;
+- partial success: ошибка одного item не валит весь batch;
+- item-level errors: каждый элемент возвращает `ok=true/false` и собственный `error.code`;
+- strict server boundary для каждого item;
+- scope checks для каждого item;
+- room visibility / permission checks для room/message resources;
+- `message.content.view` управляет выдачей message content;
+- `permission_check` переиспользует bot-visible permission whitelist;
+- runtime audit фиксирует batch resolve как resource read operation.
+
+Smoke-tested сценарии:
+
+- успешный batch для `server`, `room`, `server_member`, `message`, `role`, `invite`, `permission_check`;
+- partial error для несуществующего `message_id`;
+- partial error для `unsupported_resource_type`;
+- весь batch корректно возвращает `200 OK` при частичных ошибках внутри items.
 
 ## Observability
 
@@ -1482,6 +1525,8 @@ Enterprise requirements:
 - **P3.6 завершён**
 - **P3.7 завершён**
 - **P3.8.1–P3.8.8 завершены**
+- **P3.8.9 Search API отложен**
+- **P3.8.10 Batch Resource API завершён**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -1501,6 +1546,7 @@ Bot Platform уже поддерживает полноценный Discord-like
 - gateway reliability layer
 - Bot Context / Resource Runtime API Core
 - safe resource DTO lookup для members / rooms / messages / roles / invites / audit / events
+- Batch Resource API для получения пачки ресурсов одним запросом
 
 Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
 
@@ -1521,4 +1567,6 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.8.9 — Search API, затем P3.8.10 — Batch Resource API.
+➡️ **Следующий этап:** P3.8 hardening / OpenAPI / table-driven tests либо переход к P3.9 — Voice / Media Bot Runtime API.
+
+P3.8.9 Search API остаётся отложенным до появления полноценного системного поиска в EchoTalk.
