@@ -1,6 +1,6 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-06-10  
+**Дата обновления:** 2026-06-11  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)
 
 ---
@@ -44,8 +44,9 @@
 - **P3.8.8 Event Context API закрыт.**
 - **P3.8.9 Search API отложен.**
 - **P3.8.10 Batch Resource API закрыт.**
+- **P3.8.11 Resource API Hardening & Contract Stabilization закрыт.**
 
-➡️ **Текущий следующий этап: P3.8 hardening / OpenAPI / tests либо переход к P3.9 Voice / Media Bot Runtime API**
+➡️ **Текущий следующий этап: P3.9 Voice / Media Bot Runtime API**
 
 Пройденные end-to-end проверки:
 
@@ -147,6 +148,17 @@
 - audit logs / member audit logs / moderation-state
 - event detail / event context
 - batch resource resolve / partial item errors
+
+### Resource API Hardening / Contract Stabilization
+- unified bot error contract: `error.code/message/details/trace_id`
+- request trace middleware и `X-Request-ID`
+- error code constants и normalization smoke-check
+- Scope / Boundary Matrix: `docs/bot_resource_api_matrix.md`
+- Safe DTO audit tests и denylist для приватных полей
+- recursive audit meta sanitization
+- table-driven contract tests для Batch / Message / Event contracts
+- minimal OpenAPI draft: `docs/openapi/bot-resource-api.yaml`
+- OpenAPI lint проверен
 ### Moderation Runtime
 - `/bot/servers/:serverID/bans`
 - `POST /bot/servers/:serverID/bans`
@@ -247,7 +259,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий следующий этап: P3.8 hardening / OpenAPI / tests либо P3.9 Voice / Media Bot Runtime API**
+➡️ **Текущий следующий этап: P3.9 Voice / Media Bot Runtime API**
 
 
 ---
@@ -932,6 +944,12 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Runtime protection middleware | ✅ | all runtime routes protected |
 | Redis block cache | ✅ | fast-path blocked installations |
 | Structured runtime logs | ✅ | production runtime diagnostics |
+| Unified bot error contract | ✅ | `error.code/message/details/trace_id` |
+| Request trace ID | ✅ | `RequestTraceMiddleware`, `X-Request-ID` |
+| Safe DTO audit | ✅ | denylist tests, no private fields in bot responses |
+| Audit meta sanitization | ✅ | recursive sensitive-key removal |
+| Resource API contract tests | ✅ | Batch / Message / Event table-driven tests |
+| Bot Resource OpenAPI | ✅ | `docs/openapi/bot-resource-api.yaml`, lint OK |
 
 ---
 
@@ -1266,7 +1284,7 @@ Adaptive penalties:
 
 ### P3.7 — Event Replay API + Dev Portal Replay UI ✅
 
-### P3.8 — Bot Context / Resource Runtime API 🚧 in progress
+### P3.8 — Bot Context / Resource Runtime API ✅
 
 Цель:
 
@@ -1283,8 +1301,8 @@ Enterprise requirements:
 - отдельные read-only scopes `server.invites.view` и `server.audit.view`
 - runtime audit для resource reads (`bot.resource.*`)
 - rate limiting and abuse protection через Runtime Protection middleware
-- OpenAPI contract planned
-- table-driven backend tests planned
+- OpenAPI contract создан: `docs/openapi/bot-resource-api.yaml`
+- table-driven backend contract tests добавлены для Batch / Message / Event contracts
 
 #### P3.8.1 — Resource Core Completion ✅
 
@@ -1492,6 +1510,46 @@ Smoke-tested сценарии:
 - partial error для `unsupported_resource_type`;
 - весь batch корректно возвращает `200 OK` при частичных ошибках внутри items.
 
+#### P3.8.11 — Resource API Hardening & Contract Stabilization ✅
+
+Закрыто и проверено:
+
+- unified bot error contract для `/bot/*` ошибок:
+  - `error.code`;
+  - `error.message`;
+  - `error.details`;
+  - `error.trace_id`;
+- `RequestTraceMiddleware` добавляет request trace ID и возвращает `X-Request-ID`;
+- `writeBotError` вынесен в единый helper и переиспользуется bot controllers;
+- error code constants добавлены в `controllers/bots/error_codes.go`;
+- error code normalization smoke-tested для:
+  - `message_not_found`;
+  - `server_boundary_violation`;
+  - batch item-level errors;
+- Scope / Boundary Matrix добавлена в `docs/bot_resource_api_matrix.md`;
+- Safe DTO Audit добавлен:
+  - denylist test helper для приватных полей;
+  - DTO tests для user/member/message/audit/batch responses;
+  - recursive audit meta sanitization;
+  - nested sensitive fields removal test;
+- table-driven contract tests добавлены для:
+  - Batch Resource API validation / item errors / JSON contract;
+  - Message DTO content included/redacted contract;
+  - Event refs extraction / invalid payload safety / event DTO contract;
+- `go test ./controllers/bots` проходит;
+- `go test ./...` выявил только старые `go vet` замечания в `internal/sockets/roomOperationHandler.go`, не связанные с P3.8.11;
+- minimal OpenAPI draft создан: `docs/openapi/bot-resource-api.yaml`;
+- OpenAPI lint пройден.
+
+Итог:
+
+- Resource API получил стабильный публичный contract layer;
+- ошибки унифицированы;
+- traceability улучшена;
+- safe DTO/no raw DB model policy закреплена тестами;
+- batch/message/event поведение зафиксировано contract tests;
+- появилась основа для Swagger/Redoc/Bot SDK.
+
 ## Observability
 
 ### Реализовано
@@ -1527,6 +1585,7 @@ Smoke-tested сценарии:
 - **P3.8.1–P3.8.8 завершены**
 - **P3.8.9 Search API отложен**
 - **P3.8.10 Batch Resource API завершён**
+- **P3.8.11 Resource API Hardening & Contract Stabilization завершён**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -1547,6 +1606,11 @@ Bot Platform уже поддерживает полноценный Discord-like
 - Bot Context / Resource Runtime API Core
 - safe resource DTO lookup для members / rooms / messages / roles / invites / audit / events
 - Batch Resource API для получения пачки ресурсов одним запросом
+- unified error contract и trace_id для bot-facing ошибок
+- Scope / Boundary Matrix для Resource API
+- Safe DTO audit и recursive audit meta sanitization
+- table-driven contract tests для Batch / Message / Event contracts
+- minimal OpenAPI draft для Bot Resource API
 
 Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
 
@@ -1567,6 +1631,6 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.8 hardening / OpenAPI / table-driven tests либо переход к P3.9 — Voice / Media Bot Runtime API.
+➡️ **Следующий этап:** P3.9 — Voice / Media Bot Runtime API.
 
 P3.8.9 Search API остаётся отложенным до появления полноценного системного поиска в EchoTalk.
