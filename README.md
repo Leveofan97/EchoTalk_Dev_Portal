@@ -1,6 +1,6 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-06-11  
+**Дата обновления:** 2026-06-26  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)
 
 ---
@@ -45,8 +45,10 @@
 - **P3.8.9 Search API отложен.**
 - **P3.8.10 Batch Resource API закрыт.**
 - **P3.8.11 Resource API Hardening & Contract Stabilization закрыт.**
+- **P3.9.1 Create Bot Media Session закрыт на production-MVP уровне.**
+- **P3.9.1.1 Bot Voice Lobby Integration + Moderator Kick закрыт и end-to-end проверен.**
 
-➡️ **Текущий следующий этап: P3.9 Voice / Media Bot Runtime API**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Следующий практический шаг: P3.9.1.2 Voice Media Session Hardening / Diagnostics / Contract Tests.**
 
 Пройденные end-to-end проверки:
 
@@ -159,6 +161,22 @@
 - table-driven contract tests для Batch / Message / Event contracts
 - minimal OpenAPI draft: `docs/openapi/bot-resource-api.yaml`
 - OpenAPI lint проверен
+
+### Voice / Media Bot Runtime API
+- LiveKit self-hosted используется как media runtime для bot voice sessions
+- `POST /bot/voice/rooms/:roomID/media-sessions` создаёт bot media session и выдаёт LiveKit join token
+- media session создаётся со статусом `pending`, после LiveKit webhook становится `active`
+- LiveKit participant identity для бота: `bot:<installation_id>:<media_session_id>`
+- LiveKit token содержит безопасную metadata: `userID`, `nickname`, `avatar`, `isBot`, `mediaSessionID`, `installationID`, `botAppID`
+- bot user добавляется как server participant при установке/переустановке, чтобы платформа могла отображать и модерировать бота как участника сервера
+- frontend VoiceLobby нормализует LiveKit participant в `Tile` с `userId`, `isBot`, `mediaSessionId`, `label`
+- moderator kick из voice lobby для bot participant end-to-end проверен
+- при moderator kick backend переводит session в `revoked` с `end_reason=moderator_kick`
+- LiveKit participant disconnect после moderator kick проверен
+- повторный voluntary bot disconnect после revoke корректно отклоняется как `media_session_not_disconnectable`
+- `voice.participant.joined` и `voice.participant.left` доставляются через Gateway с LiveKit room и participant DTO
+- `participant.is_bot` и `actor_type=bot` подготовлены для корректного voice event contract
+
 ### Moderation Runtime
 - `/bot/servers/:serverID/bans`
 - `POST /bot/servers/:serverID/bans`
@@ -259,7 +277,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий следующий этап: P3.9 Voice / Media Bot Runtime API**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. P3.9.1 и moderator kick slice уже реализованы; следующий шаг — hardening и diagnostics.**
 
 
 ---
@@ -459,6 +477,7 @@
 &bots.BotInteraction{},
 &bots.BotInteractionResponse{},
 &bots.BotInteractionModal{},
+&bots.BotMediaSession{},
 ```
 
 ### P1.1 delivery models
@@ -508,6 +527,18 @@
   - rate limit violations
   - auto-block events
   - adaptive penalty escalation
+
+### P3.9 voice / media runtime models
+
+- `BotMediaSession`
+  - lifecycle bot media session для LiveKit voice room
+  - `session_id` публичный bot-facing идентификатор формата `bms_*`
+  - `installation_id`, `server_id`, `room_id`, `bot_id` фиксируют boundary
+  - `livekit_room` и `participant_identity` связывают EchoTalk session с LiveKit participant
+  - statuses: `pending`, `active`, `ended`, `revoked`, `failed`
+  - terminal reasons: `bot_disconnect`, `expired`, `moderator_kick`, `policy_violation`, `token_generation_failed`
+  - capabilities snapshot: subscribe/publish audio/video
+  - `expires_at`, `started_at`, `ended_at` используются для lifecycle control и диагностики
 
 ---
 
@@ -680,6 +711,12 @@ GET    /bot/events/:eventID/context
 // Batch Resource API
 POST   /bot/resources/batch-resolve
 
+// Voice / Media Bot Runtime API — P3.9
+POST   /bot/voice/rooms/:roomID/media-sessions
+POST   /bot/voice/media-sessions/:sessionID/refresh-token
+POST   /bot/voice/media-sessions/:sessionID/disconnect
+// planned next: GET /bot/voice/media-sessions/:sessionID
+
 ```
 
 ---
@@ -733,6 +770,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - invite/audit resource endpoints используют отдельные read-only scopes
 - resource read operations логируются в audit как `bot.resource.*`
 - edit/delete messages разрешены только для own bot messages по `bot_installation_id`
+- Voice / Media API проверяет installation/server/room boundary и capabilities через `validateVoiceScopes`
 
 ### Ограничения
 
@@ -767,6 +805,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | `/oauth/token` | ✅ |
 | Создание installation | ✅ |
 | Создание bot user | ✅ |
+| Добавление bot user в server participants | ✅ | Нужно для отображения/модерации бота как участника сервера |
 | Выдача access/refresh token | ✅ |
 
 ### 6.3 Runtime ✅
@@ -908,6 +947,24 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Batch Resource API | ✅ | `POST /bot/resources/batch-resolve`, partial success, item-level errors |
 
 
+### 6.12 Voice / Media Bot Runtime API 🚧
+
+| Шаг | Статус | Примечание |
+|-----|--------|------------|
+| LiveKit self-hosted integration для bot runtime | ✅ | `livekitHost`, API key/secret, BotTokenService |
+| Create bot media session | ✅ | `POST /bot/voice/rooms/:roomID/media-sessions` |
+| LiveKit join token для bot participant | ✅ | identity `bot:<installation_id>:<session_id>` |
+| Safe LiveKit metadata для frontend resolve | ✅ | `userID`, `nickname`, `avatar`, `isBot`, `mediaSessionID` |
+| Refresh media session token | 🚧 | метод реализуется/обновлён metadata helper, требуется отдельный smoke-test |
+| Bot disconnect media session | ✅ | voluntary disconnect: `ended/bot_disconnect` |
+| Moderator kick bot from voice room | ✅ | end-to-end проверено: `revoked/moderator_kick` |
+| LiveKit webhook participant joined/left | ✅ | session `pending -> active`, `voice.participant.*` events |
+| Gateway delivery voice events | ✅ | `voice.participant.joined`, `voice.participant.left` доставлены bot client |
+| Frontend VoiceLobby bot tile | ✅ | `tile.userId`, `tile.isBot`, bot badge, kick by `user_id` |
+| Voice Resource API diagnostics | ❌ | следующий шаг: `GET media session`, list/participants |
+| Listen/transcription runtime | ❌ | planned после hardening |
+| Speak/publish audio runtime | ❌ | planned после listen core |
+
 ---
 
 ## 7. Безопасность — текущее состояние
@@ -950,6 +1007,12 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Audit meta sanitization | ✅ | recursive sensitive-key removal |
 | Resource API contract tests | ✅ | Batch / Message / Event table-driven tests |
 | Bot Resource OpenAPI | ✅ | `docs/openapi/bot-resource-api.yaml`, lint OK |
+| Voice media session boundary | ✅ | session ограничена `installation_id`, `server_id`, `room_id` |
+| Voice room validation | ✅ | media session создаётся только для voice room, room/server boundary проверяется |
+| LiveKit token metadata safety | ✅ | в metadata только UI-safe поля, без tokens/secrets/scopes |
+| Moderator kick authorization | ✅ | frontend кнопка не является защитой; backend проверяет право кика через socket authorizer |
+| Terminal session protection | ✅ | `revoked` не перетирается обычным bot disconnect, повторный disconnect отклоняется |
+| Frontend LiveKit logs | ⚠️ | полный participant object содержит временный access token в `ws.url`; production logs нужно санитизировать |
 
 ---
 
@@ -1028,6 +1091,10 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - подключиться к Gateway
 - получать события по webhook или websocket
 - получать пачку ресурсов одним batch-запросом через `/bot/resources/batch-resolve`
+- создавать bot media session для voice room
+- подключаться к LiveKit voice room как bot participant
+- получать `voice.participant.joined` / `voice.participant.left` events через Gateway
+- корректно переживать moderator kick: session становится `revoked/moderator_kick`, LiveKit disconnect приходит bot client
 
 ---
 
@@ -1550,6 +1617,72 @@ Smoke-tested сценарии:
 - batch/message/event поведение зафиксировано contract tests;
 - появилась основа для Swagger/Redoc/Bot SDK.
 
+### P3.9 — Voice / Media Bot Runtime API 🚧
+
+Цель:
+
+Дать ботам безопасный runtime-доступ к голосовым комнатам EchoTalk через LiveKit: подключение, подписка на audio/video tracks, lifecycle control, voice events, диагностика, а позже listen/transcription/speak сценарии.
+
+#### P3.9.1 — Create Bot Media Session ✅
+
+Закрыто и smoke-tested:
+
+- `POST /bot/voice/rooms/:roomID/media-sessions`;
+- создание `BotMediaSession` со статусом `pending`;
+- генерация LiveKit room name через legacy room naming;
+- генерация bot LiveKit participant identity `bot:<installation_id>:<session_id>`;
+- выдача LiveKit join token через `BotTokenService`;
+- проверка room exists / voice room only / server boundary;
+- проверка requested capabilities через `normalizeVoiceMediaCapabilities` и `validateVoiceScopes`;
+- корректные ошибки для non-voice room, missing room, unsupported capability, insufficient scopes;
+- переход session в `active` после LiveKit webhook participant joined.
+
+#### P3.9.1.1 — Bot Voice Lobby Integration + Moderator Kick ✅
+
+Закрыто и end-to-end проверено:
+
+- bot user добавляется как server participant при install/token flow;
+- LiveKit token содержит безопасную metadata для frontend resolve:
+  - `userID`;
+  - `nickname`;
+  - `avatar`;
+  - `isBot`;
+  - `mediaSessionID`;
+  - `installationID`;
+  - `botAppID`;
+- `RefreshMediaSessionToken` переведён на тот же metadata/profile helper, чтобы reconnect не терял `userID` и `nickname`;
+- VoiceLobby формирует `Tile` из LiveKit participant metadata;
+- kick из VoiceLobby отправляет `user_id`, а не LiveKit `identity`;
+- backend socket handler вызывает media session revoker для bot user;
+- media session переводится в `revoked` с `end_reason=moderator_kick`;
+- LiveKit participant disconnect происходит успешно;
+- `voice.participant.left` доставляется bot client;
+- повторный voluntary disconnect после revoke отклоняется как `media_session_not_disconnectable`;
+- БД подтверждает финальное состояние `revoked/moderator_kick`.
+
+#### P3.9.1.2 — Voice Media Session Hardening / Diagnostics 🚧 next
+
+Следующий практический шаг:
+
+- `GET /bot/voice/media-sessions/:sessionID`;
+- list active media sessions для installation/server/room;
+- lifecycle contract tests для `pending/active/ended/revoked/failed`;
+- защита от перетирания terminal status (`revoked` не должен стать `ended`);
+- idempotent handling повторных LiveKit webhook events;
+- OpenAPI для Voice / Media Bot API;
+- error code normalization и trace_id smoke tests для voice endpoints;
+- Dev Portal diagnostics для media sessions;
+- production-safe frontend logging без полного LiveKit participant object.
+
+#### P3.9.x — Planned after hardening
+
+- Voice Resource API: rooms / participants / sessions diagnostics;
+- Listen Runtime: subscribe audio tracks, receive frames/stream abstraction;
+- Transcription / meeting notes integration layer;
+- Speak Runtime: publish audio / TTS / music bot scenarios;
+- Voice moderation/resource controls;
+- Bot SDK helpers for media lifecycle.
+
 ## Observability
 
 ### Реализовано
@@ -1586,6 +1719,8 @@ Smoke-tested сценарии:
 - **P3.8.9 Search API отложен**
 - **P3.8.10 Batch Resource API завершён**
 - **P3.8.11 Resource API Hardening & Contract Stabilization завершён**
+- **P3.9.1 Create Bot Media Session завершён на production-MVP уровне**
+- **P3.9.1.1 Bot Voice Lobby Integration + Moderator Kick завершён и end-to-end проверен**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -1611,6 +1746,8 @@ Bot Platform уже поддерживает полноценный Discord-like
 - Safe DTO audit и recursive audit meta sanitization
 - table-driven contract tests для Batch / Message / Event contracts
 - minimal OpenAPI draft для Bot Resource API
+- Voice / Media Bot Runtime API Core: media sessions, LiveKit token, metadata, voice participant events
+- moderator kick bot из voice room с финальным `revoked/moderator_kick` lifecycle
 
 Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
 
@@ -1631,6 +1768,6 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.9 — Voice / Media Bot Runtime API.
+➡️ **Следующий этап:** P3.9.1.2 — Voice Media Session Hardening / Diagnostics / Contract Tests.
 
 P3.8.9 Search API остаётся отложенным до появления полноценного системного поиска в EchoTalk.
