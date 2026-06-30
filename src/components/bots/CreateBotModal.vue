@@ -37,24 +37,56 @@
               <label>Разрешения (Scopes)</label>
               <p class="form-hint">Выберите, к каким данным бот будет иметь доступ</p>
 
-              <div class="scopes-list">
-                <label
-                  v-for="scope in availableScopes"
-                  :key="scope.name"
-                  class="scope-checkbox"
-                  :class="{ 'scope-disabled': !scope.assignable }"
+              <div class="scope-groups">
+                <div
+                  v-for="group in groupedScopes"
+                  :key="group.name"
+                  class="scope-group"
+                  :class="{ 'scope-group-sensitive': group.hasSensitive }"
                 >
-                  <input
-                    type="checkbox"
-                    v-model="form.scopes"
-                    :value="scope.name"
-                    :disabled="!scope.assignable"
-                  />
-                  <div class="scope-info">
-                    <strong>{{ scope.label }}</strong>
-                    <span>{{ scope.description }}</span>
+                  <div class="scope-group-header">
+                    <div>
+                      <h4>{{ group.label }}</h4>
+                      <p>{{ group.description }}</p>
+                    </div>
+
+                    <span v-if="group.hasSensitive" class="sensitive-pill"> sensitive </span>
                   </div>
-                </label>
+
+                  <div v-if="group.name === 'voice'" class="voice-warning">
+                    Боты с voice-разрешениями могут подключаться к голосовым комнатам. Разрешение
+                    <strong>voice.listen</strong> позволяет получать аудио участников.
+                  </div>
+
+                  <div class="scopes-list">
+                    <label
+                      v-for="scope in group.scopes"
+                      :key="scope.name"
+                      class="scope-checkbox"
+                      :class="{
+                        'scope-disabled': !scope.assignable,
+                        'scope-sensitive': scope.sensitive,
+                      }"
+                    >
+                      <input
+                        type="checkbox"
+                        v-model="form.scopes"
+                        :value="scope.name"
+                        :disabled="!scope.assignable"
+                        @change="syncScopeDependencies(scope.name)"
+                      />
+
+                      <div class="scope-info">
+                        <div class="scope-title-row">
+                          <strong>{{ scope.label }}</strong>
+                          <span v-if="scope.sensitive" class="scope-sensitive-mark">важное</span>
+                        </div>
+                        <span>{{ scope.description }}</span>
+                        <code>{{ scope.name }}</code>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -147,6 +179,8 @@ const handleSubmit = async () => {
     return
   }
 
+  syncScopeDependencies('submit')
+
   // ✅ Проверка scopes
   if (!hasValidScopes.value) {
     localError.value = 'Необходимо выбрать хотя бы одно разрешение'
@@ -180,6 +214,42 @@ const handleSubmit = async () => {
   } else {
     // Ошибка - показываем
     localError.value = botsStore.error || 'Не удалось создать бота'
+  }
+}
+
+const hasScope = (scope: string) => form.scopes.includes(scope)
+
+const ensureScope = (scope: string) => {
+  if (!hasScope(scope)) {
+    form.scopes.push(scope)
+  }
+}
+
+const removeScope = (scope: string) => {
+  form.scopes = form.scopes.filter((item) => item !== scope)
+}
+
+const syncScopeDependencies = (changedScope: string) => {
+  ensureScope('bot')
+
+  if (hasScope('voice.listen') || hasScope('voice.speak')) {
+    ensureScope('voice.connect')
+    ensureScope('voice.view')
+  }
+
+  if (hasScope('voice.connect')) {
+    ensureScope('voice.view')
+  }
+
+  if (!hasScope('voice.connect')) {
+    removeScope('voice.listen')
+    removeScope('voice.speak')
+  }
+
+  if (!hasScope('voice.view')) {
+    removeScope('voice.connect')
+    removeScope('voice.listen')
+    removeScope('voice.speak')
   }
 }
 
@@ -345,6 +415,84 @@ onMounted(async () => {
 .scope-disabled {
   opacity: 0.7;
   cursor: default;
+}
+
+.scope-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.scope-group {
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+}
+
+.scope-group-sensitive {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.scope-group-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.scope-group-header h4 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.scope-group-header p {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.sensitive-pill,
+.scope-sensitive-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  color: #f59e0b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.voice-warning {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.scope-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.scope-sensitive {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.scope-info code {
+  margin-top: 0.15rem;
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
 }
 
 @keyframes slideUp {
