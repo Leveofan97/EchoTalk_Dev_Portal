@@ -1,7 +1,9 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-06-26  
-**Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)
+**Дата обновления:** 2026-07-16  
+**Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
+**Текущий релиз:** release 0.22.0  
+**Текущий рабочий статус:** после P3.9.7.3.2 Speak Duration Observe-only Counters
 
 ---
 
@@ -47,8 +49,24 @@
 - **P3.8.11 Resource API Hardening & Contract Stabilization закрыт.**
 - **P3.9.1 Create Bot Media Session закрыт на production-MVP уровне.**
 - **P3.9.1.1 Bot Voice Lobby Integration + Moderator Kick закрыт и end-to-end проверен.**
+- **P3.9.1.2 / P3.9.1.3 Voice Media Session Hardening & Refactoring закрыты.**
+- **P3.9.2 Listen Runtime Core закрыт на production-MVP уровне.**
+- **P3.9.2.1 Voice Media Session Public DTO Contract закрыт.**
+- **P3.9.3 Transcription Runtime / Meeting Notes закрыт на production-MVP уровне.**
+- **P3.9.4 Speak / Publish Audio Runtime закрыт и end-to-end проверен.**
+- **P3.9.5.1 Voice Media Session Audit + Admin UI закрыт.**
+- **P3.9.5.2 Bots Policy for Voice Rooms закрыт.**
+- **P3.9.5.3 Policy Change Active Session Enforcement закрыт.**
+- **P3.9.6 Voice / Media Admin Diagnostics & Runtime Observability закрыт.**
+- **P3.9.7.1 Bot Media Track State закрыт.**
+- **P3.9.7.2 Bot Speak Control via Track Mute / Unmute закрыт и проверен.**
+- **P3.9.7.2.1 Voice Track Control Hardening остаётся cleanup/test этапом, но не блокирует video runtime.**
+- **P3.9.7.3 Speak Runtime Limits закрыт на production-MVP уровне.**
+- **P3.9.7.3.1 Media Limits Post-check on Track Published закрыт и проверен.**
+- **P3.9.7.3.2 Speak Duration Observe-only Counters закрыт и проверен.**
+- **P3.9.7.3.3 Обновление статусной документации выполняется текущим обновлением.**
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Следующий практический шаг: P3.9.1.2 Voice Media Session Hardening / Diagnostics / Contract Tests.**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio runtime control layer стабилизирован: speak, track-state, mute/unmute, active limits, post-check и duration observe-only accounting работают. Следующий инженерный шаг — P3.9.8.1 Bot Video Publish Capability.**
 
 Пройденные end-to-end проверки:
 
@@ -169,13 +187,37 @@
 - LiveKit participant identity для бота: `bot:<installation_id>:<media_session_id>`
 - LiveKit token содержит безопасную metadata: `userID`, `nickname`, `avatar`, `isBot`, `mediaSessionID`, `installationID`, `botAppID`
 - bot user добавляется как server participant при установке/переустановке, чтобы платформа могла отображать и модерировать бота как участника сервера
-- frontend VoiceLobby нормализует LiveKit participant в `Tile` с `userId`, `isBot`, `mediaSessionId`, `label`
+- frontend VoiceLobby нормализует LiveKit participant в `Tile` с `userId`, `isBot`, `mediaSessionId`, `label`, `livekitIdentity`
 - moderator kick из voice lobby для bot participant end-to-end проверен
 - при moderator kick backend переводит session в `revoked` с `end_reason=moderator_kick`
 - LiveKit participant disconnect после moderator kick проверен
 - повторный voluntary bot disconnect после revoke корректно отклоняется как `media_session_not_disconnectable`
 - `voice.participant.joined` и `voice.participant.left` доставляются через Gateway с LiveKit room и participant DTO
 - `participant.is_bot` и `actor_type=bot` подготовлены для корректного voice event contract
+- Voice Media Session Public DTO Contract стабилизирован: bot-facing ответы не раскрывают raw DB/LiveKit internals
+- Listen Runtime Core реализован: bot runtime умеет подключаться к LiveKit и получать audio frames/track stream; STT остаётся ответственностью bot developer / transcription layer
+- Transcription Runtime / Meeting Notes реализован как runtime слой для voice transcript / notes сценариев
+- Speak / Publish Audio Runtime реализован и проверен: bot может публиковать audio track в voice room, звук слышен участникам комнаты
+- Voice Media Session Audit реализован: session lifecycle, disconnect/revoke/policy decisions отражаются в audit/runtime событиях
+- Admin UI для voice media session audit / diagnostics добавлен
+- Bots Policy for Voice Rooms реализован: room-level policy определяет возможность присутствия/подключения ботов в голосовые комнаты
+- Policy Change Active Session Enforcement реализован: изменение политики применяется к активным bot media sessions
+- Voice / Media Admin Diagnostics & Runtime Observability реализованы: backend/admin слой показывает состояние sessions/tracks/policy/runtime событий
+- Bot Media Track State реализован: опубликованные bot tracks сохраняются в `bot_media_tracks`, включая `track_s_id`, `track_name`, `track_type`, `track_source`, `muted`, `status`, timestamps
+- Bot Speak Control via Track Mute / Unmute реализован: LiveKit `MutePublishedTrack` используется для mute/unmute user/bot audio tracks
+- для bot tracks состояние `bot_media_tracks.muted` синхронизируется с успешным LiveKit mute/unmute
+- для обычных пользователей `bot_media_tracks` не используется, mute/unmute работает только через LiveKit state
+- frontend VoiceLobby корректно отражает mic state по LiveKit publications и `participantInfo.tracks`, включая начальное состояние при подключении пользователя/бота
+- `track_sid` optional: если клиент передал track SID, backend проверяет принадлежность track участнику; если не передал — backend ищет первый track нужного media-типа
+- `room_name` из клиента считается deprecated/backward-compatible полем и не должен использоваться как source of truth
+- Speak Runtime Limits реализованы: enforced active limits для speaking bots/tracks, post-check после `track_published`, observe-only duration counters и runtime limit audit
+- `max_active_speaking_bots_per_room` ограничивает количество разных bot installations, публикующих audio в одной voice room
+- `max_active_tracks_per_bot` ограничивает количество активных published tracks одной installation
+- `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` работают в `observe_only` режиме: фиксируют превышение, но не отключают бота
+- `bot_media_usage_daily` агрегирует daily publish usage по installation/date: audio/video/screen duration и количество опубликованных tracks
+- `usage_accumulated_at` в `bot_media_tracks` защищает duration accounting от двойного начисления при `track_unpublished`, `participant_left` и `room_finished`
+- `media_auto_revoke_on_limit` заложен как policy flag, но auto revoke намеренно выключен до отдельного runtime enforcement worker
+
 
 ### Moderation Runtime
 - `/bot/servers/:serverID/bans`
@@ -277,7 +319,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. P3.9.1 и moderator kick slice уже реализованы; следующий шаг — hardening и diagnostics.**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio runtime уже включает create/connect/listen/transcription/speak/audit/policy/diagnostics/track-state/mute-unmute, active limits, post-check и duration observe-only accounting; следующий шаг — P3.9.8.1 Bot Video Publish Capability.**
 
 
 ---
@@ -478,6 +520,8 @@
 &bots.BotInteractionResponse{},
 &bots.BotInteractionModal{},
 &bots.BotMediaSession{},
+&bots.BotMediaTrack{},
+&bots.BotMediaUsageDaily{},
 ```
 
 ### P1.1 delivery models
@@ -521,6 +565,10 @@
   - burst protection
   - violation tracking
   - auto-block state
+  - media runtime limits: active speaking bots per room, active tracks per bot
+  - duration limit modes: `disabled`, `observe_only`, `enforced`
+  - speak session / daily speak duration thresholds
+  - `media_auto_revoke_on_limit` заложен, но выключен для текущего observe-only этапа
 
 - `BotRuntimeAuditEvent`
   - runtime protection audit trail
@@ -540,7 +588,25 @@
   - capabilities snapshot: subscribe/publish audio/video
   - `expires_at`, `started_at`, `ended_at` используются для lifecycle control и диагностики
 
----
+- `BotMediaTrack`
+  - runtime state опубликованных bot media tracks
+  - связывает `session_id`, `installation_id`, `server_id`, `room_id`, `livekit_room`, `participant_identity`
+  - хранит LiveKit track identity: `track_s_id`, `track_name`, `track_type`, `track_source`
+  - хранит control state: `muted`, `status`, `published_at`, `unpublished_at`, `updated_at`
+  - хранит usage accounting fields: `usage_duration_sec`, `usage_accumulated_at`
+  - используется для Bot Speak Control, diagnostics, audit, runtime limits и будущего video/screen runtime
+  - обычные user tracks в эту таблицу не пишутся
+
+- `BotMediaUsageDaily`
+  - daily aggregate media publish usage по bot installation
+  - уникальный ключ: `installation_id + usage_date`
+  - хранит `audio_publish_duration_sec`, `video_publish_duration_sec`, `screen_publish_duration_sec`
+  - хранит `published_audio_tracks`, `published_video_tracks`, `published_screen_tracks`
+  - используется для observe-only duration limits, diagnostics, будущих quotas/billing и video/screen runtime
+
+- `LiveKitWebhookEvent`
+  - журнал входящих LiveKit webhook events
+  - используется для диагностики runtime lifecycle, track publish/unpublish и idempotency/hardening сценариев
 
 ## 4. Текущий набор роутов
 
@@ -713,10 +779,16 @@ POST   /bot/resources/batch-resolve
 
 // Voice / Media Bot Runtime API — P3.9
 POST   /bot/voice/rooms/:roomID/media-sessions
+GET    /bot/voice/media-sessions/:sessionID
 POST   /bot/voice/media-sessions/:sessionID/refresh-token
 POST   /bot/voice/media-sessions/:sessionID/disconnect
-// planned next: GET /bot/voice/media-sessions/:sessionID
 
+// User/Admin Voice Track Control
+POST   /moderate-voice-participant
+
+// Implemented admin/diagnostics layer
+// Voice/media session audit, policy enforcement and runtime observability are implemented in backend/admin UI.
+// Exact admin route names are kept in application routing files and should be mirrored in OpenAPI during P3.9.7.2.2.
 ```
 
 ---
@@ -771,6 +843,9 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - resource read operations логируются в audit как `bot.resource.*`
 - edit/delete messages разрешены только для own bot messages по `bot_installation_id`
 - Voice / Media API проверяет installation/server/room boundary и capabilities через `validateVoiceScopes`
+- Voice room bot policy проверяется при создании/поддержании media session
+- Active policy changes применяются к уже активным bot media sessions
+- Voice track control не доверяет client `room_name`, проверяет room_id, LiveKit participant и track ownership
 
 ### Ограничения
 
@@ -947,25 +1022,38 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Batch Resource API | ✅ | `POST /bot/resources/batch-resolve`, partial success, item-level errors |
 
 
-### 6.12 Voice / Media Bot Runtime API 🚧
+### 6.12 Voice / Media Bot Runtime API ✅ / 🚧
 
 | Шаг | Статус | Примечание |
 |-----|--------|------------|
 | LiveKit self-hosted integration для bot runtime | ✅ | `livekitHost`, API key/secret, BotTokenService |
 | Create bot media session | ✅ | `POST /bot/voice/rooms/:roomID/media-sessions` |
 | LiveKit join token для bot participant | ✅ | identity `bot:<installation_id>:<session_id>` |
-| Safe LiveKit metadata для frontend resolve | ✅ | `userID`, `nickname`, `avatar`, `isBot`, `mediaSessionID` |
-| Refresh media session token | 🚧 | метод реализуется/обновлён metadata helper, требуется отдельный smoke-test |
+| Safe LiveKit metadata для frontend resolve | ✅ | `userID`, `nickname`, `avatar`, `isBot`, `mediaSessionID`, `installationID`, `botAppID` |
+| Refresh media session token | ✅ | metadata/profile helper сохранён для reconnect |
 | Bot disconnect media session | ✅ | voluntary disconnect: `ended/bot_disconnect` |
 | Moderator kick bot from voice room | ✅ | end-to-end проверено: `revoked/moderator_kick` |
 | LiveKit webhook participant joined/left | ✅ | session `pending -> active`, `voice.participant.*` events |
 | Gateway delivery voice events | ✅ | `voice.participant.joined`, `voice.participant.left` доставлены bot client |
-| Frontend VoiceLobby bot tile | ✅ | `tile.userId`, `tile.isBot`, bot badge, kick by `user_id` |
-| Voice Resource API diagnostics | ❌ | следующий шаг: `GET media session`, list/participants |
-| Listen/transcription runtime | ❌ | planned после hardening |
-| Speak/publish audio runtime | ❌ | planned после listen core |
+| Public DTO contract | ✅ | `P3.9.2.1`, bot-facing DTO без raw internals |
+| Listen Runtime Core | ✅ | bot runtime получает audio frames/track stream; STT вне core listen layer |
+| Transcription Runtime / Meeting Notes | ✅ | runtime слой для transcript / notes сценариев |
+| Speak / Publish Audio Runtime | ✅ | bot публикует audio track, звук слышен участникам комнаты |
+| Voice Media Session Audit | ✅ | audit lifecycle и session actions |
+| Admin audit UI | ✅ | admin panel обновлён для voice media session audit |
+| Bots Policy for Voice Rooms | ✅ | room-level policy для bot media sessions |
+| Policy Change Active Session Enforcement | ✅ | active sessions приводятся к новой policy |
+| Admin Diagnostics & Runtime Observability | ✅ | backend/admin diagnostics для sessions/runtime state |
+| Bot Media Track State | ✅ | `bot_media_tracks` хранит published/unpublished/muted track state |
+| Bot Speak Control via Track Mute / Unmute | ✅ | user/bot mute/unmute через LiveKit `MutePublishedTrack` |
+| Bot media track DB sync | ✅ | `bot_media_tracks.muted` обновляется для bot tracks |
+| VoiceLobby mic state sync | ✅ | начальное и event-driven состояние Mic/MicOff отражает LiveKit reality |
+| Voice Track Control Hardening | ⚠️ | cleanup/test этап остаётся запланированным, но не блокирует video runtime |
+| Speak Runtime Limits | ✅ | active limits enforced, post-check, duration observe-only accounting, audit |
+| Media Limits Post-check | ✅ | `track_published` запускает actual-state check после записи `bot_media_tracks` |
+| Speak Duration Observe-only Counters | ✅ | session/daily duration считаются и пишут audit без revoke |
+| Bot Video / Screen Stream Runtime | 🚧 | следующий большой этап P3.9.8, старт с P3.9.8.1 video publish |
 
----
 
 ## 7. Безопасность — текущее состояние
 
@@ -1012,6 +1100,17 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | LiveKit token metadata safety | ✅ | в metadata только UI-safe поля, без tokens/secrets/scopes |
 | Moderator kick authorization | ✅ | frontend кнопка не является защитой; backend проверяет право кика через socket authorizer |
 | Terminal session protection | ✅ | `revoked` не перетирается обычным bot disconnect, повторный disconnect отклоняется |
+| Voice media session public DTO contract | ✅ | public DTO стабилизирован, raw internal fields не выдаются bot-facing API |
+| Voice room bot policy | ✅ | bots policy for voice rooms + active session enforcement |
+| Voice media session audit | ✅ | session lifecycle и control actions фиксируются audit/runtime событиями |
+| Bot media track state protection | ✅ | track state хранится только для bot tracks, ordinary user tracks не пишутся в bot tables |
+| Voice track control authorization | ✅ | backend проверяет право mute, room boundary, LiveKit participant и track ownership |
+| Voice track control DB sync safety | ✅ | sync `bot_media_tracks` не должен ломать успешный LiveKit mute/unmute |
+| Media runtime active limits | ✅ | `max_active_speaking_bots_per_room` и `max_active_tracks_per_bot` проверяются pre-create и post-track-published |
+| Media runtime duration accounting | ✅ | `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` работают observe-only через `bot_media_usage_daily` |
+| Media runtime auto revoke | ⚠️ | flag `media_auto_revoke_on_limit` заложен, но отключён до отдельного enforcement worker |
+| Media usage idempotency | ✅ | `usage_accumulated_at` предотвращает двойное начисление usage |
+
 | Frontend LiveKit logs | ⚠️ | полный participant object содержит временный access token в `ws.url`; production logs нужно санитизировать |
 
 ---
@@ -1094,7 +1193,15 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - создавать bot media session для voice room
 - подключаться к LiveKit voice room как bot participant
 - получать `voice.participant.joined` / `voice.participant.left` events через Gateway
+- получать audio frames / track stream в Listen Runtime
+- использовать transcription / meeting notes runtime слой
+- публиковать audio track через Speak Runtime
+- быть замьюченным/размьюченным через Track Mute / Unmute control
+- видеть синхронизированное состояние `muted` в `bot_media_tracks` для bot tracks
 - корректно переживать moderator kick: session становится `revoked/moderator_kick`, LiveKit disconnect приходит bot client
+- работать под active speak runtime limits: room-level speaking bots и per-bot active tracks
+- попадать в media duration accounting: session duration и daily audio publish duration фиксируются observe-only
+- получать audit/runtime visibility по превышениям media limits без принудительного отключения
 
 ---
 
@@ -1102,13 +1209,18 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ### Критично для production
 
-- daily quotas
+- enforced daily quotas и runtime enforcement worker для длительных media sessions
 - distributed/global quotas
 - advanced anomaly detection
 - ML-based abuse detection
 
 ### Следующие возможности
 
+- P3.9.8.1 Bot Video Publish Capability
+- P3.9.8.x Screen Share Publish Runtime
+- Dev Portal Media Runtime Limits UI для новых media-полей
+- Active Media Usage Monitor / Runtime Enforcement Worker для enforced duration quotas и auto revoke
+- P3.9.7.2.1 Voice Track Control Hardening: service/use-case cleanup, tests, final audit/error contract
 - deferred interaction responses
 - autocomplete interactions
 - user/role/channel select components
@@ -1621,7 +1733,7 @@ Smoke-tested сценарии:
 
 Цель:
 
-Дать ботам безопасный runtime-доступ к голосовым комнатам EchoTalk через LiveKit: подключение, подписка на audio/video tracks, lifecycle control, voice events, диагностика, а позже listen/transcription/speak сценарии.
+Дать ботам безопасный runtime-доступ к голосовым комнатам EchoTalk через LiveKit: подключение, подписка/получение audio, transcription/notes сценарии, публикация audio, lifecycle control, voice events, policy enforcement, diagnostics, track state и подготовка к video/screen runtime.
 
 #### P3.9.1 — Create Bot Media Session ✅
 
@@ -1660,28 +1772,229 @@ Smoke-tested сценарии:
 - повторный voluntary disconnect после revoke отклоняется как `media_session_not_disconnectable`;
 - БД подтверждает финальное состояние `revoked/moderator_kick`.
 
-#### P3.9.1.2 — Voice Media Session Hardening / Diagnostics 🚧 next
+#### P3.9.1.2 / P3.9.1.3 — Voice Media Session Hardening & Refactoring ✅
 
-Следующий практический шаг:
+Закрыто:
 
-- `GET /bot/voice/media-sessions/:sessionID`;
-- list active media sessions для installation/server/room;
-- lifecycle contract tests для `pending/active/ended/revoked/failed`;
-- защита от перетирания terminal status (`revoked` не должен стать `ended`);
-- idempotent handling повторных LiveKit webhook events;
-- OpenAPI для Voice / Media Bot API;
-- error code normalization и trace_id smoke tests для voice endpoints;
-- Dev Portal diagnostics для media sessions;
-- production-safe frontend logging без полного LiveKit participant object.
+- hardening media session lifecycle;
+- refactoring runtime/service слоя;
+- защита terminal statuses от некорректного перетирания;
+- нормализация session metadata/profile helper;
+- подготовка к diagnostics, public DTO и listen/speak runtime;
+- route param fixes и cleanup по результатам smoke-тестов.
 
-#### P3.9.x — Planned after hardening
+#### P3.9.2 — Listen Runtime Core ✅
 
-- Voice Resource API: rooms / participants / sessions diagnostics;
-- Listen Runtime: subscribe audio tracks, receive frames/stream abstraction;
-- Transcription / meeting notes integration layer;
-- Speak Runtime: publish audio / TTS / music bot scenarios;
-- Voice moderation/resource controls;
-- Bot SDK helpers for media lifecycle.
+Закрыто и проверено:
+
+- bot подключается к LiveKit voice room;
+- bot получает audio frames / track stream от участников комнаты;
+- тестовый bot listener подтверждает получение audio;
+- Dev Portal command `/voicelisten` добавлен и используется для runtime проверки;
+- clarified contract: core listen runtime отдаёт audio frames/stream, а STT является отдельным слоем bot developer / transcription runtime.
+
+#### P3.9.2.1 — Voice Media Session Public DTO Contract ✅
+
+Закрыто:
+
+- стабилизирован публичный DTO для media session;
+- bot-facing ответы не раскрывают raw DB/LiveKit internals;
+- закреплены public fields для session, participant, room, capabilities, status, timestamps;
+- подготовлена база для diagnostics UI и OpenAPI.
+
+#### P3.9.3 — Transcription Runtime / Meeting Notes ✅
+
+Закрыто на production-MVP уровне:
+
+- добавлен runtime слой для transcription / meeting notes сценариев;
+- voice listen layer используется как источник audio context;
+- заложена архитектура для будущих bot developer сценариев: transcript, notes, summaries, meeting assistant;
+- функциональность отделена от core listen runtime, чтобы платформа не навязывала конкретный STT provider.
+
+#### P3.9.4 — Speak / Publish Audio Runtime ✅
+
+Закрыто и end-to-end проверено:
+
+- bot может публиковать audio track в LiveKit voice room;
+- звук bot audio track слышен участникам voice room;
+- test command `/voicespeak` используется для проверки publish audio runtime;
+- bot media session корректно завершается через disconnect;
+- DB фиксирует lifecycle `active/ended`, `started_at`, `ended_at`, `end_reason=bot_disconnect`.
+
+#### P3.9.5.1 — Voice Media Session Audit ✅
+
+Закрыто:
+
+- добавлен audit для voice media session lifecycle;
+- session create/connect/disconnect/revoke/policy decisions отражаются в audit/runtime событиях;
+- Admin UI обновлён для просмотра voice media session audit;
+- audit используется для диагностики moderator kick, bot disconnect и policy actions.
+
+#### P3.9.5.2 — Bots Policy for Voice Rooms ✅
+
+Закрыто:
+
+- реализована room-level policy для bot media sessions в voice rooms;
+- backend проверяет возможность подключения/присутствия ботов в конкретной voice room;
+- user middleware / room overrides flow приведены к единой policy-модели;
+- исправлены switcher и single-handler scenarios для room overrides.
+
+#### P3.9.5.3 — Policy Change Active Session Enforcement ✅
+
+Закрыто:
+
+- изменение voice room bot policy применяется к активным bot media sessions;
+- active sessions могут быть приведены к новой policy;
+- заложена база для будущего auto revoke / runtime protection enforcement.
+
+#### P3.9.6 — Voice / Media Admin Diagnostics & Runtime Observability ✅
+
+Закрыто:
+
+- backend/admin diagnostics для voice/media runtime;
+- route param fixes;
+- runtime observability для media sessions и LiveKit state;
+- Dockerfile/build обновления в рамках runtime deployment cleanup;
+- diagnostics используются для проверки session/track lifecycle и админского анализа runtime.
+
+#### P3.9.7.1 — Bot Media Track State ✅
+
+Закрыто и проверено:
+
+- добавлена таблица/модель `bot_media_tracks`;
+- track publish state фиксируется при LiveKit webhook `track_published`;
+- сохраняются `session_id`, `participant_identity`, `livekit_room`, `room_id`, `track_s_id`, `track_name`, `track_type`, `track_source`, `muted`, `status`;
+- track unpublish state фиксируется без перетирания terminal/revoked statuses;
+- исправлено имя/маппинг track name column;
+- состояние track стало основой для Bot Speak Control, diagnostics и будущего video/screen runtime.
+
+#### P3.9.7.2 — Bot Speak Control via Track Mute / Unmute ✅
+
+Закрыто и end-to-end проверено:
+
+- backend использует LiveKit `MutePublishedTrack` для mute/unmute audio track;
+- работает mute/unmute обычных пользователей voice room;
+- работает mute/unmute bot participant;
+- frontend передаёт `room_id`, `target_identity`, optional `track_sid`, `media`, `muted`;
+- backend не доверяет `room_name` клиента и строит LiveKit room name по `room_id` из БД;
+- если `track_sid` передан, backend проверяет принадлежность track participant и media type;
+- если `track_sid` не передан, backend fallback-ом выбирает первый track нужного типа;
+- для ordinary user `bot_media_tracks` не обновляется;
+- для bot participant `bot_media_tracks.muted` синхронизируется с successful LiveKit mute/unmute;
+- `bot_track_updated=true/false` отражает результат bot track DB sync;
+- VoiceLobby корректно определяет `track_sid` через LiveKit publications и fallback `participantInfo.tracks`;
+- VoiceLobby mic state корректно отражает реальность при подключении пользователя/бота и после TrackMuted/TrackUnmuted;
+- release `0.22.0` включает финальные fixes по P3.9.7.2.
+
+#### P3.9.7.2.1 — Voice Track Control Hardening 🚧 next cleanup
+
+Запланировано ближайшим cleanup/test этапом:
+
+- вынести `MuteParticipant` из controller в `VoiceTrackControlService`;
+- controller оставить тонким: bind/auth/call service/response;
+- добавить DTO request/response для voice track control;
+- добавить table-driven unit tests для:
+  - `botMediaSessionIDFromIdentity`;
+  - `resolveParticipantTrackSID`;
+  - media type mapping;
+  - explicit wrong `track_sid`;
+  - fallback without `track_sid`;
+- добавить/закрепить audit events `voice.track.mute` / `voice.track.unmute`;
+- нормализовать error contract и traceability;
+- сохранить backward compatibility payload с deprecated `room_name`.
+
+#### P3.9.7.3.3 — Обновление статусной документации ✅ current
+
+Текущее обновление:
+
+- статусная документация обновлена после закрытия P3.9.7.3.1 и P3.9.7.3.2;
+- отражены Speak Runtime Limits, post-check after `track_published` и duration observe-only counters;
+- отражена новая модель `BotMediaUsageDaily` и usage accounting fields в `BotMediaTrack`;
+- отражён release `0.22.0` и рабочий статус после P3.9.7.3;
+- зафиксированы текущие known limitations и roadmap;
+- следующий инженерный этап: P3.9.8.1 Bot Video Publish Capability.
+
+#### P3.9.7.3 — Speak Runtime Limits ✅
+
+Закрыто на production-MVP уровне:
+
+- `max_active_speaking_bots_per_room` реализован как enforced active limit;
+- room-level limit считает разные `installation_id`, а не LiveKit participant sessions;
+- `max_active_tracks_per_bot` реализован как enforced per-installation active track limit;
+- media limit error contract отдаёт реальный runtime code вместо generic `media_session_create_failed`;
+- runtime limit modes используются для duration policy: `disabled`, `observe_only`, `enforced`;
+- `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` заложены и работают в observe-only режиме;
+- `media_auto_revoke_on_limit` заложен, но отключён по умолчанию;
+- audit/runtime protection events пишутся для deny и observe-only decisions;
+- реализован архитектурный мост к video/screen runtime через `bot_media_tracks` и `bot_media_usage_daily`.
+
+#### P3.9.7.3.1 — Media Limits Post-check on Track Published ✅
+
+Закрыто и проверено:
+
+- pre-check выполняется перед созданием media session/token;
+- post-check выполняется после фактического `track_published` и записи `bot_media_tracks`;
+- post-check считает actual state, без `current + requestedTracks`;
+- violation не ломает LiveKit webhook processing;
+- violation пишет `bot.voice.media.runtime_limit` audit/log;
+- auto revoke branch заложен, но не выполняется при `media_auto_revoke_on_limit=false`.
+
+#### P3.9.7.3.2 — Speak Duration Observe-only Counters ✅
+
+Закрыто и проверено:
+
+- добавлена модель/таблица `bot_media_usage_daily`;
+- `bot_media_tracks` получил `usage_duration_sec` и `usage_accumulated_at`;
+- duration считается как разница между `published_at` и `unpublished_at`;
+- usage accumulation идемпотентен и защищён от двойного начисления;
+- `track_unpublished`, `participant_left` и `room_finished` начисляют closed-track usage;
+- daily usage агрегируется по `installation_id + usage_date`;
+- `max_speak_session_duration_sec` пишет `max_speak_session_duration_observed`;
+- `max_daily_speak_duration_sec` пишет `max_daily_speak_duration_observed`;
+- оба duration лимита работают observe-only, без disconnect/revoke/block.
+
+#### P3.9.8 — Bot Video / Screen Stream Runtime 🚧 next major
+
+Следующий большой этап после audio controls + speak limits:
+
+- P3.9.8.1 Bot Video Publish Capability;
+- create/publish video track runtime;
+- screen share publish runtime отдельным follow-up этапом;
+- track state reuse через `bot_media_tracks`;
+- usage accounting reuse через `bot_media_usage_daily`;
+- policy / limits reuse через media runtime limits abstraction;
+- diagnostics/admin UI reuse;
+- mute/unmute / revoke / lifecycle model по аналогии с audio.
+
+
+## Changelog после последнего обновления документации от 2026-06-26
+
+Сводка по git commit list и реализованным этапам:
+
+- `feat(resource_runtime_api) - P3.9.3.7.1 — moderator kick bot media session - Done`
+- `feat(resource_runtime_api) - P3.9.1.2 refactoring`
+- `feat(resource_runtime_api) - P3.9.1.3 refactoring`
+- `feat(resource_runtime_api) - P3.9.2.1 — Voice Media Session Public DTO Contract`
+- `feat(resource_runtime_api) - P3.9.3 — Transcription Runtime / Meeting Notes`
+- `feat(resource_runtime_api) - P3.9.5.1 — Voice Media Session Audit`
+- `feat(resource_runtime_api) - P3.9.5.1 — Voice Media Session Audit (update UI admin panel)`
+- `feat(resource_runtime_api) - P3.9.5.2 — Bots Policy for voice rooms`
+- `fix(resource_runtime_api) - P3.9.5.2 — Bots Policy for voice rooms, user middleware`
+- `fix(resource_runtime_api) - P3.9.5.2 — single handler room overrides`
+- `fix(resource_runtime_api) - P3.9.5.2 — correctly switcher bot policy`
+- `feat(resource_runtime_api) - P3.9.5.3 — Policy Change Active Session Enforcement`
+- `feat(resource_runtime_api) - P3.9.6 — Voice / Media Admin Diagnostics & Runtime Observability`
+- `fix(resource_runtime_api) - P3.9.6 — Voice / Media Admin Diagnostics & Runtime Observability - fix route param`
+- `(resource_runtime_api) - P3.9.6 — Voice / Media Admin Diagnostics & Runtime Observability - update Dockerfile`
+- `(resource_runtime_api) - P3.9.7.1 — Bot Media Track State`
+- `fix(resource_runtime_api) - P3.9.7.1 — Bot Media Track State - fix name column`
+- `feat(resource_runtime_api) - P3.9.7.2 — Bot Speak Control via Track Mute / Unmute`
+- `fix(resource_runtime_api) - P3.9.7.2 — Bot Speak Control via Track Mute / Unmute - fixes update`
+- `fix(resource_runtime_api) - P3.9.7.2 — Bot Speak Control via Track Mute / update state - fixes`
+- `feat(resource_runtime_api) - P3.9.7.3 — Speak Runtime Limits`
+- `feat(resource_runtime_api) - P3.9.7.3.1 — Media Limits Post-check on Track Published`
+- `feat(resource_runtime_api) - P3.9.7.3.2 — Speak Duration Observe-only Counters`
+- `release 0.22.0`
 
 ## Observability
 
@@ -1693,6 +2006,12 @@ Smoke-tested сценарии:
 - gateway diagnostics UI
 - runtime protection diagnostics UI
 - delivery attempts tracking
+- voice/media session audit
+- voice/media admin diagnostics
+- bot media track state diagnostics
+- media runtime limit audit через `bot.voice.media.runtime_limit`
+- media usage daily accounting через `bot_media_usage_daily`
+- voice track control audit planned/finalizing in P3.9.7.2.1
 
 ---
 
@@ -1721,6 +2040,23 @@ Smoke-tested сценарии:
 - **P3.8.11 Resource API Hardening & Contract Stabilization завершён**
 - **P3.9.1 Create Bot Media Session завершён на production-MVP уровне**
 - **P3.9.1.1 Bot Voice Lobby Integration + Moderator Kick завершён и end-to-end проверен**
+- **P3.9.1.2 / P3.9.1.3 Voice Media Session Hardening & Refactoring завершены**
+- **P3.9.2 Listen Runtime Core завершён**
+- **P3.9.2.1 Voice Media Session Public DTO Contract завершён**
+- **P3.9.3 Transcription Runtime / Meeting Notes завершён на production-MVP уровне**
+- **P3.9.4 Speak / Publish Audio Runtime завершён и проверен**
+- **P3.9.5.1 Voice Media Session Audit + Admin UI завершён**
+- **P3.9.5.2 Bots Policy for Voice Rooms завершён**
+- **P3.9.5.3 Policy Change Active Session Enforcement завершён**
+- **P3.9.6 Voice / Media Admin Diagnostics & Runtime Observability завершён**
+- **P3.9.7.1 Bot Media Track State завершён**
+- **P3.9.7.2 Bot Speak Control via Track Mute / Unmute завершён и проверен**
+- **P3.9.7.2.1 Voice Track Control Hardening — cleanup/test этап, не блокирует video runtime**
+- **P3.9.7.3 Speak Runtime Limits завершён на production-MVP уровне**
+- **P3.9.7.3.1 Media Limits Post-check on Track Published завершён и проверен**
+- **P3.9.7.3.2 Speak Duration Observe-only Counters завершён и проверен**
+- **P3.9.7.3.3 Обновление статусной документации завершено текущим обновлением**
+- **P3.9.8 Bot Video / Screen Stream Runtime — следующий большой этап**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -1746,8 +2082,10 @@ Bot Platform уже поддерживает полноценный Discord-like
 - Safe DTO audit и recursive audit meta sanitization
 - table-driven contract tests для Batch / Message / Event contracts
 - minimal OpenAPI draft для Bot Resource API
-- Voice / Media Bot Runtime API Core: media sessions, LiveKit token, metadata, voice participant events
+- Voice / Media Bot Runtime API: media sessions, LiveKit token, metadata, voice participant events, listen runtime, transcription/notes, speak/publish audio, audit, policy, diagnostics, bot media track state, track mute/unmute
+- Speak Runtime Limits: enforced active limits, post-check after `track_published`, observe-only duration counters, daily media usage accounting
 - moderator kick bot из voice room с финальным `revoked/moderator_kick` lifecycle
+- bot speak control через LiveKit Track Mute/Unmute с синхронизацией `bot_media_tracks.muted`
 
 Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
 
@@ -1768,6 +2106,8 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.9.1.2 — Voice Media Session Hardening / Diagnostics / Contract Tests.
+➡️ **Следующий этап:** P3.9.8.1 — Bot Video Publish Capability.
+
+После video publish первым follow-up этапом планируется **P3.9.8.x Screen Share Publish Runtime**, затем Dev Portal UI/diagnostics для media limits и usage.
 
 P3.8.9 Search API остаётся отложенным до появления полноценного системного поиска в EchoTalk.
