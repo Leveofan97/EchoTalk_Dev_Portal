@@ -1,9 +1,9 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-07-17  
+**Дата обновления:** 2026-07-20  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
 **Текущий релиз:** release 0.22.0  
-**Текущий рабочий статус:** после P3.9.8.1 Bot Video Publish Capability
+**Текущий рабочий статус:** после P3.9.8.2 Bot Screen Share Publish Capability
 
 ---
 
@@ -66,8 +66,9 @@
 - **P3.9.7.3.2 Speak Duration Observe-only Counters закрыт и проверен.**
 - **P3.9.7.3.3 Обновление статусной документации закрыто.**
 - **P3.9.8.1 Bot Video Publish Capability закрыт и end-to-end проверен.**
+- **P3.9.8.2 Bot Screen Share Publish Capability закрыт и end-to-end проверен.**
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio runtime стабилизирован, а P3.9.8.1 Bot Video Publish Capability завершён и подтверждён end-to-end. Следующий инженерный шаг — P3.9.8.2 Bot Screen Share Publish Capability.**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio, camera video и screen-share publish runtime реализованы и подтверждены end-to-end. Следующий инженерный шаг — P3.9.8.x lifecycle/control hardening и diagnostics для video/screen runtime.**
 
 Пройденные end-to-end проверки:
 
@@ -226,6 +227,14 @@
 - Gateway доставляет `voice.track.published` и `voice.track.unpublished` с `type=VIDEO`, `source=CAMERA`
 - `bot_media_tracks` фиксирует lifecycle video track и usage accumulation; проверено финальное состояние `unpublished`
 - `bot_media_usage_daily` корректно увеличивает `video_publish_duration_sec` и `published_video_tracks`, не затрагивая audio/screen counters
+- Bot Screen Share Publish Capability реализован: intent `screen_share_publish` создаёт publish-only media session без audio/video subscribe
+- LiveKit join token ограничивает screen-share session источником `SCREEN_SHARE` через `CanPublishSources`; `CAMERA` и `MICROPHONE` не выдаются
+- для screen-share publish переиспользуются scope `voice.speak`, room policy `allow_speak`, installation/server/room boundary и media runtime limits
+- тестовая команда `/screenpublish` публикует synthetic desktop/application test-pattern через `@livekit/rtc-node`
+- screen-share publish end-to-end проверен на параметрах 960x540, 5 FPS, 20 секунд, 100 frames; stream отображался пользователю как демонстрация экрана
+- Gateway доставляет `voice.track.published` и `voice.track.unpublished` с `type=VIDEO`, `source=SCREEN_SHARE`
+- `bot_media_tracks` фиксирует lifecycle screen-share track и usage accumulation; проверено финальное состояние `unpublished`
+- `bot_media_usage_daily` корректно увеличивает `screen_publish_duration_sec` и `published_screen_tracks`, не затрагивая audio/video counters
 
 
 ### Moderation Runtime
@@ -328,7 +337,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Runtime уже включает audio listen/speak, transcription, audit, policy, diagnostics, track-state, mute/unmute, limits и подтверждённый video publish через `VIDEO/CAMERA`; следующий шаг — P3.9.8.2 Bot Screen Share Publish Capability.**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Runtime уже включает audio listen/speak, transcription, audit, policy, diagnostics, track-state, mute/unmute, limits, camera video publish через `VIDEO/CAMERA` и screen-share publish через `VIDEO/SCREEN_SHARE`; следующий шаг — lifecycle/control hardening и diagnostics для video/screen runtime.**
 
 
 ---
@@ -1062,7 +1071,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Media Limits Post-check | ✅ | `track_published` запускает actual-state check после записи `bot_media_tracks` |
 | Speak Duration Observe-only Counters | ✅ | session/daily duration считаются и пишут audit без revoke |
 | Bot Video Publish Capability | ✅ | P3.9.8.1: `video_publish`, LiveKit `VIDEO/CAMERA`, Gateway lifecycle, track state и usage accounting проверены end-to-end |
-| Bot Screen Share Publish Runtime | 🚧 | следующий этап P3.9.8.2: publish source `SCREEN_SHARE` с отдельными capability/token/policy checks |
+| Bot Screen Share Publish Capability | ✅ | P3.9.8.2: `screen_share_publish`, LiveKit `VIDEO/SCREEN_SHARE`, Gateway lifecycle, track state и usage accounting проверены end-to-end |
 
 
 ## 7. Безопасность — текущее состояние
@@ -1122,6 +1131,9 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Media usage idempotency | ✅ | `usage_accumulated_at` предотвращает двойное начисление usage |
 | Video publish least privilege | ✅ | LiveKit grant для `video_publish` ограничен `CanPublishSources=[CAMERA]`; screen share и video subscribe не выдаются |
 | Video publish authorization | ✅ | обязательны `voice.connect` + `voice.speak`, room `allow_speak`, server/room boundary и active track limits |
+| Screen-share publish least privilege | ✅ | LiveKit grant для `screen_share_publish` ограничен `CanPublishSources=[SCREEN_SHARE]`; `CAMERA`, `MICROPHONE` и video subscribe не выдаются |
+| Screen-share publish authorization | ✅ | обязательны `voice.connect` + `voice.speak`, room `allow_speak`, installation/server/room boundary и active track limits |
+| Screen-share source integrity | ✅ | backend token разрешает только `SCREEN_SHARE`; test bot использует корректный rtc-node enum `TrackSource.SOURCE_SCREENSHARE` |
 
 | Frontend LiveKit logs | ⚠️ | полный participant object содержит временный access token в `ws.url`; production logs нужно санитизировать |
 
@@ -1211,6 +1223,9 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - публиковать camera video track через intent `video_publish` и команду `/videopublish`
 - получать `voice.track.published` / `voice.track.unpublished` для `VIDEO/CAMERA` через Gateway
 - учитывать video publish duration и количество video tracks в `bot_media_usage_daily`
+- публиковать screen-share track через intent `screen_share_publish` и команду `/screenpublish`
+- получать `voice.track.published` / `voice.track.unpublished` для `VIDEO/SCREEN_SHARE` через Gateway
+- учитывать screen-share publish duration и количество screen tracks в `bot_media_usage_daily`
 - быть замьюченным/размьюченным через Track Mute / Unmute control
 - видеть синхронизированное состояние `muted` в `bot_media_tracks` для bot tracks
 - корректно переживать moderator kick: session становится `revoked/moderator_kick`, LiveKit disconnect приходит bot client
@@ -1231,8 +1246,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ### Следующие возможности
 
-- P3.9.8.2 Bot Screen Share Publish Capability
-- P3.9.8.x Screen Share lifecycle/control hardening и diagnostics
+- P3.9.8.x Video / Screen Share lifecycle/control hardening и diagnostics
 - Dev Portal Media Runtime Limits UI для новых media-полей
 - Active Media Usage Monitor / Runtime Enforcement Worker для enforced duration quotas и auto revoke
 - P3.9.7.2.1 Voice Track Control Hardening: service/use-case cleanup, tests, final audit/error contract
@@ -2003,17 +2017,47 @@ Smoke-tested сценарии:
 - measured track usage: `64` seconds;
 - daily aggregate после двух video tests: `76` seconds и `2` published video tracks.
 
-#### P3.9.8.2 — Bot Screen Share Publish Capability 🚧 next
+#### P3.9.8.2 — Bot Screen Share Publish Capability ✅
 
-Следующий инженерный этап:
+Закрыто и end-to-end проверено:
 
-- отдельный intent/capability для screen-share publish;
-- LiveKit source restriction `SCREEN_SHARE` без расширения grants до `CAMERA`/`MICROPHONE`;
-- отдельная проверка policy/limits semantics для screen publish;
-- reuse `bot_media_tracks` с `VIDEO/SCREEN_SHARE`;
-- reuse `bot_media_usage_daily.screen_publish_duration_sec` и `published_screen_tracks`;
-- test bot command и end-to-end smoke test;
-- проверка Gateway lifecycle, disconnect/revoke и usage idempotency.
+- добавлен отдельный intent `screen_share_publish`;
+- session создаётся как publish-only: audio subscribe/publish выключены, video subscribe выключен, video publish включён;
+- video subscribe остаётся unsupported capability;
+- для подключения требуется `voice.connect`, для публикации переиспользуется `voice.speak`;
+- room policy `allow_speak` применяется к screen-share publish и active policy enforcement;
+- pre-create media limit check выполняется для ожидаемого track `VIDEO/SCREEN_SHARE`;
+- `max_active_tracks_per_bot` применяется к screen-share track, а `max_active_speaking_bots_per_room` остаётся audio-only;
+- LiveKit token использует source-level least privilege: `CanPublishSources=[SCREEN_SHARE]`; grants не расширяются до `CAMERA` или `MICROPHONE`;
+- refresh-token сохраняет исходный intent, video capability и source restriction `SCREEN_SHARE`;
+- тестовый bot client получил команду `/screenpublish` и synthetic desktop/application generator на `@livekit/rtc-node`;
+- исправлено точное имя rtc-node enum: `TrackSource.SOURCE_SCREENSHARE`; первоначальный timeout был диагностирован по LiveKit warning `no permission to publish track`, возникшему из-за undefined source при использовании неверного имени enum;
+- smoke test выполнен для 960x540, 5 FPS, 20 секунд, 100 frames;
+- screen-share stream был виден участнику комнаты как демонстрация экрана;
+- Gateway подтвердил `voice.participant.joined`, `voice.track.published`, `voice.track.unpublished`, `voice.participant.left`;
+- опубликованный track зафиксирован как `track_type=VIDEO`, `track_source=SCREEN_SHARE`;
+- session завершилась штатно: `ended/bot_disconnect`;
+- `bot_media_tracks` зафиксировал `unpublished`, timestamps, `usage_duration_sec` и `usage_accumulated_at`;
+- daily usage подтвердил раздельный учёт screen share: `screen_publish_duration_sec` и `published_screen_tracks` растут без изменения audio/video counters;
+- новые таблицы и миграции не потребовались: использованы существующие `BotMediaSession`, `BotMediaTrack`, `BotMediaUsageDaily`.
+
+Проверенный пример:
+
+- session: `bms_7173f749-1b50-4e3f-8594-e5068e1eb9fc`;
+- track SID: `TR_VS4wv7GFjguGAu`;
+- track name: `echotalk-bot-test-screen-share`;
+- track lifecycle: `VIDEO/SCREEN_SHARE -> unpublished`;
+- published interval: `2026-07-20 11:58:03Z` → `2026-07-20 11:58:25Z`;
+- measured track usage: `22` seconds;
+- daily screen aggregate на момент проверки: `63` seconds;
+- audio/video daily counters для этого этапа не изменились.
+
+Следующий инженерный фокус:
+
+- lifecycle/control hardening для camera/screen tracks;
+- diagnostics и Dev Portal UI для media limits/usage;
+- enforced duration quotas и optional auto revoke worker;
+- cleanup/test этап P3.9.7.2.1 для Voice Track Control.
 
 
 ## Changelog после последнего обновления документации от 2026-06-26
@@ -2045,6 +2089,7 @@ Smoke-tested сценарии:
 - `feat(resource_runtime_api) - P3.9.7.3.2 — Speak Duration Observe-only Counters`
 - `release 0.22.0`
 - `P3.9.8.1 — Bot Video Publish Capability: backend capability + test bot smoke flow, end-to-end verified`
+- `P3.9.8.2 — Bot Screen Share Publish Capability: SCREEN_SHARE grant/source, test bot /screenpublish flow, Gateway/track/usage end-to-end verified`
 
 ## Observability
 
@@ -2061,6 +2106,7 @@ Smoke-tested сценарии:
 - bot media track state diagnostics
 - media runtime limit audit через `bot.voice.media.runtime_limit`
 - media usage daily accounting через `bot_media_usage_daily`
+- screen-share lifecycle diagnostics через `VIDEO/SCREEN_SHARE` track state и Gateway events
 - voice track control audit planned/finalizing in P3.9.7.2.1
 
 ---
@@ -2107,7 +2153,7 @@ Smoke-tested сценарии:
 - **P3.9.7.3.2 Speak Duration Observe-only Counters завершён и проверен**
 - **P3.9.7.3.3 Обновление статусной документации завершено**
 - **P3.9.8.1 Bot Video Publish Capability завершён и end-to-end проверен**
-- **P3.9.8.2 Bot Screen Share Publish Capability — следующий инженерный этап**
+- **P3.9.8.2 Bot Screen Share Publish Capability завершён и end-to-end проверен**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -2133,7 +2179,7 @@ Bot Platform уже поддерживает полноценный Discord-like
 - Safe DTO audit и recursive audit meta sanitization
 - table-driven contract tests для Batch / Message / Event contracts
 - minimal OpenAPI draft для Bot Resource API
-- Voice / Media Bot Runtime API: media sessions, LiveKit token, metadata, voice participant events, listen runtime, transcription/notes, speak/publish audio, publish camera video, audit, policy, diagnostics, bot media track state, track mute/unmute
+- Voice / Media Bot Runtime API: media sessions, LiveKit token, metadata, voice participant events, listen runtime, transcription/notes, speak/publish audio, publish camera video, publish screen share, audit, policy, diagnostics, bot media track state, track mute/unmute
 - Speak Runtime Limits: enforced active limits, post-check after `track_published`, observe-only duration counters, daily media usage accounting
 - moderator kick bot из voice room с финальным `revoked/moderator_kick` lifecycle
 - bot speak control через LiveKit Track Mute/Unmute с синхронизацией `bot_media_tracks.muted`
@@ -2157,8 +2203,8 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.9.8.2 — Bot Screen Share Publish Capability.
+➡️ **Следующий этап:** P3.9.8.x — Video / Screen Share lifecycle/control hardening и diagnostics.
 
-P3.9.8.1 video publish завершён: `VIDEO/CAMERA` publication, Gateway lifecycle, track persistence и usage accounting подтверждены end-to-end. После screen-share publish планируются lifecycle/control hardening и Dev Portal UI/diagnostics для media limits и usage.
+P3.9.8.1 video publish и P3.9.8.2 screen-share publish завершены: `VIDEO/CAMERA` и `VIDEO/SCREEN_SHARE` publication, source-level LiveKit grants, Gateway lifecycle, track persistence и usage accounting подтверждены end-to-end. Далее планируются lifecycle/control hardening, Dev Portal UI/diagnostics для media limits и usage, а также отдельный enforcement worker для duration quotas и optional auto revoke.
 
 P3.8.9 Search API остаётся отложенным до появления полноценного системного поиска в EchoTalk.
