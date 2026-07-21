@@ -1,9 +1,9 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-07-20  
+**Дата обновления:** 2026-07-21  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
 **Текущий релиз:** release 0.22.0  
-**Текущий рабочий статус:** после P3.9.8.2 Bot Screen Share Publish Capability
+**Текущий рабочий статус:** после P3.9.8.3 Video / Screen Runtime Hardening
 
 ---
 
@@ -67,8 +67,13 @@
 - **P3.9.7.3.3 Обновление статусной документации закрыто.**
 - **P3.9.8.1 Bot Video Publish Capability закрыт и end-to-end проверен.**
 - **P3.9.8.2 Bot Screen Share Publish Capability закрыт и end-to-end проверен.**
+- **P3.9.8.3 Video / Screen Runtime Hardening закрыт и проверен.**
+- **P3.9.8.3.1 Intent / Capability / Source Contract Hardening закрыт.**
+- **P3.9.8.3.2 Media Lifecycle Reconciliation закрыт и проверен.**
+- **P3.9.8.3.3 Active Policy / Source Enforcement Hardening закрыт и проверен.**
+- **P3.9.8.3.4 Contract & Observability Hardening закрыт и проверен.**
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio, camera video и screen-share publish runtime реализованы и подтверждены end-to-end. Следующий инженерный шаг — P3.9.8.x lifecycle/control hardening и diagnostics для video/screen runtime.**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio, camera video и screen-share publish runtime, source enforcement, lifecycle reconciliation, Gateway media-session contract и расширенная diagnostics/observability завершены и подтверждены end-to-end. Следующий инженерный шаг — P3.9.7.2.1 Voice Track Control Hardening, затем P3.9.9 Active Media Usage Monitor / Runtime Enforcement Worker.**
 
 Пройденные end-to-end проверки:
 
@@ -235,6 +240,30 @@
 - Gateway доставляет `voice.track.published` и `voice.track.unpublished` с `type=VIDEO`, `source=SCREEN_SHARE`
 - `bot_media_tracks` фиксирует lifecycle screen-share track и usage accumulation; проверено финальное состояние `unpublished`
 - `bot_media_usage_daily` корректно увеличивает `screen_publish_duration_sec` и `published_screen_tracks`, не затрагивая audio/video counters
+- Video / Screen Runtime Hardening завершён: intent, capabilities, expected track type/source, token grants, webhook lifecycle, policy enforcement и diagnostics сведены к единому контракту
+- единый internal policy resolver покрывает `stats_only`, `listen`, `speak`, `listen_and_speak`, `video_publish`, `screen_share_publish`
+- для publish-intents backend централизованно определяет capability, ожидаемые `track_type` / `track_source`, LiveKit publish source, media kind и runtime-limit operation
+- refresh-token повторно проверяет persisted capabilities против intent policy и не расширяет права session
+- `BotTokenService` работает fail-closed: publish grant без `CanPublishSources` отклоняется, а publish sources при `CanPublish=false` запрещены
+- source contract закреплён матрицей: `speak -> AUDIO/MICROPHONE`, `video_publish -> VIDEO/CAMERA`, `screen_share_publish -> VIDEO/SCREEN_SHARE`; `listen` и `stats_only` не могут публиковать tracks
+- webhook lifecycle reconciliation защищает от duplicate/out-of-order events: terminal track не переоткрывается, duplicate unpublish идемпотентен, один track SID не может принадлежать другой session
+- поздний `track_unpublished` после terminal transition не перетирает более сильный `end_reason`; session и track сохраняют собственную корректную lifecycle-семантику
+- participant loss/process stop проверен: `track_unpublished` начисляет usage, затем `participant_left` завершает session без double accounting
+- room policy `allow_speak=false` отзывает активные `speak`, `video_publish` и `screen_share_publish` sessions
+- policy revoke проверен для CAMERA и SCREEN_SHARE: session становится `revoked/policy_speak_blocked`, track — `unpublished/policy_speak_blocked`, фактический usage начисляется один раз
+- source mismatch enforcement работает как второй защитный слой поверх LiveKit grants: нарушающая session отзывается, participant удаляется из LiveKit, expected/actual source фиксируются в audit
+- `max_active_tracks_per_bot` применяется ко всем media sources, а `max_active_speaking_bots_per_room` остаётся ограничением только для `AUDIO/MICROPHONE`
+- Gateway `voice.track.published` / `voice.track.unpublished` стабилизированы: `track.sid`, `track.type`, `track.source`, `track.muted` обязательны
+- для bot track Gateway добавляет безопасный `media_session` context: `session_id`, `installation_id`, `intent`, `status`, optional `end_reason`
+- policy revoke Gateway contract проверен: `voice.track.unpublished` содержит `media_session.status=revoked` и `end_reason=policy_speak_blocked`
+- voice/media diagnostics расширены: active/pending/ended/revoked sessions, tracks по MICROPHONE/CAMERA/SCREEN_SHARE, usage duration, stale sessions, orphan tracks, runtime violations и disconnect failures
+- временное окно diagnostics учитывает фактические `ended_at`, `unpublished_at`, `usage_accumulated_at` и `updated_at`, а не только время создания записей
+- diagnostics endpoints проверены: `GET /servers/:serverID/bot-voice/diagnostics` и `GET /rooms/:roomID/bot-voice/diagnostics`
+- исправлен DB mapping diagnostics для GORM-колонок `live_kit_room` и `track_s_id`
+- `last_session_at` теперь отражает последнюю session комнаты, включая завершённые sessions, а не только `pending/active`
+- внутренний audit meta `_ctx` удаляется из публичного diagnostics DTO
+- disconnect failure получил отдельное безопасное audit action `bot.voice.media.disconnect_failure`
+- итоговая diagnostics-проверка показала отсутствие stale/open и orphan published state: `stale_open_sessions=0`, `orphan_published_tracks=0`, `disconnect_failures=0`
 
 
 ### Moderation Runtime
@@ -337,7 +366,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Runtime уже включает audio listen/speak, transcription, audit, policy, diagnostics, track-state, mute/unmute, limits, camera video publish через `VIDEO/CAMERA` и screen-share publish через `VIDEO/SCREEN_SHARE`; следующий шаг — lifecycle/control hardening и diagnostics для video/screen runtime.**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Runtime уже включает audio listen/speak, transcription, audit, policy, diagnostics, track-state, mute/unmute, limits, camera video publish, screen-share publish, strict source contract, lifecycle reconciliation, active policy/source enforcement и Gateway/diagnostics observability. Следующий шаг — P3.9.7.2.1 Voice Track Control Hardening.**
 
 
 ---
@@ -602,7 +631,7 @@
   - `installation_id`, `server_id`, `room_id`, `bot_id` фиксируют boundary
   - `livekit_room` и `participant_identity` связывают EchoTalk session с LiveKit participant
   - statuses: `pending`, `active`, `ended`, `revoked`, `failed`
-  - terminal reasons: `bot_disconnect`, `expired`, `moderator_kick`, `policy_violation`, `token_generation_failed`
+  - terminal reasons включают `bot_disconnect`, `participant_left`, `expired`, `moderator_kick`, `policy_speak_blocked`, `media_source_mismatch`, `token_generation_failed`
   - capabilities snapshot: subscribe/publish audio/video
   - `expires_at`, `started_at`, `ended_at` используются для lifecycle control и диагностики
 
@@ -612,7 +641,7 @@
   - хранит LiveKit track identity: `track_s_id`, `track_name`, `track_type`, `track_source`
   - хранит control state: `muted`, `status`, `published_at`, `unpublished_at`, `updated_at`
   - хранит usage accounting fields: `usage_duration_sec`, `usage_accumulated_at`
-  - используется для Bot Speak Control, diagnostics, audit, runtime limits и будущего video/screen runtime
+  - используется для Bot Speak Control, diagnostics, audit, runtime limits и production video/screen runtime
   - обычные user tracks в эту таблицу не пишутся
 
 - `BotMediaUsageDaily`
@@ -804,9 +833,12 @@ POST   /bot/voice/media-sessions/:sessionID/disconnect
 // User/Admin Voice Track Control
 POST   /moderate-voice-participant
 
-// Implemented admin/diagnostics layer
+// User/Admin Voice / Media Diagnostics
+GET    /servers/:serverID/bot-voice/diagnostics
+GET    /rooms/:roomID/bot-voice/diagnostics
+
 // Voice/media session audit, policy enforcement and runtime observability are implemented in backend/admin UI.
-// Exact admin route names are kept in application routing files and should be mirrored in OpenAPI during P3.9.7.2.2.
+// Diagnostics routes require server-scoped administrative permission and return sanitized audit/runtime data.
 ```
 
 ---
@@ -1072,6 +1104,12 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Speak Duration Observe-only Counters | ✅ | session/daily duration считаются и пишут audit без revoke |
 | Bot Video Publish Capability | ✅ | P3.9.8.1: `video_publish`, LiveKit `VIDEO/CAMERA`, Gateway lifecycle, track state и usage accounting проверены end-to-end |
 | Bot Screen Share Publish Capability | ✅ | P3.9.8.2: `screen_share_publish`, LiveKit `VIDEO/SCREEN_SHARE`, Gateway lifecycle, track state и usage accounting проверены end-to-end |
+| Intent / Capability / Source Contract Hardening | ✅ | P3.9.8.3.1: единый intent policy resolver, refresh validation, fail-closed LiveKit publish grants |
+| Media Lifecycle Reconciliation | ✅ | P3.9.8.3.2: duplicate/out-of-order webhook safety, terminal-state preservation, idempotent usage accounting |
+| Active Policy / Source Enforcement | ✅ | P3.9.8.3.3: CAMERA/SCREEN_SHARE policy revoke и source mismatch enforcement |
+| Gateway Media Session Contract | ✅ | `voice.track.*` содержит обязательный track contract и optional safe `media_session` context |
+| Contract & Observability Hardening | ✅ | P3.9.8.3.4: usage/source diagnostics, stale/orphan counters, runtime violations, disconnect failures |
+| Diagnostics Corrective Hardening | ✅ | `live_kit_room` mapping, `last_session_at`, public audit `_ctx` sanitization исправлены и проверены |
 
 
 ## 7. Безопасность — текущее состояние
@@ -1134,6 +1172,14 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Screen-share publish least privilege | ✅ | LiveKit grant для `screen_share_publish` ограничен `CanPublishSources=[SCREEN_SHARE]`; `CAMERA`, `MICROPHONE` и video subscribe не выдаются |
 | Screen-share publish authorization | ✅ | обязательны `voice.connect` + `voice.speak`, room `allow_speak`, installation/server/room boundary и active track limits |
 | Screen-share source integrity | ✅ | backend token разрешает только `SCREEN_SHARE`; test bot использует корректный rtc-node enum `TrackSource.SOURCE_SCREENSHARE` |
+| Unified media intent/source policy | ✅ | capabilities, expected type/source, LiveKit grants, refresh и limiter input вычисляются из единого internal policy resolver |
+| LiveKit publish grant fail-closed | ✅ | publish без source whitelist и sources при `CanPublish=false` отклоняются до выдачи token |
+| Media source mismatch enforcement | ✅ | actual track сверяется с intent; mismatch вызывает revoke, LiveKit participant removal и safe audit expected/actual |
+| Video/screen active policy enforcement | ✅ | `allow_speak=false` отзывает active CAMERA/SCREEN_SHARE sessions и сохраняет `policy_speak_blocked` |
+| Webhook lifecycle idempotency | ✅ | duplicate/out-of-order publish/unpublish/participant events не переоткрывают terminal state и не дублируют usage |
+| Gateway media-session data minimization | ✅ | bot track events содержат только safe session context без JWT/secrets/authorization metadata |
+| Voice diagnostics authorization/boundary | ✅ | server/room diagnostics ограничены administrative permission и server boundary |
+| Voice diagnostics audit sanitization | ✅ | internal `_ctx` удаляется из public diagnostics DTO; raw LiveKit errors/secrets не выдаются |
 
 | Frontend LiveKit logs | ⚠️ | полный participant object содержит временный access token в `ws.url`; production logs нужно санитизировать |
 
@@ -1201,6 +1247,8 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - нажимать buttons/selects
 - получать ephemeral responses
 - заполнять bot modals
+- просматривать server/room voice-media diagnostics с session, track, policy, usage и runtime violation context
+- видеть stale sessions, orphan tracks, source-specific active tracks и disconnect failures
 
 ### Как bot client
 
@@ -1232,6 +1280,11 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - работать под active speak runtime limits: room-level speaking bots и per-bot active tracks
 - попадать в media duration accounting: session duration и daily audio publish duration фиксируются observe-only
 - получать audit/runtime visibility по превышениям media limits без принудительного отключения
+- получать стабильный `media_session` context в `voice.track.published` / `voice.track.unpublished`
+- видеть `intent`, session `status` и terminal `end_reason` прямо в Gateway track lifecycle event
+- работать под strict source contract: `AUDIO/MICROPHONE`, `VIDEO/CAMERA`, `VIDEO/SCREEN_SHARE`
+- корректно переживать abrupt process stop/participant loss без reopening terminal track и без двойного usage
+- получать согласованный policy revoke lifecycle для camera/screen publication
 
 ---
 
@@ -1246,10 +1299,10 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ### Следующие возможности
 
-- P3.9.8.x Video / Screen Share lifecycle/control hardening и diagnostics
-- Dev Portal Media Runtime Limits UI для новых media-полей
-- Active Media Usage Monitor / Runtime Enforcement Worker для enforced duration quotas и auto revoke
 - P3.9.7.2.1 Voice Track Control Hardening: service/use-case cleanup, tests, final audit/error contract
+- P3.9.9 Active Media Usage Monitor / Runtime Enforcement Worker для enforced duration quotas и auto revoke
+- P3.9.10 Media Runtime Dev Portal & Contract Stabilization
+- Dev Portal Media Runtime Limits / Usage UI для новых media-полей
 - deferred interaction responses
 - autocomplete interactions
 - user/role/channel select components
@@ -1981,7 +2034,7 @@ Smoke-tested сценарии:
 - `max_daily_speak_duration_sec` пишет `max_daily_speak_duration_observed`;
 - оба duration лимита работают observe-only, без disconnect/revoke/block.
 
-#### P3.9.8 — Bot Video / Screen Stream Runtime 🚧
+#### P3.9.8 — Bot Video / Screen Stream Runtime ✅
 
 Общий media runtime расширяется от audio publish к video и screen-share источникам с переиспользованием session lifecycle, track state, usage accounting, policies, limits и diagnostics.
 
@@ -2052,12 +2105,133 @@ Smoke-tested сценарии:
 - daily screen aggregate на момент проверки: `63` seconds;
 - audio/video daily counters для этого этапа не изменились.
 
+#### P3.9.8.3 — Video / Screen Runtime Hardening ✅
+
+Закрыт полный hardening-цикл для camera video и screen-share runtime:
+
+- intent/capability/source contract централизован;
+- LiveKit publish grants переведены на fail-closed source restrictions;
+- webhook lifecycle защищён от duplicate/out-of-order delivery;
+- terminal session/track state и first terminal reason сохраняются;
+- source mismatch и active room policy enforcement реализованы;
+- Gateway track contract расширен безопасным media-session context;
+- diagnostics расширены source-specific usage и stale/orphan/runtime counters;
+- corrective diagnostics fixes по DB column mapping, `last_session_at` и audit meta sanitization применены и проверены;
+- новые таблицы и миграции не потребовались.
+
+#### P3.9.8.3.1 — Intent / Capability / Source Contract Hardening ✅
+
+Закрыто:
+
+- добавлен единый internal `botMediaIntentPolicy` resolver;
+- resolver покрывает `stats_only`, `listen`, `speak`, `listen_and_speak`, `video_publish`, `screen_share_publish`;
+- capabilities normalization, expected publish sources, pre-create limits, audit и refresh-token используют один policy contract;
+- `speak` и `listen_and_speak` разрешают только `AUDIO/MICROPHONE`;
+- `video_publish` разрешает только `VIDEO/CAMERA`;
+- `screen_share_publish` разрешает только `VIDEO/SCREEN_SHARE`;
+- `listen` и `stats_only` не разрешают publication;
+- refresh-token проверяет persisted capabilities против session intent;
+- `BotTokenService` fail-closed:
+  - `CanPublish=true` без sources → ошибка;
+  - `CanPublish=false` с sources → ошибка.
+
+#### P3.9.8.3.2 — Media Lifecycle Reconciliation ✅
+
+Закрыто и regression-tested:
+
+- webhook processor больше не проглатывает repository/usage/audit errors;
+- room state очищается только после успешной публикации runtime event;
+- `participant_joined`, `participant_left`, `track_published`, `track_unpublished`, `room_finished` приведены к согласованному lifecycle;
+- duplicate active publish обновляет только безопасное mutable state и не сбрасывает lifecycle timestamps;
+- один LiveKit track SID не может быть переиспользован другой media session;
+- terminal или уже accumulated track не может быть повторно открыт delayed `track_published`;
+- duplicate `track_unpublished` идемпотентен;
+- missing publish + early unpublish фиксируется как terminal zero-duration row;
+- stronger terminal state/reason не перетирается поздним webhook;
+- abrupt bot process stop проверен:
+  - track закрывается `unpublished/track_unpublished`;
+  - usage начисляется один раз;
+  - session завершается `ended/participant_left`;
+- различие track `end_reason` и session `end_reason` зафиксировано как корректная семантика, а не ошибка.
+
+#### P3.9.8.3.3 — Active Policy / Source Enforcement Hardening ✅
+
+Закрыто и end-to-end проверено:
+
+- actual published track сверяется с persisted media session intent;
+- source contract:
+  - `speak` / `listen_and_speak` → `AUDIO/MICROPHONE`;
+  - `video_publish` → `VIDEO/CAMERA`;
+  - `screen_share_publish` → `VIDEO/SCREEN_SHARE`;
+  - `listen` / `stats_only` → publication forbidden;
+- source mismatch приводит к revoke session, track termination, LiveKit participant removal и safe audit expected/actual;
+- повторный enforcement идемпотентен и не создаёт double revoke/double usage;
+- room policy `allow_speak=false` применяется к активным audio, camera и screen-share publish sessions;
+- video policy revoke проверен:
+  - session `revoked/policy_speak_blocked`;
+  - track `unpublished/policy_speak_blocked`;
+  - usage `6` seconds, `usage_accumulated_at` заполнен;
+- screen-share policy revoke проверен с тем же contract и `6` seconds usage;
+- `max_active_tracks_per_bot` продолжает считать AUDIO/CAMERA/SCREEN_SHARE;
+- `max_active_speaking_bots_per_room` остаётся audio-only и считает `AUDIO/MICROPHONE`.
+
+#### P3.9.8.3.4 — Contract & Observability Hardening ✅
+
+Закрыто и end-to-end проверено:
+
+- Gateway `voice.track.published` / `voice.track.unpublished` стабилизированы:
+  - `track.sid`;
+  - `track.type`;
+  - `track.source`;
+  - `track.muted`;
+- bot track events получили optional safe `media_session`:
+  - `session_id`;
+  - `installation_id`;
+  - `intent`;
+  - `status`;
+  - optional `end_reason`;
+- Gateway contract проверен для:
+  - `AUDIO/MICROPHONE` + `intent=speak`;
+  - `VIDEO/CAMERA` + `intent=video_publish`;
+  - `VIDEO/SCREEN_SHARE` + `intent=screen_share_publish`;
+- policy revoke event проверен: `voice.track.unpublished` содержит `status=revoked` и `end_reason=policy_speak_blocked`;
+- diagnostics summary расширен:
+  - active/pending/ended/revoked/failed sessions;
+  - published/unpublished/revoked/failed tracks;
+  - source mismatch revokes;
+  - runtime limit violations;
+  - disconnect failures;
+  - stale open sessions;
+  - orphan published tracks;
+  - active MICROPHONE/CAMERA/SCREEN_SHARE tracks;
+  - audio/camera/screen usage duration;
+- временное окно учитывает lifecycle timestamps, а не только `created_at`;
+- track DTO содержит `usage_duration_sec` и `usage_accumulated_at`;
+- добавлен audit action `bot.voice.media.disconnect_failure`;
+- diagnostics routes зафиксированы:
+  - `GET /servers/:serverID/bot-voice/diagnostics`;
+  - `GET /rooms/:roomID/bot-voice/diagnostics`;
+- corrective hardening:
+  - scanner mapping исправлен с `livekit_room` на реальную GORM-колонку `live_kit_room`;
+  - `track_s_id` mapping подтверждён;
+  - `last_session_at` учитывает завершённые sessions;
+  - internal audit meta `_ctx` удаляется из public response;
+- итоговая проверка:
+  - `livekit_room` возвращается для sessions/tracks;
+  - `last_session_at` заполнен для комнаты с историей;
+  - `_ctx` отсутствует;
+  - `stale_open_sessions=0`;
+  - `orphan_published_tracks=0`;
+  - `disconnect_failures=0`;
+  - usage summary совпадает с суммой track durations.
+
 Следующий инженерный фокус:
 
-- lifecycle/control hardening для camera/screen tracks;
-- diagnostics и Dev Portal UI для media limits/usage;
-- enforced duration quotas и optional auto revoke worker;
-- cleanup/test этап P3.9.7.2.1 для Voice Track Control.
+- P3.9.7.2.1 Voice Track Control Hardening;
+- P3.9.9 Active Media Usage Monitor / Runtime Enforcement Worker;
+- P3.9.10 Media Runtime Dev Portal & Contract Stabilization;
+- enforced duration quotas и optional auto revoke;
+- Dev Portal UI для media limits/usage.
 
 
 ## Changelog после последнего обновления документации от 2026-06-26
@@ -2090,6 +2264,11 @@ Smoke-tested сценарии:
 - `release 0.22.0`
 - `P3.9.8.1 — Bot Video Publish Capability: backend capability + test bot smoke flow, end-to-end verified`
 - `P3.9.8.2 — Bot Screen Share Publish Capability: SCREEN_SHARE grant/source, test bot /screenpublish flow, Gateway/track/usage end-to-end verified`
+- `P3.9.8.3.1 — Intent / Capability / Source Contract Hardening: unified intent policy + fail-closed LiveKit sources`
+- `P3.9.8.3.2 — Media Lifecycle Reconciliation: duplicate/out-of-order webhook safety + terminal state preservation`
+- `P3.9.8.3.3 — Active Policy / Source Enforcement Hardening: camera/screen policy revoke + source mismatch enforcement`
+- `P3.9.8.3.4 — Contract & Observability Hardening: Gateway media_session context + extended diagnostics`
+- `P3.9.8.3.4.1 — Diagnostics corrective: live_kit_room mapping, last_session_at, audit _ctx sanitization`
 
 ## Observability
 
@@ -2107,6 +2286,14 @@ Smoke-tested сценарии:
 - media runtime limit audit через `bot.voice.media.runtime_limit`
 - media usage daily accounting через `bot_media_usage_daily`
 - screen-share lifecycle diagnostics через `VIDEO/SCREEN_SHARE` track state и Gateway events
+- Gateway bot track events содержат safe `media_session` context для correlation session ↔ participant ↔ track
+- source contract audit содержит expected/actual type/source и validity
+- diagnostics summary разделяет active/usage по MICROPHONE, CAMERA и SCREEN_SHARE
+- stale session / orphan track / disconnect failure counters
+- lifecycle time-window queries учитывают end/unpublish/usage timestamps
+- diagnostics DB mapping для `live_kit_room` / `track_s_id` проверен на реальной PostgreSQL schema
+- `last_session_at` показывает последнюю session комнаты независимо от terminal status
+- public diagnostics audit meta очищается от internal `_ctx`
 - voice track control audit planned/finalizing in P3.9.7.2.1
 
 ---
@@ -2154,6 +2341,11 @@ Smoke-tested сценарии:
 - **P3.9.7.3.3 Обновление статусной документации завершено**
 - **P3.9.8.1 Bot Video Publish Capability завершён и end-to-end проверен**
 - **P3.9.8.2 Bot Screen Share Publish Capability завершён и end-to-end проверен**
+- **P3.9.8.3 Video / Screen Runtime Hardening завершён и проверен**
+- **P3.9.8.3.1 Intent / Capability / Source Contract Hardening завершён**
+- **P3.9.8.3.2 Media Lifecycle Reconciliation завершён и regression-tested**
+- **P3.9.8.3.3 Active Policy / Source Enforcement Hardening завершён и end-to-end проверен**
+- **P3.9.8.3.4 Contract & Observability Hardening завершён и end-to-end проверен**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -2179,7 +2371,7 @@ Bot Platform уже поддерживает полноценный Discord-like
 - Safe DTO audit и recursive audit meta sanitization
 - table-driven contract tests для Batch / Message / Event contracts
 - minimal OpenAPI draft для Bot Resource API
-- Voice / Media Bot Runtime API: media sessions, LiveKit token, metadata, voice participant events, listen runtime, transcription/notes, speak/publish audio, publish camera video, publish screen share, audit, policy, diagnostics, bot media track state, track mute/unmute
+- Voice / Media Bot Runtime API: media sessions, LiveKit token, metadata, voice participant events, listen runtime, transcription/notes, speak/publish audio, publish camera video, publish screen share, unified intent/source policy, lifecycle reconciliation, source enforcement, Gateway media-session context, audit, policy, diagnostics, bot media track state, track mute/unmute
 - Speak Runtime Limits: enforced active limits, post-check after `track_published`, observe-only duration counters, daily media usage accounting
 - moderator kick bot из voice room с финальным `revoked/moderator_kick` lifecycle
 - bot speak control через LiveKit Track Mute/Unmute с синхронизацией `bot_media_tracks.muted`
@@ -2203,8 +2395,10 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.9.8.x — Video / Screen Share lifecycle/control hardening и diagnostics.
+➡️ **Следующий этап:** P3.9.7.2.1 — Voice Track Control Hardening.
 
-P3.9.8.1 video publish и P3.9.8.2 screen-share publish завершены: `VIDEO/CAMERA` и `VIDEO/SCREEN_SHARE` publication, source-level LiveKit grants, Gateway lifecycle, track persistence и usage accounting подтверждены end-to-end. Далее планируются lifecycle/control hardening, Dev Portal UI/diagnostics для media limits и usage, а также отдельный enforcement worker для duration quotas и optional auto revoke.
+P3.9.8.1 video publish, P3.9.8.2 screen-share publish и P3.9.8.3 Video / Screen Runtime Hardening завершены. Для `VIDEO/CAMERA`, `VIDEO/SCREEN_SHARE` и `AUDIO/MICROPHONE` подтверждены strict source contract, source-level LiveKit grants, lifecycle reconciliation, active policy enforcement, Gateway media-session context, track persistence, usage accounting и расширенная diagnostics/observability.
+
+После P3.9.7.2.1 планируются P3.9.9 Active Media Usage Monitor / Runtime Enforcement Worker и P3.9.10 Media Runtime Dev Portal & Contract Stabilization.
 
 P3.8.9 Search API остаётся отложенным до появления полноценного системного поиска в EchoTalk.
