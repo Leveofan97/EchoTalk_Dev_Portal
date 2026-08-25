@@ -1,9 +1,9 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-07-21  
+**Дата обновления:** 2026-08-25  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
 **Текущий релиз:** release 0.22.0  
-**Текущий рабочий статус:** после P3.9.8.3 Video / Screen Runtime Hardening
+**Текущий рабочий статус:** P3.9.9.1 Media Session Expiration Enforcement закрыт и end-to-end проверен; следующий этап — P3.9.9.2 Active Media Usage Monitor
 
 ---
 
@@ -60,7 +60,7 @@
 - **P3.9.6 Voice / Media Admin Diagnostics & Runtime Observability закрыт.**
 - **P3.9.7.1 Bot Media Track State закрыт.**
 - **P3.9.7.2 Bot Speak Control via Track Mute / Unmute закрыт и проверен.**
-- **P3.9.7.2.1 Voice Track Control Hardening остаётся cleanup/test этапом, но не блокирует video runtime.**
+- **P3.9.7.2.1 Voice Track Control Hardening закрыт и проверен.**
 - **P3.9.7.3 Speak Runtime Limits закрыт на production-MVP уровне.**
 - **P3.9.7.3.1 Media Limits Post-check on Track Published закрыт и проверен.**
 - **P3.9.7.3.2 Speak Duration Observe-only Counters закрыт и проверен.**
@@ -72,8 +72,10 @@
 - **P3.9.8.3.2 Media Lifecycle Reconciliation закрыт и проверен.**
 - **P3.9.8.3.3 Active Policy / Source Enforcement Hardening закрыт и проверен.**
 - **P3.9.8.3.4 Contract & Observability Hardening закрыт и проверен.**
+- **P3.9.9.1 Media Session Expiration Enforcement закрыт и end-to-end проверен.**
+- **P3.9.9.2 Active Media Usage Monitor — следующий этап.**
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio, camera video и screen-share publish runtime, source enforcement, lifecycle reconciliation, Gateway media-session contract и расширенная diagnostics/observability завершены и подтверждены end-to-end. Следующий инженерный шаг — P3.9.7.2.1 Voice Track Control Hardening, затем P3.9.9 Active Media Usage Monitor / Runtime Enforcement Worker.**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio, camera video и screen-share publish runtime, source enforcement, lifecycle reconciliation, Gateway media-session contract, Voice Track Control Hardening и Media Session Expiration Enforcement завершены и подтверждены end-to-end. Следующий инженерный шаг — P3.9.9.2 Active Media Usage Monitor, затем duration enforcement / auto revoke и recovery/observability hardening.**
 
 Пройденные end-to-end проверки:
 
@@ -264,6 +266,13 @@
 - внутренний audit meta `_ctx` удаляется из публичного diagnostics DTO
 - disconnect failure получил отдельное безопасное audit action `bot.voice.media.disconnect_failure`
 - итоговая diagnostics-проверка показала отсутствие stale/open и orphan published state: `stale_open_sessions=0`, `orphan_published_tracks=0`, `disconnect_failures=0`
+- Voice Track Control Hardening завершён: `MuteParticipant` вынесен в отдельный service/use-case слой, controller оставлен тонким, добавлены source-aware resolver и строгая проверка bot identity/session boundary
+- Track control различает `AUDIO/MICROPHONE`, `VIDEO/CAMERA` и `VIDEO/SCREEN_SHARE`; неоднозначный video selector без `track_sid/source` fail-closed вместо выбора случайного video track
+- audit actions `voice.track.mute` / `voice.track.unmute` end-to-end проверены; diagnostics считает `track_mute_actions`, `track_unmute_actions`, `track_control_noop_actions`
+- P3.9.9.1 Media Session Expiration Enforcement завершён: expiration worker удаляет просроченный active bot participant из LiveKit, переводит session в `ended/expired`, закрывает media lifecycle и финализирует usage
+- expiration worker использует grace period 30 секунд; end-to-end тест подтвердил `participant_removed=true`, `usage_finalized=true`, отсутствие `bot.voice.media.disconnect_failure` и audit action `bot.voice.media_session.expire`
+- refresh-token continuity проверена: refresh до старого `expires_at` продлевает lease примерно на 5 минут без разрыва текущего LiveKit connection; старый expiration больше не срабатывает, а worker корректно завершает session только после нового `expires_at + grace`
+- expiration processing защищён от multi-instance гонок через row locking / `FOR UPDATE SKIP LOCKED`; terminal transitions и usage accounting остаются идемпотентными
 
 
 ### Moderation Runtime
@@ -366,7 +375,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Runtime уже включает audio listen/speak, transcription, audit, policy, diagnostics, track-state, mute/unmute, limits, camera video publish, screen-share publish, strict source contract, lifecycle reconciliation, active policy/source enforcement и Gateway/diagnostics observability. Следующий шаг — P3.9.7.2.1 Voice Track Control Hardening.**
+➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Runtime уже включает audio listen/speak, transcription, audit, policy, diagnostics, track-state, source-aware mute/unmute hardening, limits, camera video publish, screen-share publish, strict source contract, lifecycle reconciliation, active policy/source enforcement, Gateway/diagnostics observability и enforced expiration lifecycle для media sessions. Следующий шаг — P3.9.9.2 Active Media Usage Monitor.**
 
 
 ---
@@ -1098,7 +1107,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Bot Speak Control via Track Mute / Unmute | ✅ | user/bot mute/unmute через LiveKit `MutePublishedTrack` |
 | Bot media track DB sync | ✅ | `bot_media_tracks.muted` обновляется для bot tracks |
 | VoiceLobby mic state sync | ✅ | начальное и event-driven состояние Mic/MicOff отражает LiveKit reality |
-| Voice Track Control Hardening | ⚠️ | cleanup/test этап остаётся запланированным, но не блокирует video runtime |
+| Voice Track Control Hardening | ✅ | service/use-case cleanup, source-aware resolver, strict bot boundary, audit/error contract и diagnostics counters завершены и проверены |
 | Speak Runtime Limits | ✅ | active limits enforced, post-check, duration observe-only accounting, audit |
 | Media Limits Post-check | ✅ | `track_published` запускает actual-state check после записи `bot_media_tracks` |
 | Speak Duration Observe-only Counters | ✅ | session/daily duration считаются и пишут audit без revoke |
@@ -1110,6 +1119,8 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Gateway Media Session Contract | ✅ | `voice.track.*` содержит обязательный track contract и optional safe `media_session` context |
 | Contract & Observability Hardening | ✅ | P3.9.8.3.4: usage/source diagnostics, stale/orphan counters, runtime violations, disconnect failures |
 | Diagnostics Corrective Hardening | ✅ | `live_kit_room` mapping, `last_session_at`, public audit `_ctx` sanitization исправлены и проверены |
+| Media Session Expiration Enforcement | ✅ | P3.9.9.1: active/pending expiration lifecycle, LiveKit participant removal, 30s grace, usage finalization, refresh race hardening проверены end-to-end |
+| Active Media Usage Monitor | 🚧 | P3.9.9.2 — следующий этап: мониторинг текущей active duration поверх уже существующего usage accounting |
 
 
 ## 7. Безопасность — текущее состояние
@@ -1162,10 +1173,13 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Voice media session audit | ✅ | session lifecycle и control actions фиксируются audit/runtime событиями |
 | Bot media track state protection | ✅ | track state хранится только для bot tracks, ordinary user tracks не пишутся в bot tables |
 | Voice track control authorization | ✅ | backend проверяет право mute, room boundary, LiveKit participant и track ownership |
-| Voice track control DB sync safety | ✅ | sync `bot_media_tracks` не должен ломать успешный LiveKit mute/unmute |
+| Voice track control DB sync safety | ✅ | строгий sync по installation/session/room/LiveKit room/participant/track SID; успешный LiveKit mute/unmute не ломается DB sync |
 | Media runtime active limits | ✅ | `max_active_speaking_bots_per_room` и `max_active_tracks_per_bot` проверяются pre-create и post-track-published |
 | Media runtime duration accounting | ✅ | `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` работают observe-only через `bot_media_usage_daily` |
 | Media runtime auto revoke | ⚠️ | flag `media_auto_revoke_on_limit` заложен, но отключён до отдельного enforcement worker |
+| Media session expiration enforcement | ✅ | просроченный active participant удаляется из LiveKit после grace period; session завершается `ended/expired`, usage финализируется |
+| Media session refresh race protection | ✅ | refresh продлевает lease только для refreshable open session; старый expiration не может завершить уже продлённую session |
+| Media expiration multi-instance safety | ✅ | worker использует row locking / `FOR UPDATE SKIP LOCKED`; повторная обработка не должна дублировать terminal transition/usage |
 | Media usage idempotency | ✅ | `usage_accumulated_at` предотвращает двойное начисление usage |
 | Video publish least privilege | ✅ | LiveKit grant для `video_publish` ограничен `CanPublishSources=[CAMERA]`; screen share и video subscribe не выдаются |
 | Video publish authorization | ✅ | обязательны `voice.connect` + `voice.speak`, room `allow_speak`, server/room boundary и active track limits |
@@ -1285,6 +1299,9 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - работать под strict source contract: `AUDIO/MICROPHONE`, `VIDEO/CAMERA`, `VIDEO/SCREEN_SHARE`
 - корректно переживать abrupt process stop/participant loss без reopening terminal track и без двойного usage
 - получать согласованный policy revoke lifecycle для camera/screen publication
+- обновлять media session lease через refresh-token без разрыва уже установленного LiveKit connection
+- продолжать полезную voice/media работу после refresh: старый `expires_at` больше не завершает продлённую session
+- автоматически отключаться платформой при окончательном истечении media session: после `expires_at + grace` active participant удаляется из LiveKit и session завершается как `ended/expired`
 
 ---
 
@@ -1299,8 +1316,9 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ### Следующие возможности
 
-- P3.9.7.2.1 Voice Track Control Hardening: service/use-case cleanup, tests, final audit/error contract
-- P3.9.9 Active Media Usage Monitor / Runtime Enforcement Worker для enforced duration quotas и auto revoke
+- P3.9.9.2 Active Media Usage Monitor — следующий этап
+- P3.9.9.3 Duration Limit Enforcement / Auto Revoke для `enforced` duration policy
+- P3.9.9.4 Recovery / Idempotency / Observability hardening для media enforcement worker
 - P3.9.10 Media Runtime Dev Portal & Contract Stabilization
 - Dev Portal Media Runtime Limits / Usage UI для новых media-полей
 - deferred interaction responses
@@ -1968,22 +1986,43 @@ Smoke-tested сценарии:
 - VoiceLobby mic state корректно отражает реальность при подключении пользователя/бота и после TrackMuted/TrackUnmuted;
 - release `0.22.0` включает финальные fixes по P3.9.7.2.
 
-#### P3.9.7.2.1 — Voice Track Control Hardening 🚧 next cleanup
+#### P3.9.7.2.1 — Voice Track Control Hardening ✅
 
-Запланировано ближайшим cleanup/test этапом:
+Закрыто и проверено:
 
-- вынести `MuteParticipant` из controller в `VoiceTrackControlService`;
-- controller оставить тонким: bind/auth/call service/response;
-- добавить DTO request/response для voice track control;
-- добавить table-driven unit tests для:
-  - `botMediaSessionIDFromIdentity`;
-  - `resolveParticipantTrackSID`;
-  - media type mapping;
-  - explicit wrong `track_sid`;
-  - fallback without `track_sid`;
-- добавить/закрепить audit events `voice.track.mute` / `voice.track.unmute`;
-- нормализовать error contract и traceability;
-- сохранить backward compatibility payload с deprecated `room_name`.
+- `MuteParticipant` вынесен из controller в отдельный `VoiceTrackControlService`; controller оставлен тонким и отвечает за bind/runtime context/call service/HTTP response;
+- добавлены отдельные DTO/типы и порты для track-control use-case, LiveKit adapter, repository и audit;
+- canonical LiveKit room name строится backend-ом по доверенным `server_id + room name + room_id`; client `room_name` остаётся deprecated/backward-compatible полем и не является source of truth;
+- добавлен source-aware selector/resolver:
+  - audio → `MICROPHONE`;
+  - video → `CAMERA` или `SCREEN_SHARE`;
+  - aliases нормализуются;
+  - explicit `track_sid` проверяется на принадлежность participant, media type и source;
+  - fallback без `track_sid` разрешён только при единственном подходящем track;
+  - несколько подходящих video tracks приводят к `voice_track_ambiguous`, а не к выбору случайного track;
+- bot participant identity валидируется строго как `bot:<positive installation_id>:bms_*`;
+- bot track DB sync ограничен полным runtime boundary: installation/session/room/LiveKit room/participant identity/track SID/status=`published`;
+- mute/unmute стал идемпотентным: если фактический `muted` уже равен запрошенному, LiveKit mutation не вызывается, а response фиксирует `changed=false`;
+- добавлены audit actions:
+  - `voice.track.mute`;
+  - `voice.track.unmute`;
+- audit meta фиксирует media/source, previous/current muted state, `changed`, `bot_track_updated`, installation/session для bot tracks;
+- audit failure не ломает успешный LiveKit mutation;
+- публичный error contract нормализован через typed `VoiceTrackControlError`;
+- table-driven tests добавлены для identity parser, selector/source normalization и resolver edge-cases;
+- end-to-end mute/unmute проверен на bot audio track;
+- diagnostics интеграция проверена:
+  - `track_mute_actions=2`;
+  - `track_unmute_actions=2`;
+  - `track_control_noop_actions=0`;
+- public diagnostics продолжает удалять internal audit `_ctx`.
+
+Итог:
+
+- Track Mute / Unmute больше не зависит от controller-level ad-hoc resolver;
+- CAMERA и SCREEN_SHARE различаются явно;
+- ownership/boundary и DB sync закреплены отдельным use-case слоем;
+- P3.9.7.2.1 закрыт и не является roadmap-хвостом.
 
 #### P3.9.7.3.3 — Обновление статусной документации ✅
 
@@ -2225,12 +2264,112 @@ Smoke-tested сценарии:
   - `disconnect_failures=0`;
   - usage summary совпадает с суммой track durations.
 
+### P3.9.9 — Active Media Usage Monitor / Runtime Enforcement Worker 🚧
+
+Цель:
+
+Довести media runtime от observe-only duration accounting до production enforcement: корректно завершать просроченные media sessions, затем контролировать фактическую active duration и применять `enforced` limits / auto revoke без гонок, double accounting и orphan LiveKit participants.
+
+#### P3.9.9.1 — Media Session Expiration Enforcement ✅
+
+Закрыто и end-to-end проверено:
+
+- существующий media-session cleanup переработан из DB-only cleanup в полноценный expiration enforcement lifecycle;
+- `pending` session после истечения lease завершается без LiveKit removal, так как participant ещё не подключался;
+- `active` session после истечения lease:
+  - ждёт grace period;
+  - удаляет bot participant из LiveKit через room admin service;
+  - переводит session в `ended`;
+  - сохраняет `end_reason=expired`;
+  - закрывает/финализирует media lifecycle;
+  - финализирует usage accounting;
+  - пишет audit `bot.voice.media_session.expire`;
+- grace period на текущем runtime установлен в `30s`;
+- worker обрабатывает expiration пакетами и использует row locking / `FOR UPDATE SKIP LOCKED`, чтобы несколько backend-инстансов не выполняли один terminal transition одновременно;
+- LiveKit/admin failure не должен оставлять ложный успешный DB terminal state; failure фиксируется через `bot.voice.media.disconnect_failure` и может быть повторно обработан;
+- refresh/expiration race hardened:
+  - refresh разрешён только для `pending/active` refreshable session;
+  - успешный refresh продлевает `BotMediaSession.expires_at`;
+  - новый LiveKit JWT выдаётся без разрыва существующего WebRTC connection;
+  - старый `expires_at` после refresh больше не должен использоваться worker-ом;
+- developer contract закреплён:
+  - refresh должен выполняться до `expires_at`;
+  - grace period является worker safety window, а не дополнительным refresh TTL.
+
+End-to-end проверки от 2026-08-25:
+
+1. **Expiration без refresh**
+  - active `video_publish` session вручную получила короткий `expires_at`;
+  - после окончания lease + ~30s grace бот фактически исчез из LiveKit voice room;
+  - DB: session `ended/expired`;
+  - audit: `bot.voice.media_session.expire`;
+  - audit meta подтвердил:
+    - `was_active=true`;
+    - `participant_removed=true`;
+    - `usage_finalized=true`;
+    - `grace_period_sec=30`;
+  - `bot.voice.media.disconnect_failure` для тестовой session отсутствовал.
+
+2. **Refresh continuity**
+  - active `listen` session получила короткий старый `expires_at`;
+  - до истечения выполнен `POST /bot/voice/media-sessions/:sessionID/refresh-token`;
+  - `expires_at` продлился примерно на 5 минут;
+  - session осталась `active` после старого `expires_at + grace`;
+  - текущий LiveKit connection не прервался;
+  - worker завершил session только после уже нового `expires_at + grace`;
+  - финальный state: `ended/expired`.
+
+Проверенный timing refresh-continuity сценария:
+
+- старый `expires_at`: `2026-08-25 12:37:47Z`;
+- новый `expires_at` после refresh: `2026-08-25 12:42:21Z`;
+- после старой expiration boundary session продолжала оставаться `active`;
+- `ended_at`: `2026-08-25 12:42:56Z`;
+- `end_reason=expired`;
+- фактическая задержка после нового expiry ~35 секунд соответствует `30s grace + worker tick`.
+
+Итог:
+
+- media-session lease теперь является реально enforced server-side lifecycle contract;
+- refresh продлевает lease без необходимости прерывать полезную voice/media работу бота;
+- бот, который перестал refresh-ить lease, не может бесконечно оставаться подключённым к LiveKit;
+- P3.9.9.1 закрыт.
+
+#### P3.9.9.2 — Active Media Usage Monitor 🚧 next
+
+Следующий этап:
+
+- вычислять текущую active duration опубликованных media tracks/sessions без постоянной записи duration на каждом tick;
+- объединять closed daily usage из `bot_media_usage_daily` с текущим active usage;
+- использовать уже существующие `max_speak_session_duration_sec` / `max_daily_speak_duration_sec` и mode `disabled|observe_only|enforced`;
+- формировать единый runtime decision contract, не дублируя lifecycle/revoke код.
+
+#### P3.9.9.3 — Duration Limit Enforcement / Auto Revoke ❌
+
+Планируется:
+
+- применять `enforced` duration decisions к active session;
+- задействовать `media_auto_revoke_on_limit`;
+- безопасно выполнять revoke / LiveKit participant removal / track close / usage finalization;
+- различать session-duration и daily-duration terminal reasons;
+- сохранять audit и diagnostics contract.
+
+#### P3.9.9.4 — Recovery / Idempotency / Observability ❌
+
+Планируется:
+
+- recovery/reconciliation после backend restart;
+- multi-instance safety для duration enforcement;
+- retry/recovery после LiveKit admin errors;
+- metrics и diagnostics counters для scans, violations, revokes и failures;
+- soak/regression tests для race scenarios.
+
 Следующий инженерный фокус:
 
-- P3.9.7.2.1 Voice Track Control Hardening;
-- P3.9.9 Active Media Usage Monitor / Runtime Enforcement Worker;
+- P3.9.9.2 Active Media Usage Monitor;
+- P3.9.9.3 Duration Limit Enforcement / Auto Revoke;
+- P3.9.9.4 Recovery / Idempotency / Observability;
 - P3.9.10 Media Runtime Dev Portal & Contract Stabilization;
-- enforced duration quotas и optional auto revoke;
 - Dev Portal UI для media limits/usage.
 
 
@@ -2269,6 +2408,8 @@ Smoke-tested сценарии:
 - `P3.9.8.3.3 — Active Policy / Source Enforcement Hardening: camera/screen policy revoke + source mismatch enforcement`
 - `P3.9.8.3.4 — Contract & Observability Hardening: Gateway media_session context + extended diagnostics`
 - `P3.9.8.3.4.1 — Diagnostics corrective: live_kit_room mapping, last_session_at, audit _ctx sanitization`
+- `P3.9.7.2.1 — Voice Track Control Hardening: service/use-case extraction, source-aware resolver, strict bot boundary, mute/unmute audit + diagnostics integration, end-to-end verified`
+- `P3.9.9.1 — Media Session Expiration Enforcement: active participant removal after expires_at + grace, refresh race hardening, multi-instance locking, usage finalization, end-to-end verified`
 
 ## Observability
 
@@ -2294,7 +2435,9 @@ Smoke-tested сценарии:
 - diagnostics DB mapping для `live_kit_room` / `track_s_id` проверен на реальной PostgreSQL schema
 - `last_session_at` показывает последнюю session комнаты независимо от terminal status
 - public diagnostics audit meta очищается от internal `_ctx`
-- voice track control audit planned/finalizing in P3.9.7.2.1
+- voice track control audit `voice.track.mute` / `voice.track.unmute` реализован и включён в diagnostics counters
+- media session expiration audit `bot.voice.media_session.expire` реализован; meta включает `was_active`, `participant_removed`, `usage_finalized`, `grace_period_sec`, `expired_at`
+- expiration disconnect failures фиксируются отдельным `bot.voice.media.disconnect_failure`
 
 ---
 
@@ -2334,7 +2477,7 @@ Smoke-tested сценарии:
 - **P3.9.6 Voice / Media Admin Diagnostics & Runtime Observability завершён**
 - **P3.9.7.1 Bot Media Track State завершён**
 - **P3.9.7.2 Bot Speak Control via Track Mute / Unmute завершён и проверен**
-- **P3.9.7.2.1 Voice Track Control Hardening — cleanup/test этап, не блокирует video runtime**
+- **P3.9.7.2.1 Voice Track Control Hardening завершён и проверен**
 - **P3.9.7.3 Speak Runtime Limits завершён на production-MVP уровне**
 - **P3.9.7.3.1 Media Limits Post-check on Track Published завершён и проверен**
 - **P3.9.7.3.2 Speak Duration Observe-only Counters завершён и проверен**
@@ -2346,6 +2489,8 @@ Smoke-tested сценарии:
 - **P3.9.8.3.2 Media Lifecycle Reconciliation завершён и regression-tested**
 - **P3.9.8.3.3 Active Policy / Source Enforcement Hardening завершён и end-to-end проверен**
 - **P3.9.8.3.4 Contract & Observability Hardening завершён и end-to-end проверен**
+- **P3.9.9.1 Media Session Expiration Enforcement завершён и end-to-end проверен**
+- **P3.9.9.2 Active Media Usage Monitor — следующий этап**
 
 
 Bot Platform уже поддерживает полноценный Discord-like server management runtime:
@@ -2375,6 +2520,8 @@ Bot Platform уже поддерживает полноценный Discord-like
 - Speak Runtime Limits: enforced active limits, post-check after `track_published`, observe-only duration counters, daily media usage accounting
 - moderator kick bot из voice room с финальным `revoked/moderator_kick` lifecycle
 - bot speak control через LiveKit Track Mute/Unmute с синхронизацией `bot_media_tracks.muted`
+- source-aware Voice Track Control Hardening с audit `voice.track.mute` / `voice.track.unmute` и ambiguity protection для camera/screen tracks
+- Media Session Expiration Enforcement: server-side lease, refresh без разрыва LiveKit connection, автоматическое удаление просроченного active bot participant после grace period
 
 Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
 
@@ -2395,10 +2542,15 @@ Bot Platform уже поддерживает полноценный Discord-like
 
 через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
 
-➡️ **Следующий этап:** P3.9.7.2.1 — Voice Track Control Hardening.
+➡️ **Следующий этап:** P3.9.9.2 — Active Media Usage Monitor.
 
-P3.9.8.1 video publish, P3.9.8.2 screen-share publish и P3.9.8.3 Video / Screen Runtime Hardening завершены. Для `VIDEO/CAMERA`, `VIDEO/SCREEN_SHARE` и `AUDIO/MICROPHONE` подтверждены strict source contract, source-level LiveKit grants, lifecycle reconciliation, active policy enforcement, Gateway media-session context, track persistence, usage accounting и расширенная diagnostics/observability.
+P3.9.7.2.1 Voice Track Control Hardening, P3.9.8.1 video publish, P3.9.8.2 screen-share publish, P3.9.8.3 Video / Screen Runtime Hardening и P3.9.9.1 Media Session Expiration Enforcement завершены. Для `VIDEO/CAMERA`, `VIDEO/SCREEN_SHARE` и `AUDIO/MICROPHONE` подтверждены strict source contract, source-level LiveKit grants, source-aware track control, lifecycle reconciliation, active policy enforcement, Gateway media-session context, track persistence, usage accounting, server-side session lease/refresh и автоматическое expiration enforcement.
 
-После P3.9.7.2.1 планируются P3.9.9 Active Media Usage Monitor / Runtime Enforcement Worker и P3.9.10 Media Runtime Dev Portal & Contract Stabilization.
+Дальнейший P3.9 roadmap:
+
+1. P3.9.9.2 Active Media Usage Monitor;
+2. P3.9.9.3 Duration Limit Enforcement / Auto Revoke;
+3. P3.9.9.4 Recovery / Idempotency / Observability;
+4. P3.9.10 Media Runtime Dev Portal & Contract Stabilization.
 
 P3.8.9 Search API остаётся отложенным до появления полноценного системного поиска в EchoTalk.
