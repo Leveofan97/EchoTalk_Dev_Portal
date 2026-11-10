@@ -447,6 +447,7 @@ import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } 
 import { useRoute, useRouter } from 'vue-router'
 import '@stoplight/elements/web-components.min.js'
 import '@stoplight/elements/styles.min.css'
+import AsyncApiReference from '@/views/AsyncApiReference.vue'
 
 type NavItem = {
   id: string
@@ -486,7 +487,7 @@ const openApiUrl = configuredOpenApiUrl || '/openapi/bot-resource-api.yaml'
 
 const configuredAsyncApiUrl = String(import.meta.env.VITE_BOT_ASYNCAPI_URL ?? '').trim()
 
-const asyncApiUrl = configuredAsyncApiUrl || '/asyncapi/bot-gateway.yaml'
+const asyncApiUrl = configuredAsyncApiUrl || '/asyncapi/bot-gateway-asyncapi.yaml'
 
 async function setActiveApiReference(view: ApiReferenceView): Promise<void> {
   activeApiReference.value = view
@@ -991,9 +992,11 @@ const EndpointRow = defineComponent({
 
 .api-reference-frame {
   min-height: 75vh;
-  overflow: hidden;
+  overflow: visible;
+
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
+
   background: var(--bg-tertiary);
 }
 

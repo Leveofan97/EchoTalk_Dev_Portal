@@ -1,77 +1,59 @@
 <template>
-  <div ref="containerRef" class="asyncapi-reference" />
+  <div class="asyncapi-reference">
+    <ApiReference :key="specUrl" :configuration="configuration" />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 
-import '@asyncapi/react-component/browser/index.js'
-import '@asyncapi/react-component/styles/default.min.css'
-
-interface AsyncApiStandalone {
-  render(
-    options: {
-      schema: string
-      config?: Record<string, unknown>
-    },
-    element: HTMLElement,
-  ): void
-}
-
-declare global {
-  interface Window {
-    AsyncApiStandalone?: AsyncApiStandalone
-  }
-}
+import { ApiReference } from '@scalar/api-reference'
+import '@scalar/api-reference/style.css'
 
 const props = defineProps<{
   specUrl: string
 }>()
 
-const containerRef = ref<HTMLDivElement | null>(null)
+const configuration = computed(() => ({
+  url: props.specUrl,
 
-async function renderAsyncApi(): Promise<void> {
-  if (!containerRef.value) {
-    return
-  }
+  layout: 'modern' as const,
+  theme: 'purple',
 
-  const response = await fetch(props.specUrl)
+  showSidebar: true,
 
-  if (!response.ok) {
-    throw new Error(`Failed to load AsyncAPI specification: ${response.status}`)
-  }
+  modelsSectionLabel: 'Schemas',
 
-  const schema = await response.text()
+  // Для WS Gateway API-клиент нам сейчас не нужен.
+  hideClientButton: true,
+  hideTestRequestButton: true,
 
-  await nextTick()
+  // Не показываем внутренние dev-инструменты Scalar.
+  showDeveloperTools: 'never' as const,
 
-  if (!containerRef.value) {
-    return
-  }
+  // Не позволяем Scalar менять route Dev Portal.
+  urlRouting: false,
 
-  if (!window.AsyncApiStandalone) {
-    throw new Error('AsyncApiStandalone is not available')
-  }
+  // Используем шрифты приложения.
+  withDefaultFonts: false,
 
-  window.AsyncApiStandalone.render(
-    {
-      schema,
-      config: {
-        show: {
-          sidebar: true,
-          info: true,
-          operations: true,
-          messages: true,
-          schemas: true,
-          errors: true,
-        },
-      },
-    },
-    containerRef.value,
-  )
-}
+  // Пока документацию держим светлой,
+  // как твой REST reference.
+  forceDarkModeState: 'light' as const,
+  hideDarkModeToggle: true,
 
-onMounted(() => {
-  void renderAsyncApi()
-})
+  customFetch: (input: string | URL | globalThis.Request, init?: RequestInit) =>
+    window.fetch(input, {
+      ...init,
+      credentials: 'omit',
+    }),
+}))
 </script>
+
+<style scoped>
+.asyncapi-reference {
+  width: 100%;
+  min-width: 0;
+  min-height: 75vh;
+}
+</style>
