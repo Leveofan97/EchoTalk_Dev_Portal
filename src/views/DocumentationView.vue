@@ -373,20 +373,59 @@
     </div>
 
     <div v-else class="api-reference-shell">
+      <div class="api-type-switcher" role="tablist" aria-label="API protocol">
+        <button
+          type="button"
+          role="tab"
+          class="api-type-switcher__button"
+          :class="{
+            'api-type-switcher__button--active': activeApiReference === 'rest',
+          }"
+          :aria-selected="activeApiReference === 'rest'"
+          @click="setActiveApiReference('rest')"
+        >
+          REST API
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          class="api-type-switcher__button"
+          :class="{
+            'api-type-switcher__button--active': activeApiReference === 'gateway',
+          }"
+          :aria-selected="activeApiReference === 'gateway'"
+          @click="setActiveApiReference('gateway')"
+        >
+          Gateway WebSocket
+        </button>
+      </div>
+
       <header class="api-reference-hero">
-        <div>
+        <div v-if="activeApiReference === 'rest'">
           <div class="docs-badge">Canonical OpenAPI</div>
-          <h1>EchoTalk Bot API Reference</h1>
+
+          <h1>EchoTalk Bot REST API</h1>
+
           <p>
-            Интерактивный reference рендерится Stoplight Elements напрямую из канонической
-            OpenAPI-спецификации backend. Изменения в YAML автоматически отражаются здесь без
-            ручного дублирования endpoint и DTO.
+            HTTP Runtime и Resource API для EchoTalk bots. Контракт описан спецификацией OpenAPI.
+          </p>
+        </div>
+
+        <div v-else>
+          <div class="docs-badge">Canonical AsyncAPI</div>
+
+          <h1>EchoTalk Bot Gateway</h1>
+
+          <p>
+            WebSocket Gateway для доставки runtime events. Контракт описывает hello, event, resume,
+            ACK, heartbeat и protocol errors.
           </p>
         </div>
 
         <a
           class="api-reference-source"
-          :href="openApiUrl"
+          :href="activeApiReference === 'rest' ? openApiUrl : asyncApiUrl"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -395,7 +434,9 @@
       </header>
 
       <div class="api-reference-frame">
-        <StoplightReference :spec-url="openApiUrl" />
+        <StoplightReference v-if="activeApiReference === 'rest'" :spec-url="openApiUrl" />
+
+        <AsyncApiReference v-else :spec-url="asyncApiUrl" />
       </div>
     </div>
   </div>
@@ -430,15 +471,39 @@ type ErrorRow = {
 }
 
 type DocsView = 'guides' | 'api'
+type ApiReferenceView = 'rest' | 'gateway'
 
 const route = useRoute()
 const router = useRouter()
 
 const activeView = ref<DocsView>(route.query.view === 'api' ? 'api' : 'guides')
 
+const activeApiReference = ref<ApiReferenceView>(route.query.api === 'gateway' ? 'gateway' : 'rest')
+
 const configuredOpenApiUrl = String(import.meta.env.VITE_BOT_OPENAPI_URL ?? '').trim()
 
 const openApiUrl = configuredOpenApiUrl || '/openapi/bot-resource-api.yaml'
+
+const configuredAsyncApiUrl = String(import.meta.env.VITE_BOT_ASYNCAPI_URL ?? '').trim()
+
+const asyncApiUrl = configuredAsyncApiUrl || '/asyncapi/bot-gateway.yaml'
+
+async function setActiveApiReference(view: ApiReferenceView): Promise<void> {
+  activeApiReference.value = view
+
+  const query = {
+    ...route.query,
+    view: 'api',
+  }
+
+  if (view === 'gateway') {
+    query.api = 'gateway'
+  } else {
+    delete query.api
+  }
+
+  await router.replace({ query })
+}
 
 async function setActiveView(view: DocsView): Promise<void> {
   activeView.value = view
@@ -447,8 +512,13 @@ async function setActiveView(view: DocsView): Promise<void> {
 
   if (view === 'api') {
     query.view = 'api'
+
+    if (activeApiReference.value === 'gateway') {
+      query.api = 'gateway'
+    }
   } else {
     delete query.view
+    delete query.api
   }
 
   await router.replace({ query })
@@ -1364,5 +1434,47 @@ const EndpointRow = defineComponent({
     grid-template-columns: 1fr;
     gap: 6px;
   }
+}
+
+.api-type-switcher {
+  width: fit-content;
+
+  display: inline-flex;
+  gap: 4px;
+
+  margin-bottom: 24px;
+  padding: 4px;
+
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+
+  background: var(--bg-tertiary);
+}
+
+.api-type-switcher__button {
+  padding: 8px 14px;
+
+  border: 0;
+  border-radius: 7px;
+
+  background: transparent;
+  color: var(--text-secondary);
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+
+  transition: var(--transition);
+}
+
+.api-type-switcher__button:hover {
+  color: var(--text-primary);
+}
+
+.api-type-switcher__button--active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 </style>
