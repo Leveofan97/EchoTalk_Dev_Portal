@@ -1,9 +1,9 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-08-25  
+**Дата обновления:** 2026-11-11  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
-**Текущий релиз:** release 0.22.0  
-**Текущий рабочий статус:** P3.9.9.1 Media Session Expiration Enforcement закрыт и end-to-end проверен; следующий этап — P3.9.9.2 Active Media Usage Monitor
+**Базовый релиз:** release 0.22.0; документ также учитывает unreleased hardening/runtime changes, внедрённые после него  
+**Текущий рабочий статус:** функциональное ядро Bot Platform и публичные REST/Gateway contracts практически стабилизированы. P3.9.9.2 Active Media Usage Monitor и duration enforcement реализованы в runtime; recovery worker/health monitor также присутствуют. Следующий основной этап — P4.0 Release Candidate Hardening: security, scope symmetry, OAuth rotation, outbound SSRF protection, SCA и финальные soak/regression проверки.
 
 ---
 
@@ -73,9 +73,28 @@
 - **P3.9.8.3.3 Active Policy / Source Enforcement Hardening закрыт и проверен.**
 - **P3.9.8.3.4 Contract & Observability Hardening закрыт и проверен.**
 - **P3.9.9.1 Media Session Expiration Enforcement закрыт и end-to-end проверен.**
-- **P3.9.9.2 Active Media Usage Monitor — следующий этап.**
+- **P3.9.9.2 Active Media Usage Monitor реализован.**
+- **P3.9.9.3 Duration Limit Enforcement / Auto Revoke реализован в runtime; требуется финальная end-to-end/soak фиксация статуса.**
+- **P3.9.9.4 Recovery / Idempotency / Observability реализован ядром: duration revoke recovery worker + recovery health monitor; требуется финальная multi-instance/chaos/soak проверка.**
+- **P3.9.10 Contract Stabilization частично закрыт: REST OpenAPI + Gateway AsyncAPI + typed event payloads стабилизированы; Media Runtime Limits/Usage UI остаётся отдельным UX-хвостом.**
+- **P4.0 Release Candidate Hardening — текущий приоритет перед 1.0.**
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Audio, camera video и screen-share publish runtime, source enforcement, lifecycle reconciliation, Gateway media-session contract, Voice Track Control Hardening и Media Session Expiration Enforcement завершены и подтверждены end-to-end. Следующий инженерный шаг — P3.9.9.2 Active Media Usage Monitor, затем duration enforcement / auto revoke и recovery/observability hardening.**
+➡️ **Текущий этап: P4.0 Release Candidate Hardening. Основной функциональный объём платформы уже реализован. До 1.0 фокус смещается с расширения API на закрытие security/reliability release gates: OAuth refresh rotation, outbound SSRF protection, event scope symmetry/data minimization, log sanitization, SCA, idempotency критичных mutation endpoints и финальные media/gateway soak tests.**
+
+### 0.1 Оценка готовности к первому релизу
+
+Инженерная оценка по текущему состоянию кода и контрактов (не product KPI):
+
+| Область | Готовность | Комментарий |
+|---|---:|---|
+| Bot Platform functional core | ~95% | auth/install, commands, interactions, resources, moderation, roles, structure, events, Gateway, voice/media runtime реализованы |
+| REST / Gateway public contracts | ~95% | OpenAPI + AsyncAPI, typed event payloads и examples есть; остаётся release policy/versioning |
+| Security hardening | ~78% | сильная scope/boundary база, но есть несколько release blockers ниже |
+| Reliability / operations | ~85% | retries, backlog, runtime protection, media recovery/health есть; нужны финальные soak/chaos проверки |
+| Developer Experience | ~75% | Dev Portal развит; SDK, interaction inspector и release/version management можно вынести после 1.0 |
+| **Итоговая готовность к Bot Platform 1.0** | **~87%** | функционально близко к релизу; оставшаяся работа преимущественно hardening, а не новые базовые возможности |
+
+**Вывод:** для первого релиза не требуется достраивать весь список будущих возможностей. Release 1.0 разумно выпускать после закрытия P4.0 security/reliability gate. Autocomplete, deferred responses, global search, SDK, hosted runtime/billing и ML abuse detection не являются обязательными для первого GA-релиза.
 
 Пройденные end-to-end проверки:
 
@@ -482,6 +501,11 @@
 | Reconnect replacement | ✅ | |
 | Last seen / last ack tracking | ✅ | `last_seen_at` / `last_acked_at` обновляются при ACK/heartbeat |
 | Backlog overflow cleanup | ✅ | cleanup по overflow добавлен, требуется long-run проверка |
+| Gateway close/send/replay hardening | ✅ | concurrency-safe close, durable ACK ordering, expired replay filtering, bounded replay queue hardening |
+| Per-installation event payload redaction | ✅ | `message.content.view` применяется до webhook persistence / Gateway backlog |
+| Typed Gateway event contract | ✅ | AsyncAPI 1.1.x: typed payload variants для публичных runtime events |
+| Gateway AsyncAPI reference | ✅ | lifecycle, ACK/resume, examples, recovery semantics опубликованы |
+| Event scope symmetry audit | 🚧 | перед 1.0 требуется закрыть invite/moderation/voice data-minimization findings |
 
 ### Runtime configuration — installation-level
 
@@ -870,6 +894,10 @@ GET    /rooms/:roomID/bot-voice/diagnostics
 - `room.view`
 - `room.sendMessage`
 - `message.content.view`
+- `voice.view`
+- `voice.connect`
+- `voice.listen`
+- `voice.speak`
 
 Важно:
 
@@ -887,6 +915,10 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - `server.audit.view` → audit logs и moderation context APIs
 - `server.roles.manage` → управление ролями через runtime API
 - `server.manageRooms` → управление комнатами/категориями и чтение effective overrides
+- `voice.view` → read-only voice room/state и voice lifecycle events
+- `voice.connect` → создание/поддержание media session
+- `voice.listen` → получение audio runtime / track events, где требуется listen visibility
+- `voice.speak` → публикация audio/video/screen-share согласно intent policy
 
 Подписка на событие дополнительно проверяется через event policy.
 
@@ -1152,7 +1184,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Quotas | ⚠️ | daily quotas postponed |
 | Idempotency/request_id | ⚠️ | delivery_id есть, строгий runtime idempotency не везде |
 | Gateway ACK monotonic protection | ✅ | проверено через старый ACK, seq не откатывается |
-| Gateway resume validation | ✅ | replay `seq > last_ack_seq` проверен; invalid resume требуется финально проверить |
+| Gateway resume validation | ✅ | replay `seq > last_ack_seq` + invalid resume handling реализованы |
 | Gateway backlog overflow protection | ✅ | добавлена cleanup policy, нужна long-run проверка |
 | Runtime protection middleware | ✅ | all runtime routes protected |
 | Redis block cache | ✅ | fast-path blocked installations |
@@ -1162,7 +1194,9 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Safe DTO audit | ✅ | denylist tests, no private fields in bot responses |
 | Audit meta sanitization | ✅ | recursive sensitive-key removal |
 | Resource API contract tests | ✅ | Batch / Message / Event table-driven tests |
-| Bot Resource OpenAPI | ✅ | `docs/openapi/bot-resource-api.yaml`, lint OK |
+| Bot Resource OpenAPI | ✅ | canonical REST contract, lint/render проверены |
+| Bot Gateway AsyncAPI | ✅ | canonical WebSocket/Gateway contract, typed payloads + examples |
+| Message event content redaction | ✅ | `message.created/updated` redacted per-installation без `message.content.view` до persistence/delivery |
 | Voice media session boundary | ✅ | session ограничена `installation_id`, `server_id`, `room_id` |
 | Voice room validation | ✅ | media session создаётся только для voice room, room/server boundary проверяется |
 | LiveKit token metadata safety | ✅ | в metadata только UI-safe поля, без tokens/secrets/scopes |
@@ -1196,6 +1230,30 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Voice diagnostics audit sanitization | ✅ | internal `_ctx` удаляется из public diagnostics DTO; raw LiveKit errors/secrets не выдаются |
 
 | Frontend LiveKit logs | ⚠️ | полный participant object содержит временный access token в `ws.url`; production logs нужно санитизировать |
+| Outbound Webhook/Command SSRF protection | 🚧 | **release blocker:** необходимо подтвердить/реализовать запрет private/loopback/link-local/metadata IP, redirect/DNS rebinding protection, HTTPS policy и timeouts |
+| Invite event scope symmetry | ⚠️ | **release blocker:** `server.invite.*` сейчас policy-level привязан к `server.view`; invite payload содержит invite context/code — должен использовать `server.invites.view` либо redaction |
+| Moderation reason data minimization | ⚠️ | **release blocker:** moderation events доступны по `server.members.view`, при этом payload может содержать `reason`; reason должен зависеть от `server.audit.view` либо быть redacted |
+| Voice Gateway internal identifiers | ⚠️ | до 1.0 определить public contract: raw LiveKit room/identity/SID/track SID не должны случайно становиться стабильным публичным API |
+| Frontend/token log sanitization | 🚧 | **release blocker:** исключить JWT/access tokens, `ws.url`, Authorization/Cookie и full participant/session objects из production logs |
+| Dependency/SCA gate | 🚧 | **release blocker:** fresh `govulncheck`, frontend audit и container image scan; critical/high findings должны быть triaged/closed before GA |
+
+---
+
+### 7.1 Release security risk matrix
+
+| Приоритет | Риск | Состояние | Release action |
+|---|---|---|---|
+| **P0 / High** | OAuth refresh token replay/rotation semantics | refresh endpoint есть, rotation semantics не зафиксированы как закрытые | atomic rotate, revoke previous refresh, concurrent refresh test, reuse handling |
+| **P0 / High** | SSRF через developer-controlled `WebhookURL` / `CommandBaseURL` | требует отдельного source audit | safe outbound URL policy + DNS/IP/redirect validation + strict HTTP timeouts |
+| **P0 / High** | Invite code exposure через event scope mismatch | policy использует `server.view`, тогда как Resource API имеет `server.invites.view` | перевести invite events на invite scope или redaction; contract test |
+| **P0 / High** | Token leakage через production logs | известный риск для LiveKit/frontend logging | centralized log sanitizer + grep/regression test на secrets |
+| **P1 / Medium-High** | Moderation `reason` доступен через более широкий member scope | scope symmetry требует hardening | `reason` только с `server.audit.view` либо redaction |
+| **P1 / Medium** | Raw LiveKit identifiers в public Gateway payloads | public/private boundary не полностью определён | минимизировать DTO или официально версионировать как public fields |
+| **P1 / Medium** | Duplicate mutations при retries | строгая idempotency есть не для всех mutation endpoints | `Idempotency-Key` для наиболее дорогих/опасных POST operations |
+| **P1 / Medium** | Event contract evolution | schema version есть, formal compatibility/deprecation policy не описана | event versioning + deprecation policy before external ecosystem grows |
+| **P1 / Medium** | Supply-chain vulnerabilities | состояние зависимостей меняется со временем | automated SCA in CI + release gate |
+
+**Уже закрытая утечка:** message content больше не должен обходить `message.content.view` через Webhook/Gateway: event payload redaction выполняется per-installation до persistence и replay.
 
 ---
 
@@ -1305,32 +1363,72 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ---
 
-## 9. Что не реализовано / что осталось
+## 9. Что осталось до первого релиза
 
-### Критично для production
+### P0 — обязательно закрыть до Bot Platform 1.0 GA
 
-- enforced daily quotas и runtime enforcement worker для длительных media sessions
-- distributed/global quotas
-- advanced anomaly detection
-- ML-based abuse detection
+1. **OAuth refresh-token hardening**
+- rotation semantics;
+- atomic revoke old / issue new;
+- concurrent refresh protection;
+- reuse/replay handling;
+- regression tests на installation revoke.
 
-### Следующие возможности
+2. **Outbound SSRF hardening** для `WebhookURL` и `CommandBaseURL`
+- production HTTPS policy;
+- запрет loopback/private/link-local/multicast/metadata destinations;
+- DNS resolve/rebinding protection;
+- redirect target revalidation или redirects disabled;
+- connect/read/overall timeout и response-size limit.
 
-- P3.9.9.2 Active Media Usage Monitor — следующий этап
-- P3.9.9.3 Duration Limit Enforcement / Auto Revoke для `enforced` duration policy
-- P3.9.9.4 Recovery / Idempotency / Observability hardening для media enforcement worker
-- P3.9.10 Media Runtime Dev Portal & Contract Stabilization
-- Dev Portal Media Runtime Limits / Usage UI для новых media-полей
-- deferred interaction responses
-- autocomplete interactions
-- user/role/channel select components
-- Dev Portal interaction inspector
-- Search API для глобального scoped search — отложен до появления системного поиска
-- bot SDK / helpers
-- metrics / analytics
-- hosted runtime / billing / releases
-- advanced RBAC / room overrides integration
-- event versioning policy
+3. **Event scope symmetry / data minimization**
+- `server.invite.*` согласовать с `server.invites.view`;
+- moderation `reason` согласовать с `server.audit.view`;
+- провести полный event-vs-REST scope matrix test;
+- принять решение по raw LiveKit identifiers в Gateway payload.
+
+4. **Production log sanitization**
+- LiveKit JWT / `ws.url`;
+- bot access/refresh/session tokens;
+- Authorization/Cookie;
+- webhook secrets и signatures;
+- sensitive request/response bodies.
+
+5. **Dependency / supply-chain release gate**
+- `govulncheck ./...`;
+- frontend dependency audit после удаления устаревшего AsyncAPI React stack;
+- container/base-image scan;
+- triage critical/high findings.
+
+6. **Security regression suite**
+- cross-installation/cross-server IDOR;
+- scope downgrade tests;
+- event payload denylist;
+- replay/backlog redaction;
+- SSRF test matrix;
+- token/secret log leakage test.
+
+### P1 — желательно закрыть в RC, но можно ограниченно перенести в 1.0.x
+
+- финальный soak/chaos test `P3.9.9.3/.4` для duration revoke/recovery, LiveKit admin failure и backend restart;
+- long-run Gateway backlog/overflow/reconnect test;
+- idempotency keys для критичных mutation endpoints (`send message`, create media session, create structure/role, moderation actions);
+- documented event versioning/deprecation policy;
+- daily/global quotas там, где одного per-minute/burst protection недостаточно;
+- Dev Portal Media Runtime Limits / Usage UI.
+
+### Не блокирует 1.0 / post-release roadmap
+
+- deferred interaction responses;
+- autocomplete interactions;
+- user/role/channel select components;
+- Dev Portal interaction inspector;
+- global scoped Search API — после системного search layer EchoTalk;
+- official Bot SDK / helpers;
+- advanced analytics;
+- hosted runtime / billing / releases;
+- advanced anomaly / ML-based abuse detection;
+- rich presence source integration.
 
 ---
 
@@ -2299,25 +2397,25 @@ Smoke-tested сценарии:
 End-to-end проверки от 2026-08-25:
 
 1. **Expiration без refresh**
-  - active `video_publish` session вручную получила короткий `expires_at`;
-  - после окончания lease + ~30s grace бот фактически исчез из LiveKit voice room;
-  - DB: session `ended/expired`;
-  - audit: `bot.voice.media_session.expire`;
-  - audit meta подтвердил:
-    - `was_active=true`;
-    - `participant_removed=true`;
-    - `usage_finalized=true`;
-    - `grace_period_sec=30`;
-  - `bot.voice.media.disconnect_failure` для тестовой session отсутствовал.
+- active `video_publish` session вручную получила короткий `expires_at`;
+- после окончания lease + ~30s grace бот фактически исчез из LiveKit voice room;
+- DB: session `ended/expired`;
+- audit: `bot.voice.media_session.expire`;
+- audit meta подтвердил:
+  - `was_active=true`;
+  - `participant_removed=true`;
+  - `usage_finalized=true`;
+  - `grace_period_sec=30`;
+- `bot.voice.media.disconnect_failure` для тестовой session отсутствовал.
 
 2. **Refresh continuity**
-  - active `listen` session получила короткий старый `expires_at`;
-  - до истечения выполнен `POST /bot/voice/media-sessions/:sessionID/refresh-token`;
-  - `expires_at` продлился примерно на 5 минут;
-  - session осталась `active` после старого `expires_at + grace`;
-  - текущий LiveKit connection не прервался;
-  - worker завершил session только после уже нового `expires_at + grace`;
-  - финальный state: `ended/expired`.
+- active `listen` session получила короткий старый `expires_at`;
+- до истечения выполнен `POST /bot/voice/media-sessions/:sessionID/refresh-token`;
+- `expires_at` продлился примерно на 5 минут;
+- session осталась `active` после старого `expires_at + grace`;
+- текущий LiveKit connection не прервался;
+- worker завершил session только после уже нового `expires_at + grace`;
+- финальный state: `ended/expired`.
 
 Проверенный timing refresh-continuity сценария:
 
@@ -2335,45 +2433,94 @@ End-to-end проверки от 2026-08-25:
 - бот, который перестал refresh-ить lease, не может бесконечно оставаться подключённым к LiveKit;
 - P3.9.9.1 закрыт.
 
-#### P3.9.9.2 — Active Media Usage Monitor 🚧 next
+#### P3.9.9.2 — Active Media Usage Monitor ✅
 
-Следующий этап:
+Фактический runtime уже реализует:
 
-- вычислять текущую active duration опубликованных media tracks/sessions без постоянной записи duration на каждом tick;
-- объединять closed daily usage из `bot_media_usage_daily` с текущим active usage;
-- использовать уже существующие `max_speak_session_duration_sec` / `max_daily_speak_duration_sec` и mode `disabled|observe_only|enforced`;
-- формировать единый runtime decision contract, не дублируя lifecycle/revoke код.
+- periodic scan active media sessions;
+- active `AUDIO/MICROPHONE` track usage без постоянной записи duration на каждом tick;
+- объединение текущего active usage с finalized daily usage;
+- session/daily duration decisions через `BotMediaRuntimeLimiter`;
+- violation counters/logging и report cooldown;
+- runtime wiring через `StartBotMediaActiveUsageMonitor`.
 
-#### P3.9.9.3 — Duration Limit Enforcement / Auto Revoke ❌
+#### P3.9.9.3 — Duration Limit Enforcement / Auto Revoke ⚠️
 
-Планируется:
+Реализация присутствует в runtime:
 
-- применять `enforced` duration decisions к active session;
-- задействовать `media_auto_revoke_on_limit`;
-- безопасно выполнять revoke / LiveKit participant removal / track close / usage finalization;
-- различать session-duration и daily-duration terminal reasons;
-- сохранять audit и diagnostics contract.
+- `enforced` duration decision может вызвать `EnforceBotMediaDurationLimit`;
+- поддерживается `AutoRevoke`;
+- session переводится через controlled `revoking -> revoked`;
+- LiveKit participant removal и usage finalization разделены по lifecycle;
+- session-duration и daily-duration имеют отдельные terminal reasons;
+- monitor считает `AutoRevokedSessions`.
 
-#### P3.9.9.4 — Recovery / Idempotency / Observability ❌
+**Остаток до статуса ✅:** зафиксировать отдельный end-to-end + soak regression для session limit, daily limit, duplicate enforcement и LiveKit admin failure.
 
-Планируется:
+#### P3.9.9.4 — Recovery / Idempotency / Observability ⚠️
 
-- recovery/reconciliation после backend restart;
-- multi-instance safety для duration enforcement;
-- retry/recovery после LiveKit admin errors;
-- metrics и diagnostics counters для scans, violations, revokes и failures;
-- soak/regression tests для race scenarios.
+Core implementation присутствует:
 
-Следующий инженерный фокус:
+- `StartBotMediaDurationRevokeRecoveryWorker`;
+- recovery зависших `revoking` sessions;
+- retry window и per-operation timeouts;
+- optimistic claim через `updated_at` для multi-instance contention;
+- disconnect failure audit;
+- `BotMediaRecoveryHealthMonitor` запущен отдельным worker;
+- recovery result counters/logging.
 
-- P3.9.9.2 Active Media Usage Monitor;
-- P3.9.9.3 Duration Limit Enforcement / Auto Revoke;
-- P3.9.9.4 Recovery / Idempotency / Observability;
-- P3.9.10 Media Runtime Dev Portal & Contract Stabilization;
-- Dev Portal UI для media limits/usage.
+**Остаток до статуса ✅:** multi-instance/chaos/soak доказательство, restart recovery test и финальная проверка metrics/diagnostics alertability.
+
+#### P3.9.10 — Media Runtime Dev Portal & Contract Stabilization ⚠️
+
+Закрыто:
+
+- REST OpenAPI contract;
+- Gateway AsyncAPI contract;
+- typed runtime event payloads;
+- Gateway ACK/resume/lifecycle documentation;
+- Scalar rendering для Gateway reference;
+- message event per-installation content redaction contract.
+
+Остаётся:
+
+- Media Runtime Limits / Usage UI;
+- release/deprecation policy;
+- финальная сверка public voice identifiers / data minimization.
+
+### P4.0 — Release Candidate Hardening 🚧 CURRENT
+
+Цель: не расширять поверхность API до бесконечности, а довести уже существующую платформу до безопасного первого GA-релиза.
+
+Release gate:
+
+- P4.0.1 OAuth refresh rotation & replay hardening;
+- P4.0.2 Outbound SSRF protection for webhook/command callbacks;
+- P4.0.3 Event Scope Symmetry & Data Minimization;
+- P4.0.4 Secret/Token Log Sanitization;
+- P4.0.5 SCA / dependency / container security gate;
+- P4.0.6 Cross-installation IDOR + scope downgrade regression suite;
+- P4.0.7 Runtime mutation idempotency for high-risk endpoints;
+- P4.0.8 Gateway + media enforcement soak/chaos tests;
+- P4.0.9 Public API/event versioning & deprecation policy;
+- P4.0.10 Release candidate checklist / rollback / backup verification.
+
+**После закрытия P4.0 платформа может считаться Bot Platform 1.0 GA.**
 
 
 ## Changelog после последнего обновления документации от 2026-06-26
+
+### Актуализация 2026-11-11
+
+- Gateway hardening: durable ACK ordering, expired backlog filtering, replay queue/close concurrency hardening;
+- REST API reference стабилизирован в OpenAPI;
+- Gateway reference стабилизирован в AsyncAPI 1.1.x;
+- AsyncAPI получил typed payload variants для публичных runtime events и examples;
+- Dev Portal использует отдельные REST / Gateway reference views;
+- `message.content.view` распространён на event delivery: per-installation redaction выполняется до webhook persistence / Gateway backlog;
+- regression tests для message event redaction проходят;
+- roadmap переведён из feature-expansion режима в P4.0 Release Candidate Hardening;
+- security review выявил release-gate задачи: OAuth refresh rotation, outbound SSRF validation, event scope symmetry/data minimization, token-log sanitization, SCA.
 
 Сводка по git commit list и реализованным этапам:
 
@@ -2443,114 +2590,47 @@ End-to-end проверки от 2026-08-25:
 
 ## 11. Вывод
 
-Текущее состояние проекта:
+### Текущее состояние
 
-- **P0 завершён**
-- **P1.1 завершён**
-- **P1.1.1 завершён**
-- **P1.2 завершён**
-- **P2.1 завершён базово**
-- **P2.2 завершён на production-MVP уровне**
-- **P2.3 завершён**
-- **P2.4 завершён на production-MVP уровне**
-- **P3.1 завершён**
-- **P3.2 завершён**
-- **P3.3 завершён**
-- **P3.4 завершён**
-- **P3.5 завершён**
-- **P3.6 завершён**
-- **P3.7 завершён**
-- **P3.8.1–P3.8.8 завершены**
-- **P3.8.9 Search API отложен**
-- **P3.8.10 Batch Resource API завершён**
-- **P3.8.11 Resource API Hardening & Contract Stabilization завершён**
-- **P3.9.1 Create Bot Media Session завершён на production-MVP уровне**
-- **P3.9.1.1 Bot Voice Lobby Integration + Moderator Kick завершён и end-to-end проверен**
-- **P3.9.1.2 / P3.9.1.3 Voice Media Session Hardening & Refactoring завершены**
-- **P3.9.2 Listen Runtime Core завершён**
-- **P3.9.2.1 Voice Media Session Public DTO Contract завершён**
-- **P3.9.3 Transcription Runtime / Meeting Notes завершён на production-MVP уровне**
-- **P3.9.4 Speak / Publish Audio Runtime завершён и проверен**
-- **P3.9.5.1 Voice Media Session Audit + Admin UI завершён**
-- **P3.9.5.2 Bots Policy for Voice Rooms завершён**
-- **P3.9.5.3 Policy Change Active Session Enforcement завершён**
-- **P3.9.6 Voice / Media Admin Diagnostics & Runtime Observability завершён**
-- **P3.9.7.1 Bot Media Track State завершён**
-- **P3.9.7.2 Bot Speak Control via Track Mute / Unmute завершён и проверен**
-- **P3.9.7.2.1 Voice Track Control Hardening завершён и проверен**
-- **P3.9.7.3 Speak Runtime Limits завершён на production-MVP уровне**
-- **P3.9.7.3.1 Media Limits Post-check on Track Published завершён и проверен**
-- **P3.9.7.3.2 Speak Duration Observe-only Counters завершён и проверен**
-- **P3.9.7.3.3 Обновление статусной документации завершено**
-- **P3.9.8.1 Bot Video Publish Capability завершён и end-to-end проверен**
-- **P3.9.8.2 Bot Screen Share Publish Capability завершён и end-to-end проверен**
-- **P3.9.8.3 Video / Screen Runtime Hardening завершён и проверен**
-- **P3.9.8.3.1 Intent / Capability / Source Contract Hardening завершён**
-- **P3.9.8.3.2 Media Lifecycle Reconciliation завершён и regression-tested**
-- **P3.9.8.3.3 Active Policy / Source Enforcement Hardening завершён и end-to-end проверен**
-- **P3.9.8.3.4 Contract & Observability Hardening завершён и end-to-end проверен**
-- **P3.9.9.1 Media Session Expiration Enforcement завершён и end-to-end проверен**
-- **P3.9.9.2 Active Media Usage Monitor — следующий этап**
+EchoTalk Bot Platform уже является практически полной developer platform, а не набором отдельных bot endpoints. Реализованы:
 
+- OAuth/install/credentials и installation-scoped authorization;
+- webhook + WebSocket Gateway с ACK/resume/replay;
+- slash commands, buttons, selects, modals, ephemeral/update callbacks;
+- message/member/resource/context APIs;
+- moderation, roles, room overrides, room/category management;
+- event-driven server runtime;
+- runtime rate limiting / adaptive abuse protection;
+- safe DTO/resource contracts;
+- voice/media sessions, listen/speak, video camera publish, screen share, source policy, track lifecycle, usage accounting, expiration, active usage monitoring, duration enforcement/recovery core;
+- REST OpenAPI + Gateway AsyncAPI developer documentation.
 
-Bot Platform уже поддерживает полноценный Discord-like server management runtime:
+### Оценка первого релиза
 
-- buttons
-- selects
-- modals
-- ephemeral responses
-- interaction callbacks
-- webhook/ws delivery
-- moderation runtime
-- roles runtime
-- room overrides runtime
-- room/category structure runtime
-- runtime protection
-- adaptive penalties
-- gateway reliability layer
-- Bot Context / Resource Runtime API Core
-- safe resource DTO lookup для members / rooms / messages / roles / invites / audit / events
-- Batch Resource API для получения пачки ресурсов одним запросом
-- unified error contract и trace_id для bot-facing ошибок
-- Scope / Boundary Matrix для Resource API
-- Safe DTO audit и recursive audit meta sanitization
-- table-driven contract tests для Batch / Message / Event contracts
-- minimal OpenAPI draft для Bot Resource API
-- Voice / Media Bot Runtime API: media sessions, LiveKit token, metadata, voice participant events, listen runtime, transcription/notes, speak/publish audio, publish camera video, publish screen share, unified intent/source policy, lifecycle reconciliation, source enforcement, Gateway media-session context, audit, policy, diagnostics, bot media track state, track mute/unmute
-- Speak Runtime Limits: enforced active limits, post-check after `track_published`, observe-only duration counters, daily media usage accounting
-- moderator kick bot из voice room с финальным `revoked/moderator_kick` lifecycle
-- bot speak control через LiveKit Track Mute/Unmute с синхронизацией `bot_media_tracks.muted`
-- source-aware Voice Track Control Hardening с audit `voice.track.mute` / `voice.track.unmute` и ambiguity protection для camera/screen tracks
-- Media Session Expiration Enforcement: server-side lease, refresh без разрыва LiveKit connection, автоматическое удаление просроченного active bot participant после grace period
+**Ориентировочная инженерная готовность: ~87%.**
 
-Платформа уже позволяет ботам не только взаимодействовать с сообщениями, но и полноценно управлять серверной структурой, moderation lifecycle и runtime permissions.
+Недостающие проценты — в основном не новые пользовательские возможности, а security/reliability hardening. Поэтому дальнейшее добавление фич до закрытия P4.0 будет увеличивать attack surface быстрее, чем повышать готовность к релизу.
 
+### Что блокирует 1.0 GA
 
-Поддерживается полноценная event-driven модель взаимодействия.
+1. OAuth refresh rotation/replay hardening.
+2. SSRF-safe outbound HTTP для webhook/command callbacks.
+3. Event scope symmetry и data minimization.
+4. Production secret/token log sanitization.
+5. Fresh SCA/dependency/container security gate.
+6. Cross-installation / scope downgrade / event redaction security regression.
+7. Финальные Gateway/media soak/chaos tests и recovery proof.
+8. Idempotency для наиболее опасных mutation operations.
+9. Public API/event versioning + deprecation policy.
 
-Боты могут получать события:
+### Что можно спокойно оставить после 1.0
 
-- сообщений
-- реакций
-- закреплений
-- участников сервера
-- активности комнат
-- модерации
-- ролей
-- структуры сервера
-- permission overrides
+- deferred/autocomplete interactions;
+- specialized user/role/channel selects;
+- interaction inspector;
+- global search;
+- official SDK;
+- hosted runtime/billing/releases;
+- ML anomaly detection.
 
-через webhook delivery либо WebSocket Gateway с поддержкой ACK, resume и replay.
-
-➡️ **Следующий этап:** P3.9.9.2 — Active Media Usage Monitor.
-
-P3.9.7.2.1 Voice Track Control Hardening, P3.9.8.1 video publish, P3.9.8.2 screen-share publish, P3.9.8.3 Video / Screen Runtime Hardening и P3.9.9.1 Media Session Expiration Enforcement завершены. Для `VIDEO/CAMERA`, `VIDEO/SCREEN_SHARE` и `AUDIO/MICROPHONE` подтверждены strict source contract, source-level LiveKit grants, source-aware track control, lifecycle reconciliation, active policy enforcement, Gateway media-session context, track persistence, usage accounting, server-side session lease/refresh и автоматическое expiration enforcement.
-
-Дальнейший P3.9 roadmap:
-
-1. P3.9.9.2 Active Media Usage Monitor;
-2. P3.9.9.3 Duration Limit Enforcement / Auto Revoke;
-3. P3.9.9.4 Recovery / Idempotency / Observability;
-4. P3.9.10 Media Runtime Dev Portal & Contract Stabilization.
-
-P3.8.9 Search API остаётся отложенным до появления полноценного системного поиска в EchoTalk.
+➡️ **Следующий этап: P4.0 Release Candidate Hardening. После его закрытия EchoTalk Bot Platform можно переводить в 1.0 GA без необходимости предварительно реализовывать весь post-release backlog.**
