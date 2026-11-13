@@ -1,9 +1,9 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-11-11  
+**Дата обновления:** 2026-11-13  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
 **Базовый релиз:** release 0.22.0; документ также учитывает unreleased hardening/runtime changes, внедрённые после него  
-**Текущий рабочий статус:** функциональное ядро Bot Platform и публичные REST/Gateway contracts практически стабилизированы. P3.9.9.2 Active Media Usage Monitor и duration enforcement реализованы в runtime; recovery worker/health monitor также присутствуют. Следующий основной этап — P4.0 Release Candidate Hardening: security, scope symmetry, OAuth rotation, outbound SSRF protection, SCA и финальные soak/regression проверки.
+**Текущий рабочий статус:** функциональный объём Bot Platform для первого GA-релиза заморожен. P4.0.1–P4.0.6 закрыты. До Bot Platform 1.0 остаются только два release-blocking gate: P4.0.8 минимальный Gateway/media soak/chaos proof и P4.0.10 release checklist / rollback / backup verification. Новые feature/hardening-задачи до 1.0 не добавляются, если они не выявляют реальный release blocker.
 
 ---
 
@@ -77,9 +77,17 @@
 - **P3.9.9.3 Duration Limit Enforcement / Auto Revoke реализован в runtime; требуется финальная end-to-end/soak фиксация статуса.**
 - **P3.9.9.4 Recovery / Idempotency / Observability реализован ядром: duration revoke recovery worker + recovery health monitor; требуется финальная multi-instance/chaos/soak проверка.**
 - **P3.9.10 Contract Stabilization частично закрыт: REST OpenAPI + Gateway AsyncAPI + typed event payloads стабилизированы; Media Runtime Limits/Usage UI остаётся отдельным UX-хвостом.**
-- **P4.0 Release Candidate Hardening — текущий приоритет перед 1.0.**
+- **P4.0 Release Candidate Hardening — финальная стадия перед 1.0.**
+- **P4.0.1 OAuth refresh rotation & replay hardening — закрыт.**
+- **P4.0.2 Outbound SSRF protection — закрыт.**
+- **P4.0.3 Event Scope Symmetry & Data Minimization — закрыт.**
+- **P4.0.4 Secret / Token Log Sanitization — закрыт.**
+- **P4.0.5 SCA / dependency / container security gate — закрыт для release gate.**
+- **P4.0.6 Cross-installation IDOR + scope downgrade regression — закрыт.**
+- **P4.0.8 Gateway + media enforcement soak/chaos proof — обязательный pre-release этап.**
+- **P4.0.10 Release checklist / rollback / backup verification — обязательный финальный этап перед RC1.**
 
-➡️ **Текущий этап: P4.0 Release Candidate Hardening. Основной функциональный объём платформы уже реализован. До 1.0 фокус смещается с расширения API на закрытие security/reliability release gates: OAuth refresh rotation, outbound SSRF protection, event scope symmetry/data minimization, log sanitization, SCA, idempotency критичных mutation endpoints и финальные media/gateway soak tests.**
+➡️ **Текущий этап: P4.0.8 Gateway + media enforcement minimal soak/chaos proof. Release scope зафиксирован: после P4.0.8 выполняется только P4.0.10, затем RC1 → production smoke → v1.0.0. P4.0.7 mutation idempotency и P4.0.9 formal version/deprecation machinery остаются в post-release backlog, если soak/RC проверки не выявят конкретный release blocker.**
 
 ### 0.1 Оценка готовности к первому релизу
 
@@ -89,12 +97,12 @@
 |---|---:|---|
 | Bot Platform functional core | ~95% | auth/install, commands, interactions, resources, moderation, roles, structure, events, Gateway, voice/media runtime реализованы |
 | REST / Gateway public contracts | ~95% | OpenAPI + AsyncAPI, typed event payloads и examples есть; остаётся release policy/versioning |
-| Security hardening | ~78% | сильная scope/boundary база, но есть несколько release blockers ниже |
-| Reliability / operations | ~85% | retries, backlog, runtime protection, media recovery/health есть; нужны финальные soak/chaos проверки |
+| Security hardening | ~98% | P4.0.1–P4.0.6 закрыты; OAuth/SSRF/event minimization/log sanitization/SCA/isolation/scope-downgrade release gates пройдены |
+| Reliability / operations | ~92% | retries, backlog, runtime protection, media recovery/health есть; нужен финальный bounded soak/chaos proof |
 | Developer Experience | ~75% | Dev Portal развит; SDK, interaction inspector и release/version management можно вынести после 1.0 |
-| **Итоговая готовность к Bot Platform 1.0** | **~87%** | функционально близко к релизу; оставшаяся работа преимущественно hardening, а не новые базовые возможности |
+| **Итоговая готовность к Bot Platform 1.0** | **~96%** | feature scope заморожен; security isolation gate закрыт, остались bounded soak/chaos proof и release/rollback readiness |
 
-**Вывод:** для первого релиза не требуется достраивать весь список будущих возможностей. Release 1.0 разумно выпускать после закрытия P4.0 security/reliability gate. Autocomplete, deferred responses, global search, SDK, hosted runtime/billing и ML abuse detection не являются обязательными для первого GA-релиза.
+**Вывод:** для первого релиза не требуется достраивать весь список будущих возможностей. Feature scope для 1.0 заморожен. P4.0.6 закрыт; после P4.0.8 и P4.0.10 платформа переходит в RC1. При отсутствии новых release-blocking дефектов выполняется production smoke и выпускается v1.0.0. Все прочие улучшения переносятся в post-release backlog.
 
 Пройденные end-to-end проверки:
 
@@ -394,7 +402,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий этап: P3.9 Voice / Media Bot Runtime API. Runtime уже включает audio listen/speak, transcription, audit, policy, diagnostics, track-state, source-aware mute/unmute hardening, limits, camera video publish, screen-share publish, strict source contract, lifecycle reconciliation, active policy/source enforcement, Gateway/diagnostics observability и enforced expiration lifecycle для media sessions. Следующий шаг — P3.9.9.2 Active Media Usage Monitor.**
+➡️ **Текущий этап: P4.0.8 Gateway + Media Soak / Chaos Proof. Voice/media functional runtime и release security regression уже закрыты; теперь требуется bounded reliability proof перед финальным P4.0.10 release checklist.**
 
 
 ---
@@ -446,7 +454,7 @@
 |---------|----------|--------|------------|
 | Authorization Code flow | `POST /oauth/authorize` | ✅ | работает |
 | Обмен code на токены | `POST /oauth/token` | ✅ | проверено |
-| Refresh token flow | `POST /oauth/token/refresh` | 🚧 | endpoint есть, нужна отдельная проверка rotation semantics |
+| Refresh token flow | `POST /oauth/token/refresh` | ✅ | atomic rotation, replay/reuse protection и concurrent refresh regression закрыты в P4.0.1 |
 | Ротация credentials | `POST /dev/bots/:id/credentials/rotate` | ✅ | работает |
 | Привязка code к credential | `bot_oauth_codes.credential_id` | ✅ | исправлено |
 | Отзыв установки | `DELETE /servers/:serverID/bots/:installation_id` | ✅ | revoke installation/tokens |
@@ -505,7 +513,7 @@
 | Per-installation event payload redaction | ✅ | `message.content.view` применяется до webhook persistence / Gateway backlog |
 | Typed Gateway event contract | ✅ | AsyncAPI 1.1.x: typed payload variants для публичных runtime events |
 | Gateway AsyncAPI reference | ✅ | lifecycle, ACK/resume, examples, recovery semantics опубликованы |
-| Event scope symmetry audit | 🚧 | перед 1.0 требуется закрыть invite/moderation/voice data-minimization findings |
+| Event scope symmetry audit | ✅ | P4.0.3: invite/roles/membership/structure/overrides/voice payload symmetry и data minimization закрыты regression tests |
 
 ### Runtime configuration — installation-level
 
@@ -607,86 +615,86 @@
 ### P1.1 delivery models
 
 - `BotEventDelivery`
-  - очередь webhook событий
-  - statuses: pending / processing / retry / success / failed
+    - очередь webhook событий
+    - statuses: pending / processing / retry / success / failed
 - `BotEventDeliveryAttempt`
-  - история попыток доставки
-  - response status / error / duration / body excerpt
+    - история попыток доставки
+    - response status / error / duration / body excerpt
 
 ### P2.2 interaction models
 
 - `BotInteraction`
-  - source interaction для button/select/modal submit
-  - lifecycle: pending / acked / responded / expired
+    - source interaction для button/select/modal submit
+    - lifecycle: pending / acked / responded / expired
 - `BotInteractionResponse`
-  - факт ответа бота на interaction
-  - message / update_message / open_modal / ephemeral
+    - факт ответа бота на interaction
+    - message / update_message / open_modal / ephemeral
 - `BotInteractionModal`
-  - конкретный instance открытой формы
-  - schema / values / status / TTL / submitted_at
+    - конкретный instance открытой формы
+    - schema / values / status / TTL / submitted_at
 
 ### P2.3 gateway models
 
 - `BotGatewayState`
-  - last issued seq
-  - last acked seq
-  - connection status
-  - last connection id
-  - last seen / last ack timestamps
+    - last issued seq
+    - last acked seq
+    - connection status
+    - last connection id
+    - last seen / last ack timestamps
 - `BotGatewayEvent`
-  - persistent backlog для websocket delivery
-  - resume/replay через seq
+    - persistent backlog для websocket delivery
+    - resume/replay через seq
 
 ### P2.4 runtime protection models
 
 - `BotRuntimeLimit`
-  - runtime protection configuration
-  - requests/messages/interactions/gateway limits
-  - burst protection
-  - violation tracking
-  - auto-block state
-  - media runtime limits: active speaking bots per room, active tracks per bot
-  - duration limit modes: `disabled`, `observe_only`, `enforced`
-  - speak session / daily speak duration thresholds
-  - `media_auto_revoke_on_limit` заложен, но выключен для текущего observe-only этапа
+    - runtime protection configuration
+    - requests/messages/interactions/gateway limits
+    - burst protection
+    - violation tracking
+    - auto-block state
+    - media runtime limits: active speaking bots per room, active tracks per bot
+    - duration limit modes: `disabled`, `observe_only`, `enforced`
+    - speak session / daily speak duration thresholds
+    - `media_auto_revoke_on_limit` заложен, но выключен для текущего observe-only этапа
 
 - `BotRuntimeAuditEvent`
-  - runtime protection audit trail
-  - rate limit violations
-  - auto-block events
-  - adaptive penalty escalation
+    - runtime protection audit trail
+    - rate limit violations
+    - auto-block events
+    - adaptive penalty escalation
 
 ### P3.9 voice / media runtime models
 
 - `BotMediaSession`
-  - lifecycle bot media session для LiveKit voice room
-  - `session_id` публичный bot-facing идентификатор формата `bms_*`
-  - `installation_id`, `server_id`, `room_id`, `bot_id` фиксируют boundary
-  - `livekit_room` и `participant_identity` связывают EchoTalk session с LiveKit participant
-  - statuses: `pending`, `active`, `ended`, `revoked`, `failed`
-  - terminal reasons включают `bot_disconnect`, `participant_left`, `expired`, `moderator_kick`, `policy_speak_blocked`, `media_source_mismatch`, `token_generation_failed`
-  - capabilities snapshot: subscribe/publish audio/video
-  - `expires_at`, `started_at`, `ended_at` используются для lifecycle control и диагностики
+    - lifecycle bot media session для LiveKit voice room
+    - `session_id` публичный bot-facing идентификатор формата `bms_*`
+    - `installation_id`, `server_id`, `room_id`, `bot_id` фиксируют boundary
+    - `livekit_room` и `participant_identity` связывают EchoTalk session с LiveKit participant
+    - statuses: `pending`, `active`, `ended`, `revoked`, `failed`
+    - terminal reasons включают `bot_disconnect`, `participant_left`, `expired`, `moderator_kick`, `policy_speak_blocked`, `media_source_mismatch`, `token_generation_failed`
+    - capabilities snapshot: subscribe/publish audio/video
+    - `expires_at`, `started_at`, `ended_at` используются для lifecycle control и диагностики
 
 - `BotMediaTrack`
-  - runtime state опубликованных bot media tracks
-  - связывает `session_id`, `installation_id`, `server_id`, `room_id`, `livekit_room`, `participant_identity`
-  - хранит LiveKit track identity: `track_s_id`, `track_name`, `track_type`, `track_source`
-  - хранит control state: `muted`, `status`, `published_at`, `unpublished_at`, `updated_at`
-  - хранит usage accounting fields: `usage_duration_sec`, `usage_accumulated_at`
-  - используется для Bot Speak Control, diagnostics, audit, runtime limits и production video/screen runtime
-  - обычные user tracks в эту таблицу не пишутся
+    - runtime state опубликованных bot media tracks
+    - связывает `session_id`, `installation_id`, `server_id`, `room_id`, `livekit_room`, `participant_identity`
+    - хранит LiveKit track identity: `track_s_id`, `track_name`, `track_type`, `track_source`
+    - хранит control state: `muted`, `status`, `published_at`, `unpublished_at`, `updated_at`
+    - хранит usage accounting fields: `usage_duration_sec`, `usage_accumulated_at`
+    - используется для Bot Speak Control, diagnostics, audit, runtime limits и production video/screen runtime
+    - обычные user tracks в эту таблицу не пишутся
 
 - `BotMediaUsageDaily`
-  - daily aggregate media publish usage по bot installation
-  - уникальный ключ: `installation_id + usage_date`
-  - хранит `audio_publish_duration_sec`, `video_publish_duration_sec`, `screen_publish_duration_sec`
-  - хранит `published_audio_tracks`, `published_video_tracks`, `published_screen_tracks`
-  - используется для observe-only duration limits, diagnostics, будущих quotas/billing и video/screen runtime
+    - daily aggregate media publish usage по bot installation
+    - уникальный ключ: `installation_id + usage_date`
+    - хранит `audio_publish_duration_sec`, `video_publish_duration_sec`, `screen_publish_duration_sec`
+    - хранит `published_audio_tracks`, `published_video_tracks`, `published_screen_tracks`
+    - используется для observe-only duration limits, diagnostics, будущих quotas/billing и video/screen runtime
 
 - `LiveKitWebhookEvent`
-  - журнал входящих LiveKit webhook events
-  - используется для диагностики runtime lifecycle, track publish/unpublish и idempotency/hardening сценариев
+    - журнал входящих LiveKit webhook events
+    - используется для диагностики runtime lifecycle, track publish/unpublish и idempotency/hardening сценариев
 
 ## 4. Текущий набор роутов
 
@@ -1152,7 +1160,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Contract & Observability Hardening | ✅ | P3.9.8.3.4: usage/source diagnostics, stale/orphan counters, runtime violations, disconnect failures |
 | Diagnostics Corrective Hardening | ✅ | `live_kit_room` mapping, `last_session_at`, public audit `_ctx` sanitization исправлены и проверены |
 | Media Session Expiration Enforcement | ✅ | P3.9.9.1: active/pending expiration lifecycle, LiveKit participant removal, 30s grace, usage finalization, refresh race hardening проверены end-to-end |
-| Active Media Usage Monitor | 🚧 | P3.9.9.2 — следующий этап: мониторинг текущей active duration поверх уже существующего usage accounting |
+| Active Media Usage Monitor | ✅ | P3.9.9.2 реализован; remaining reliability proof входит в P4.0.8 soak/chaos gate |
 
 
 ## 7. Безопасность — текущее состояние
@@ -1162,7 +1170,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Authorization code TTL | ✅ | реализовано |
 | Access token TTL | ✅ | реализовано |
 | Refresh token | ✅ | выпускается |
-| Refresh rotation | 🚧 | требует отдельной доводки |
+| Refresh rotation | ✅ | P4.0.1: atomic consume/rotate, replay/reuse protection, concurrent refresh regression |
 | Credential binding для auth code | ✅ | `CredentialID` |
 | Snapshot scopes/permissions | ✅ | реализовано |
 | BotAuthMiddleware | ✅ | access/session token |
@@ -1230,12 +1238,14 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Voice diagnostics audit sanitization | ✅ | internal `_ctx` удаляется из public diagnostics DTO; raw LiveKit errors/secrets не выдаются |
 
 | Frontend LiveKit logs | ⚠️ | полный participant object содержит временный access token в `ws.url`; production logs нужно санитизировать |
-| Outbound Webhook/Command SSRF protection | 🚧 | **release blocker:** необходимо подтвердить/реализовать запрет private/loopback/link-local/metadata IP, redirect/DNS rebinding protection, HTTPS policy и timeouts |
-| Invite event scope symmetry | ⚠️ | **release blocker:** `server.invite.*` сейчас policy-level привязан к `server.view`; invite payload содержит invite context/code — должен использовать `server.invites.view` либо redaction |
-| Moderation reason data minimization | ⚠️ | **release blocker:** moderation events доступны по `server.members.view`, при этом payload может содержать `reason`; reason должен зависеть от `server.audit.view` либо быть redacted |
-| Voice Gateway internal identifiers | ⚠️ | до 1.0 определить public contract: raw LiveKit room/identity/SID/track SID не должны случайно становиться стабильным публичным API |
-| Frontend/token log sanitization | 🚧 | **release blocker:** исключить JWT/access tokens, `ws.url`, Authorization/Cookie и full participant/session objects из production logs |
-| Dependency/SCA gate | 🚧 | **release blocker:** fresh `govulncheck`, frontend audit и container image scan; critical/high findings должны быть triaged/closed before GA |
+| Outbound Webhook/Command SSRF protection | ✅ | P4.0.2: HTTPS-only, DNS/IP validation, private/loopback/link-local/CGNAT/reserved block, redirects disabled, safe dial + timeouts/size caps |
+| Invite event scope symmetry | ✅ | P4.0.3: invite events требуют `server.invites.view` |
+| Moderation/event data minimization | ✅ | P4.0.3: public event payloads приведены к scope symmetry / data-minimization policy |
+| Voice Gateway internal identifiers | ✅ | P4.0.3: raw LiveKit/runtime internals минимизированы; bot-facing media context ограничен safe public fields |
+| Frontend/token log sanitization | ✅ | P4.0.4: centralized security log redaction/fingerprinting; token/Authorization/Cookie/URL/body sanitization applied to critical runtime paths |
+| Dependency/SCA gate | ✅ | P4.0.5: govulncheck reachable=0, frontend audit clean, Trivy source/image vulnerability scan clean for release gate; backend root runtime documented as temporary TLS-key exception |
+| Effective scope downgrade | ✅ | P4.0.6: runtime использует effective scopes из `BotAuthMiddleware`; старый token не может получить scope вне token snapshot и немедленно теряет отозванный scope |
+| Cross-installation / cross-server IDOR regression | ✅ | P4.0.6: resource/event/interaction/media boundaries проверены; batch permission check использует единый access validator; media session Get/List/Refresh/Disconnect изолированы по `installation_id` |
 
 ---
 
@@ -1243,15 +1253,15 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 | Приоритет | Риск | Состояние | Release action |
 |---|---|---|---|
-| **P0 / High** | OAuth refresh token replay/rotation semantics | refresh endpoint есть, rotation semantics не зафиксированы как закрытые | atomic rotate, revoke previous refresh, concurrent refresh test, reuse handling |
-| **P0 / High** | SSRF через developer-controlled `WebhookURL` / `CommandBaseURL` | требует отдельного source audit | safe outbound URL policy + DNS/IP/redirect validation + strict HTTP timeouts |
-| **P0 / High** | Invite code exposure через event scope mismatch | policy использует `server.view`, тогда как Resource API имеет `server.invites.view` | перевести invite events на invite scope или redaction; contract test |
-| **P0 / High** | Token leakage через production logs | известный риск для LiveKit/frontend logging | centralized log sanitizer + grep/regression test на secrets |
-| **P1 / Medium-High** | Moderation `reason` доступен через более широкий member scope | scope symmetry требует hardening | `reason` только с `server.audit.view` либо redaction |
-| **P1 / Medium** | Raw LiveKit identifiers в public Gateway payloads | public/private boundary не полностью определён | минимизировать DTO или официально версионировать как public fields |
-| **P1 / Medium** | Duplicate mutations при retries | строгая idempotency есть не для всех mutation endpoints | `Idempotency-Key` для наиболее дорогих/опасных POST operations |
-| **P1 / Medium** | Event contract evolution | schema version есть, formal compatibility/deprecation policy не описана | event versioning + deprecation policy before external ecosystem grows |
-| **P1 / Medium** | Supply-chain vulnerabilities | состояние зависимостей меняется со временем | automated SCA in CI + release gate |
+| **P0 / High** | OAuth refresh token replay/rotation semantics | ✅ закрыто в P4.0.1 | atomic consume/rotate, replay/reuse handling, concurrent refresh regression |
+| **P0 / High** | SSRF через developer-controlled `WebhookURL` / `CommandBaseURL` | ✅ закрыто в P4.0.2 | safe outbound transport, HTTPS-only, DNS/IP validation, redirects disabled, strict timeouts/response caps |
+| **P0 / High** | Invite/event payload scope mismatch | ✅ закрыто в P4.0.3 | event scope symmetry + data minimization regression |
+| **P0 / High** | Token leakage через production logs | ✅ закрыто в P4.0.4 | centralized sanitizer/redaction/fingerprint helpers applied to critical paths |
+| **P1 / Medium-High** | Event sensitive payload exposure | ✅ закрыто в P4.0.3 | scope symmetry / redaction / public DTO minimization |
+| **P1 / Medium** | Raw LiveKit identifiers в public Gateway payloads | ✅ закрыто в P4.0.3 | public payload minimization; raw runtime internals не считаются public API |
+| **P1 / Medium** | Duplicate mutations при retries | post-release backlog, если P4.0.6/P4.0.8 не покажут release blocker | P4.1: `Idempotency-Key` для наиболее дорогих/опасных mutations |
+| **P1 / Medium** | Event contract evolution | post-release backlog | текущий v1 contract фиксируется для релиза; formal deprecation machinery — P4.1 |
+| **P1 / Medium** | Supply-chain vulnerabilities | ✅ текущий release gate закрыт в P4.0.5 | автоматизацию постоянного SCA/CI можно расширять post-release |
 
 **Уже закрытая утечка:** message content больше не должен обходить `message.content.view` через Webhook/Gateway: event payload redaction выполняется per-installation до persistence и replay.
 
@@ -1365,70 +1375,86 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ## 9. Что осталось до первого релиза
 
-### P0 — обязательно закрыть до Bot Platform 1.0 GA
+### Release scope freeze — зафиксировано 2026-11-12
 
-1. **OAuth refresh-token hardening**
-- rotation semantics;
-- atomic revoke old / issue new;
-- concurrent refresh protection;
-- reuse/replay handling;
-- regression tests на installation revoke.
+С этого момента до Bot Platform 1.0 **не добавляются новые feature/hardening-задачи**, если текущие проверки не выявляют конкретный release-blocking дефект.
 
-2. **Outbound SSRF hardening** для `WebhookURL` и `CommandBaseURL`
-- production HTTPS policy;
-- запрет loopback/private/link-local/multicast/metadata destinations;
-- DNS resolve/rebinding protection;
-- redirect target revalidation или redirects disabled;
-- connect/read/overall timeout и response-size limit.
+Уже закрытые release-gates:
 
-3. **Event scope symmetry / data minimization**
-- `server.invite.*` согласовать с `server.invites.view`;
-- moderation `reason` согласовать с `server.audit.view`;
-- провести полный event-vs-REST scope matrix test;
-- принять решение по raw LiveKit identifiers в Gateway payload.
+- ✅ **P4.0.1** OAuth refresh rotation & replay hardening;
+- ✅ **P4.0.2** Outbound SSRF protection;
+- ✅ **P4.0.3** Event Scope Symmetry & Data Minimization;
+- ✅ **P4.0.4** Secret / Token Log Sanitization;
+- ✅ **P4.0.5** SCA / dependency / container security gate;
+- ✅ **P4.0.6** Cross-installation IDOR + Scope Downgrade Regression.
 
-4. **Production log sanitization**
-- LiveKit JWT / `ws.url`;
-- bot access/refresh/session tokens;
-- Authorization/Cookie;
-- webhook secrets и signatures;
-- sensitive request/response bodies.
+P4.0.6 зафиксировал:
 
-5. **Dependency / supply-chain release gate**
-- `govulncheck ./...`;
-- frontend dependency audit после удаления устаревшего AsyncAPI React stack;
-- container/base-image scan;
-- triage critical/high findings.
+- effective scopes берутся из `BotAuthMiddleware`, а не повторно из raw `installation.GrantedScopes`;
+- отсутствие/некорректный effective-scope context обрабатывается fail-closed;
+- batch `permission_check` переиспользует общий `validatePermissionCheckAccess`, включая room visibility самого bot user;
+- cross-server/resource/event boundaries остаются installation/server scoped;
+- interaction `ACK` / `Callback` привязаны к `BotInstallationID + BotID`;
+- media session `List/Get/Refresh/Disconnect` изолированы по `installation_id`;
+- добавлены regression tests для runtime context/server boundary, interaction IDOR и media-session IDOR.
 
-6. **Security regression suite**
-- cross-installation/cross-server IDOR;
-- scope downgrade tests;
-- event payload denylist;
-- replay/backlog redaction;
-- SSRF test matrix;
-- token/secret log leakage test.
+### Обязательно закрыть до RC1
 
-### P1 — желательно закрыть в RC, но можно ограниченно перенести в 1.0.x
+1. **P4.0.8 — Минимальный Gateway + Media Soak / Chaos Proof**
+- Gateway reconnect/resume/backlog/duplicate protection под длительным прогоном;
+- кратковременная недоступность Redis/PostgreSQL без неконтролируемого crash-loop;
+- webhook retry/backoff;
+- media duration revoke + recovery worker;
+- backend restart во время `revoking`;
+- LiveKit admin failure/retry;
+- отсутствие runaway goroutines/memory/backlog/orphan sessions/tracks.
 
-- финальный soak/chaos test `P3.9.9.3/.4` для duration revoke/recovery, LiveKit admin failure и backend restart;
-- long-run Gateway backlog/overflow/reconnect test;
-- idempotency keys для критичных mutation endpoints (`send message`, create media session, create structure/role, moderation actions);
-- documented event versioning/deprecation policy;
-- daily/global quotas там, где одного per-minute/burst protection недостаточно;
-- Dev Portal Media Runtime Limits / Usage UI.
+Цель — не построить отдельную chaos-платформу, а доказать стабильность уже реализованного runtime.
 
-### Не блокирует 1.0 / post-release roadmap
+2. **P4.0.10 — Release Candidate Checklist / Rollback / Backup Verification**
+- миграции;
+- backup/restore;
+- rollback Docker image;
+- production env/secrets;
+- health/readiness;
+- smoke: OAuth → install → message → interaction → Gateway → voice/media;
+- release tag/version;
+- rollback procedure;
+- финальная фиксация known limitations.
 
-- deferred interaction responses;
-- autocomplete interactions;
-- user/role/channel select components;
-- Dev Portal interaction inspector;
-- global scoped Search API — после системного search layer EchoTalk;
+### После выполнения
+
+```text
+P4.0.8
+   ↓
+P4.0.10
+   ↓
+RC1
+   ↓
+Production smoke
+   ↓
+v1.0.0 GA
+```
+
+Если P4.0.8 не выявляет новый release blocker, **дополнительные этапы перед 1.0 не добавляются**.
+
+### Перенесено в post-release backlog / P4.1
+
+- P4.0.7 strict mutation idempotency для всех high-risk endpoints;
+- P4.0.9 formal public API/event versioning & deprecation machinery;
+- Client / TelegramBot non-root hardening;
+- перенос backend TLS termination на Nginx и запуск backend non-root;
+- Media Runtime Limits / Usage UI;
+- daily/global quotas;
+- deferred/autocomplete interactions;
+- specialized user/role/channel selects;
+- interaction inspector;
+- global scoped Search API;
 - official Bot SDK / helpers;
 - advanced analytics;
 - hosted runtime / billing / releases;
-- advanced anomaly / ML-based abuse detection;
-- rich presence source integration.
+- advanced anomaly / ML-based abuse detection.
+
 
 ---
 
@@ -1892,27 +1918,27 @@ Smoke-tested сценарии:
 Закрыто и проверено:
 
 - unified bot error contract для `/bot/*` ошибок:
-  - `error.code`;
-  - `error.message`;
-  - `error.details`;
-  - `error.trace_id`;
+    - `error.code`;
+    - `error.message`;
+    - `error.details`;
+    - `error.trace_id`;
 - `RequestTraceMiddleware` добавляет request trace ID и возвращает `X-Request-ID`;
 - `writeBotError` вынесен в единый helper и переиспользуется bot controllers;
 - error code constants добавлены в `controllers/bots/error_codes.go`;
 - error code normalization smoke-tested для:
-  - `message_not_found`;
-  - `server_boundary_violation`;
-  - batch item-level errors;
+    - `message_not_found`;
+    - `server_boundary_violation`;
+    - batch item-level errors;
 - Scope / Boundary Matrix добавлена в `docs/bot_resource_api_matrix.md`;
 - Safe DTO Audit добавлен:
-  - denylist test helper для приватных полей;
-  - DTO tests для user/member/message/audit/batch responses;
-  - recursive audit meta sanitization;
-  - nested sensitive fields removal test;
+    - denylist test helper для приватных полей;
+    - DTO tests для user/member/message/audit/batch responses;
+    - recursive audit meta sanitization;
+    - nested sensitive fields removal test;
 - table-driven contract tests добавлены для:
-  - Batch Resource API validation / item errors / JSON contract;
-  - Message DTO content included/redacted contract;
-  - Event refs extraction / invalid payload safety / event DTO contract;
+    - Batch Resource API validation / item errors / JSON contract;
+    - Message DTO content included/redacted contract;
+    - Event refs extraction / invalid payload safety / event DTO contract;
 - `go test ./controllers/bots` проходит;
 - `go test ./...` выявил только старые `go vet` замечания в `internal/sockets/roomOperationHandler.go`, не связанные с P3.8.11;
 - minimal OpenAPI draft создан: `docs/openapi/bot-resource-api.yaml`;
@@ -1953,13 +1979,13 @@ Smoke-tested сценарии:
 
 - bot user добавляется как server participant при install/token flow;
 - LiveKit token содержит безопасную metadata для frontend resolve:
-  - `userID`;
-  - `nickname`;
-  - `avatar`;
-  - `isBot`;
-  - `mediaSessionID`;
-  - `installationID`;
-  - `botAppID`;
+    - `userID`;
+    - `nickname`;
+    - `avatar`;
+    - `isBot`;
+    - `mediaSessionID`;
+    - `installationID`;
+    - `botAppID`;
 - `RefreshMediaSessionToken` переведён на тот же metadata/profile helper, чтобы reconnect не терял `userID` и `nickname`;
 - VoiceLobby формирует `Tile` из LiveKit participant metadata;
 - kick из VoiceLobby отправляет `user_id`, а не LiveKit `identity`;
@@ -2092,27 +2118,27 @@ Smoke-tested сценарии:
 - добавлены отдельные DTO/типы и порты для track-control use-case, LiveKit adapter, repository и audit;
 - canonical LiveKit room name строится backend-ом по доверенным `server_id + room name + room_id`; client `room_name` остаётся deprecated/backward-compatible полем и не является source of truth;
 - добавлен source-aware selector/resolver:
-  - audio → `MICROPHONE`;
-  - video → `CAMERA` или `SCREEN_SHARE`;
-  - aliases нормализуются;
-  - explicit `track_sid` проверяется на принадлежность participant, media type и source;
-  - fallback без `track_sid` разрешён только при единственном подходящем track;
-  - несколько подходящих video tracks приводят к `voice_track_ambiguous`, а не к выбору случайного track;
+    - audio → `MICROPHONE`;
+    - video → `CAMERA` или `SCREEN_SHARE`;
+    - aliases нормализуются;
+    - explicit `track_sid` проверяется на принадлежность participant, media type и source;
+    - fallback без `track_sid` разрешён только при единственном подходящем track;
+    - несколько подходящих video tracks приводят к `voice_track_ambiguous`, а не к выбору случайного track;
 - bot participant identity валидируется строго как `bot:<positive installation_id>:bms_*`;
 - bot track DB sync ограничен полным runtime boundary: installation/session/room/LiveKit room/participant identity/track SID/status=`published`;
 - mute/unmute стал идемпотентным: если фактический `muted` уже равен запрошенному, LiveKit mutation не вызывается, а response фиксирует `changed=false`;
 - добавлены audit actions:
-  - `voice.track.mute`;
-  - `voice.track.unmute`;
+    - `voice.track.mute`;
+    - `voice.track.unmute`;
 - audit meta фиксирует media/source, previous/current muted state, `changed`, `bot_track_updated`, installation/session для bot tracks;
 - audit failure не ломает успешный LiveKit mutation;
 - публичный error contract нормализован через typed `VoiceTrackControlError`;
 - table-driven tests добавлены для identity parser, selector/source normalization и resolver edge-cases;
 - end-to-end mute/unmute проверен на bot audio track;
 - diagnostics интеграция проверена:
-  - `track_mute_actions=2`;
-  - `track_unmute_actions=2`;
-  - `track_control_noop_actions=0`;
+    - `track_mute_actions=2`;
+    - `track_unmute_actions=2`;
+    - `track_control_noop_actions=0`;
 - public diagnostics продолжает удалять internal audit `_ctx`.
 
 Итог:
@@ -2269,8 +2295,8 @@ Smoke-tested сценарии:
 - `listen` и `stats_only` не разрешают publication;
 - refresh-token проверяет persisted capabilities против session intent;
 - `BotTokenService` fail-closed:
-  - `CanPublish=true` без sources → ошибка;
-  - `CanPublish=false` с sources → ошибка.
+    - `CanPublish=true` без sources → ошибка;
+    - `CanPublish=false` с sources → ошибка.
 
 #### P3.9.8.3.2 — Media Lifecycle Reconciliation ✅
 
@@ -2286,9 +2312,9 @@ Smoke-tested сценарии:
 - missing publish + early unpublish фиксируется как terminal zero-duration row;
 - stronger terminal state/reason не перетирается поздним webhook;
 - abrupt bot process stop проверен:
-  - track закрывается `unpublished/track_unpublished`;
-  - usage начисляется один раз;
-  - session завершается `ended/participant_left`;
+    - track закрывается `unpublished/track_unpublished`;
+    - usage начисляется один раз;
+    - session завершается `ended/participant_left`;
 - различие track `end_reason` и session `end_reason` зафиксировано как корректная семантика, а не ошибка.
 
 #### P3.9.8.3.3 — Active Policy / Source Enforcement Hardening ✅
@@ -2297,17 +2323,17 @@ Smoke-tested сценарии:
 
 - actual published track сверяется с persisted media session intent;
 - source contract:
-  - `speak` / `listen_and_speak` → `AUDIO/MICROPHONE`;
-  - `video_publish` → `VIDEO/CAMERA`;
-  - `screen_share_publish` → `VIDEO/SCREEN_SHARE`;
-  - `listen` / `stats_only` → publication forbidden;
+    - `speak` / `listen_and_speak` → `AUDIO/MICROPHONE`;
+    - `video_publish` → `VIDEO/CAMERA`;
+    - `screen_share_publish` → `VIDEO/SCREEN_SHARE`;
+    - `listen` / `stats_only` → publication forbidden;
 - source mismatch приводит к revoke session, track termination, LiveKit participant removal и safe audit expected/actual;
 - повторный enforcement идемпотентен и не создаёт double revoke/double usage;
 - room policy `allow_speak=false` применяется к активным audio, camera и screen-share publish sessions;
 - video policy revoke проверен:
-  - session `revoked/policy_speak_blocked`;
-  - track `unpublished/policy_speak_blocked`;
-  - usage `6` seconds, `usage_accumulated_at` заполнен;
+    - session `revoked/policy_speak_blocked`;
+    - track `unpublished/policy_speak_blocked`;
+    - usage `6` seconds, `usage_accumulated_at` заполнен;
 - screen-share policy revoke проверен с тем же contract и `6` seconds usage;
 - `max_active_tracks_per_bot` продолжает считать AUDIO/CAMERA/SCREEN_SHARE;
 - `max_active_speaking_bots_per_room` остаётся audio-only и считает `AUDIO/MICROPHONE`.
@@ -2317,50 +2343,50 @@ Smoke-tested сценарии:
 Закрыто и end-to-end проверено:
 
 - Gateway `voice.track.published` / `voice.track.unpublished` стабилизированы:
-  - `track.sid`;
-  - `track.type`;
-  - `track.source`;
-  - `track.muted`;
+    - `track.sid`;
+    - `track.type`;
+    - `track.source`;
+    - `track.muted`;
 - bot track events получили optional safe `media_session`:
-  - `session_id`;
-  - `installation_id`;
-  - `intent`;
-  - `status`;
-  - optional `end_reason`;
+    - `session_id`;
+    - `installation_id`;
+    - `intent`;
+    - `status`;
+    - optional `end_reason`;
 - Gateway contract проверен для:
-  - `AUDIO/MICROPHONE` + `intent=speak`;
-  - `VIDEO/CAMERA` + `intent=video_publish`;
-  - `VIDEO/SCREEN_SHARE` + `intent=screen_share_publish`;
+    - `AUDIO/MICROPHONE` + `intent=speak`;
+    - `VIDEO/CAMERA` + `intent=video_publish`;
+    - `VIDEO/SCREEN_SHARE` + `intent=screen_share_publish`;
 - policy revoke event проверен: `voice.track.unpublished` содержит `status=revoked` и `end_reason=policy_speak_blocked`;
 - diagnostics summary расширен:
-  - active/pending/ended/revoked/failed sessions;
-  - published/unpublished/revoked/failed tracks;
-  - source mismatch revokes;
-  - runtime limit violations;
-  - disconnect failures;
-  - stale open sessions;
-  - orphan published tracks;
-  - active MICROPHONE/CAMERA/SCREEN_SHARE tracks;
-  - audio/camera/screen usage duration;
+    - active/pending/ended/revoked/failed sessions;
+    - published/unpublished/revoked/failed tracks;
+    - source mismatch revokes;
+    - runtime limit violations;
+    - disconnect failures;
+    - stale open sessions;
+    - orphan published tracks;
+    - active MICROPHONE/CAMERA/SCREEN_SHARE tracks;
+    - audio/camera/screen usage duration;
 - временное окно учитывает lifecycle timestamps, а не только `created_at`;
 - track DTO содержит `usage_duration_sec` и `usage_accumulated_at`;
 - добавлен audit action `bot.voice.media.disconnect_failure`;
 - diagnostics routes зафиксированы:
-  - `GET /servers/:serverID/bot-voice/diagnostics`;
-  - `GET /rooms/:roomID/bot-voice/diagnostics`;
+    - `GET /servers/:serverID/bot-voice/diagnostics`;
+    - `GET /rooms/:roomID/bot-voice/diagnostics`;
 - corrective hardening:
-  - scanner mapping исправлен с `livekit_room` на реальную GORM-колонку `live_kit_room`;
-  - `track_s_id` mapping подтверждён;
-  - `last_session_at` учитывает завершённые sessions;
-  - internal audit meta `_ctx` удаляется из public response;
+    - scanner mapping исправлен с `livekit_room` на реальную GORM-колонку `live_kit_room`;
+    - `track_s_id` mapping подтверждён;
+    - `last_session_at` учитывает завершённые sessions;
+    - internal audit meta `_ctx` удаляется из public response;
 - итоговая проверка:
-  - `livekit_room` возвращается для sessions/tracks;
-  - `last_session_at` заполнен для комнаты с историей;
-  - `_ctx` отсутствует;
-  - `stale_open_sessions=0`;
-  - `orphan_published_tracks=0`;
-  - `disconnect_failures=0`;
-  - usage summary совпадает с суммой track durations.
+    - `livekit_room` возвращается для sessions/tracks;
+    - `last_session_at` заполнен для комнаты с историей;
+    - `_ctx` отсутствует;
+    - `stale_open_sessions=0`;
+    - `orphan_published_tracks=0`;
+    - `disconnect_failures=0`;
+    - usage summary совпадает с суммой track durations.
 
 ### P3.9.9 — Active Media Usage Monitor / Runtime Enforcement Worker 🚧
 
@@ -2375,24 +2401,24 @@ Smoke-tested сценарии:
 - существующий media-session cleanup переработан из DB-only cleanup в полноценный expiration enforcement lifecycle;
 - `pending` session после истечения lease завершается без LiveKit removal, так как participant ещё не подключался;
 - `active` session после истечения lease:
-  - ждёт grace period;
-  - удаляет bot participant из LiveKit через room admin service;
-  - переводит session в `ended`;
-  - сохраняет `end_reason=expired`;
-  - закрывает/финализирует media lifecycle;
-  - финализирует usage accounting;
-  - пишет audit `bot.voice.media_session.expire`;
+    - ждёт grace period;
+    - удаляет bot participant из LiveKit через room admin service;
+    - переводит session в `ended`;
+    - сохраняет `end_reason=expired`;
+    - закрывает/финализирует media lifecycle;
+    - финализирует usage accounting;
+    - пишет audit `bot.voice.media_session.expire`;
 - grace period на текущем runtime установлен в `30s`;
 - worker обрабатывает expiration пакетами и использует row locking / `FOR UPDATE SKIP LOCKED`, чтобы несколько backend-инстансов не выполняли один terminal transition одновременно;
 - LiveKit/admin failure не должен оставлять ложный успешный DB terminal state; failure фиксируется через `bot.voice.media.disconnect_failure` и может быть повторно обработан;
 - refresh/expiration race hardened:
-  - refresh разрешён только для `pending/active` refreshable session;
-  - успешный refresh продлевает `BotMediaSession.expires_at`;
-  - новый LiveKit JWT выдаётся без разрыва существующего WebRTC connection;
-  - старый `expires_at` после refresh больше не должен использоваться worker-ом;
+    - refresh разрешён только для `pending/active` refreshable session;
+    - успешный refresh продлевает `BotMediaSession.expires_at`;
+    - новый LiveKit JWT выдаётся без разрыва существующего WebRTC connection;
+    - старый `expires_at` после refresh больше не должен использоваться worker-ом;
 - developer contract закреплён:
-  - refresh должен выполняться до `expires_at`;
-  - grace period является worker safety window, а не дополнительным refresh TTL.
+    - refresh должен выполняться до `expires_at`;
+    - grace period является worker safety window, а не дополнительным refresh TTL.
 
 End-to-end проверки от 2026-08-25:
 
@@ -2402,10 +2428,10 @@ End-to-end проверки от 2026-08-25:
 - DB: session `ended/expired`;
 - audit: `bot.voice.media_session.expire`;
 - audit meta подтвердил:
-  - `was_active=true`;
-  - `participant_removed=true`;
-  - `usage_finalized=true`;
-  - `grace_period_sec=30`;
+    - `was_active=true`;
+    - `participant_removed=true`;
+    - `usage_finalized=true`;
+    - `grace_period_sec=30`;
 - `bot.voice.media.disconnect_failure` для тестовой session отсутствовал.
 
 2. **Refresh continuity**
@@ -2488,27 +2514,63 @@ Core implementation присутствует:
 - release/deprecation policy;
 - финальная сверка public voice identifiers / data minimization.
 
-### P4.0 — Release Candidate Hardening 🚧 CURRENT
+### P4.0 — Release Candidate Hardening 🚧 FINAL STAGE
 
-Цель: не расширять поверхность API до бесконечности, а довести уже существующую платформу до безопасного первого GA-релиза.
+Цель: довести существующую платформу до безопасного первого GA-релиза без дальнейшего расширения feature scope.
 
-Release gate:
+Статус release gate:
 
-- P4.0.1 OAuth refresh rotation & replay hardening;
-- P4.0.2 Outbound SSRF protection for webhook/command callbacks;
-- P4.0.3 Event Scope Symmetry & Data Minimization;
-- P4.0.4 Secret/Token Log Sanitization;
-- P4.0.5 SCA / dependency / container security gate;
-- P4.0.6 Cross-installation IDOR + scope downgrade regression suite;
-- P4.0.7 Runtime mutation idempotency for high-risk endpoints;
-- P4.0.8 Gateway + media enforcement soak/chaos tests;
-- P4.0.9 Public API/event versioning & deprecation policy;
-- P4.0.10 Release candidate checklist / rollback / backup verification.
+- ✅ **P4.0.1** OAuth refresh rotation & replay hardening;
+- ✅ **P4.0.2** Outbound SSRF protection for webhook/command callbacks;
+- ✅ **P4.0.3** Event Scope Symmetry & Data Minimization;
+- ✅ **P4.0.4** Secret/Token Log Sanitization;
+- ✅ **P4.0.5** SCA / dependency / container security gate;
+- ✅ **P4.0.6** Cross-installation IDOR + scope downgrade regression suite;
+- 🚧 **P4.0.8** Gateway + media enforcement minimal soak/chaos proof — **CURRENT**;
+- ⏭️ **P4.0.10** Release candidate checklist / rollback / backup verification — финальный обязательный gate.
 
-**После закрытия P4.0 платформа может считаться Bot Platform 1.0 GA.**
+Не являются блокерами 1.0 и перенесены в P4.1/post-release:
+
+- **P4.0.7** Runtime mutation idempotency — кроме конкретного дефекта, обнаруженного regression/soak;
+- **P4.0.9** Formal public API/event versioning & deprecation machinery — текущий public contract выпускается как v1;
+- дополнительные infra/UX hardening-задачи, не влияющие на безопасность и стабильность первого релиза.
+
+**Release rule:** P4.0.6 закрыт. После P4.0.8 → P4.0.10 формируется RC1. Если production smoke не выявляет release blocker, выпускается **Bot Platform v1.0.0 GA**. Новые улучшения до GA не добавляются.
 
 
 ## Changelog после последнего обновления документации от 2026-06-26
+
+### Актуализация 2026-11-13 — P4.0.6 закрыт
+
+- P4.0.6 Cross-installation IDOR + Scope Downgrade Regression закрыт;
+- исправлен central runtime-context path: `getBotRuntimeContext()` использует только effective scopes из `BotAuthMiddleware`, предотвращая повторное расширение прав из raw `installation.GrantedScopes`;
+- runtime-context fail-closed при отсутствии/некорректном `botGrantedScopes`;
+- batch `permission_check` приведён к единому security path через `validatePermissionCheckAccess`, включая проверку room visibility bot user;
+- interaction ACK/Callback regression подтверждает isolation по `BotInstallationID + BotID`;
+- media runtime подтверждён installation-scoped:
+    - `ListMediaSessions` фильтрует по `installation_id`;
+    - `GetMediaSession`, `RefreshMediaSessionToken`, `DisconnectMediaSession` используют `installation_id + session_id`;
+- добавлены regression tests для effective scopes/server boundary, interaction IDOR и media-session IDOR;
+- следующий и предпоследний обязательный gate перед RC1 — P4.0.8 Gateway + Media Soak / Chaos Proof;
+- после P4.0.8 остаётся только P4.0.10 Release Candidate Checklist / Rollback / Backup Verification.
+
+### Актуализация 2026-11-12 — Release Scope Freeze
+
+- P4.0.1 OAuth refresh rotation/replay hardening закрыт;
+- P4.0.2 outbound SSRF hardening закрыт;
+- P4.0.3 event scope symmetry/data minimization закрыт;
+- P4.0.4 secret/token log sanitization закрыт;
+- P4.0.5 dependency/SCA/container gate закрыт:
+    - `govulncheck`: 0 reachable vulnerabilities;
+    - Trivy source dependency scan: 0 Go/Python HIGH/CRITICAL vulnerabilities;
+    - Trivy backend image scan: 0 HIGH/CRITICAL vulnerabilities;
+    - frontend `npm audit`: предупреждения закрыты обновлением dependency tree;
+    - backend root runtime принят как временное documented exception из-за прямого чтения Let's Encrypt private key;
+- SQL dump artifacts с OAuth material удалены из рабочего дерева;
+- release scope заморожен: до 1.0 обязательны только P4.0.6, P4.0.8 и P4.0.10;
+- P4.0.7 и P4.0.9 перенесены в P4.1/post-release, если regression/soak не выявят конкретный release blocker;
+- целевой путь зафиксирован: `P4.0.6 -> P4.0.8 -> P4.0.10 -> RC1 -> production smoke -> v1.0.0`.
+
 
 ### Актуализация 2026-11-11
 
@@ -2607,21 +2669,18 @@ EchoTalk Bot Platform уже является практически полно�
 
 ### Оценка первого релиза
 
-**Ориентировочная инженерная готовность: ~87%.**
+**Ориентировочная инженерная готовность: ~96%.**
 
 Недостающие проценты — в основном не новые пользовательские возможности, а security/reliability hardening. Поэтому дальнейшее добавление фич до закрытия P4.0 будет увеличивать attack surface быстрее, чем повышать готовность к релизу.
 
 ### Что блокирует 1.0 GA
 
-1. OAuth refresh rotation/replay hardening.
-2. SSRF-safe outbound HTTP для webhook/command callbacks.
-3. Event scope symmetry и data minimization.
-4. Production secret/token log sanitization.
-5. Fresh SCA/dependency/container security gate.
-6. Cross-installation / scope downgrade / event redaction security regression.
-7. Финальные Gateway/media soak/chaos tests и recovery proof.
-8. Idempotency для наиболее опасных mutation operations.
-9. Public API/event versioning + deprecation policy.
+P4.0.6 security isolation gate закрыт. Остались только:
+
+1. **P4.0.8** Минимальный Gateway/media soak/chaos + recovery proof.
+2. **P4.0.10** Release checklist: backup/restore, rollback, migrations, smoke, tag/version.
+
+После этих двух gates формируется RC1. Если RC1 production smoke не выявляет release-blocking дефект, выпускается `v1.0.0`.
 
 ### Что можно спокойно оставить после 1.0
 
@@ -2633,4 +2692,4 @@ EchoTalk Bot Platform уже является практически полно�
 - hosted runtime/billing/releases;
 - ML anomaly detection.
 
-➡️ **Следующий этап: P4.0 Release Candidate Hardening. После его закрытия EchoTalk Bot Platform можно переводить в 1.0 GA без необходимости предварительно реализовывать весь post-release backlog.**
+➡️ **Следующий этап: P4.0.8 Gateway + media enforcement minimal soak/chaos proof. Release scope заморожен; после него остаётся только P4.0.10 перед RC1 и v1.0.0 GA.**
