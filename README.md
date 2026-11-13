@@ -3,7 +3,7 @@
 **Дата обновления:** 2026-11-13  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
 **Базовый релиз:** release 0.22.0; документ также учитывает unreleased hardening/runtime changes, внедрённые после него  
-**Текущий рабочий статус:** функциональный объём Bot Platform для первого GA-релиза заморожен. P4.0.1–P4.0.6 закрыты. До Bot Platform 1.0 остаются только два release-blocking gate: P4.0.8 минимальный Gateway/media soak/chaos proof и P4.0.10 release checklist / rollback / backup verification. Новые feature/hardening-задачи до 1.0 не добавляются, если они не выявляют реальный release blocker.
+**Текущий рабочий статус:** функциональный объём Bot Platform для первого GA-релиза заморожен. P4.0.1–P4.0.6 закрыты. **P4.0.8 частично подтверждён 2026-11-13:** Gateway reconnect/client resume, 10/10 media lifecycle, 10-минутный bounded client soak, Docker resource snapshots, Media Recovery Health и Webhook Retry Proof пройдены. **P4.0.8 ещё не закрыт:** остаются failure/recovery windows для инфраструктуры и duration revoke, а также Go runtime/backlog/orphan verification. До Bot Platform 1.0 остаются два release-blocking gate: P4.0.8 и P4.0.10. Новые feature/hardening-задачи до 1.0 не добавляются, если они не выявляют реальный release blocker.
 
 ---
 
@@ -84,7 +84,7 @@
 - **P4.0.4 Secret / Token Log Sanitization — закрыт.**
 - **P4.0.5 SCA / dependency / container security gate — закрыт для release gate.**
 - **P4.0.6 Cross-installation IDOR + scope downgrade regression — закрыт.**
-- **P4.0.8 Gateway + media enforcement soak/chaos proof — обязательный pre-release этап.**
+- **P4.0.8 Gateway + media enforcement soak/chaos proof — 🚧 частично подтверждён (2026-11-13); infrastructure/recovery proof остаётся.**
 - **P4.0.10 Release checklist / rollback / backup verification — обязательный финальный этап перед RC1.**
 
 ➡️ **Текущий этап: P4.0.8 Gateway + media enforcement minimal soak/chaos proof. Release scope зафиксирован: после P4.0.8 выполняется только P4.0.10, затем RC1 → production smoke → v1.0.0. P4.0.7 mutation idempotency и P4.0.9 formal version/deprecation machinery остаются в post-release backlog, если soak/RC проверки не выявят конкретный release blocker.**
@@ -98,7 +98,7 @@
 | Bot Platform functional core | ~95% | auth/install, commands, interactions, resources, moderation, roles, structure, events, Gateway, voice/media runtime реализованы |
 | REST / Gateway public contracts | ~95% | OpenAPI + AsyncAPI, typed event payloads и examples есть; остаётся release policy/versioning |
 | Security hardening | ~98% | P4.0.1–P4.0.6 закрыты; OAuth/SSRF/event minimization/log sanitization/SCA/isolation/scope-downgrade release gates пройдены |
-| Reliability / operations | ~92% | retries, backlog, runtime protection, media recovery/health есть; нужен финальный bounded soak/chaos proof |
+| Reliability / operations | ~92% | Gateway/client-media soak и webhook retry end-to-end пройдены 2026-11-13; остаются failure/recovery, Go runtime и orphan/backlog proof |
 | Developer Experience | ~75% | Dev Portal развит; SDK, interaction inspector и release/version management можно вынести после 1.0 |
 | **Итоговая готовность к Bot Platform 1.0** | **~96%** | feature scope заморожен; security isolation gate закрыт, остались bounded soak/chaos proof и release/rollback readiness |
 
@@ -156,7 +156,7 @@
 - `server.updated` доставляется
 - `server.invite.created` доставляется
 - `server.invite.revoked` доставляется
-- webhook delivery + retry + attempts работают стабильно
+- webhook delivery + retry + attempts работают; 2026-11-13 отдельно подтверждён `503 → retry → 200`, `attempt_count=2` и две записи attempts в PostgreSQL
 - websocket gateway delivery работает
 - gateway `hello` отдаёт `connection_id`, `last_issued_seq`, `last_acked_seq`, `status`
 - gateway event delivery по websocket проверен
@@ -1411,6 +1411,33 @@ P4.0.6 зафиксировал:
 
 Цель — не построить отдельную chaos-платформу, а доказать стабильность уже реализованного runtime.
 
+#### P4.0.8 — промежуточные результаты на 2026-11-13 (🚧 PARTIAL PASS)
+
+Это **bounded proof, а не итоговый хаос- или нагрузочный тест**. Результаты приведены только для фактически проверенного объёма; исходный P4.0.8 остаётся release blocker до завершения перечисленных ниже сценариев.
+
+| Сценарий | Фактическое доказательство | Статус |
+|---|---|---|
+| Gateway disconnect/reconnect + client resume | 1 преднамеренный client-side WebSocket drop; восстановление за **1260 мс**; `invalid_resume=0`, `server_errors=0` | ✅ PASS (client subset) |
+| Gateway event delivery/duplicate suppression | 40 raw / 40 delivered событий (10× `voice.room.started`, `voice.participant.joined`, `voice.participant.left`, `voice.room.ended`); 0 duplicate event IDs | ✅ PASS (проверенное окно) |
+| Media session lifecycle | 10 create / 10 active / 10 end; `errors=[]`, `unresolved=[]`; штатный terminal `ended/bot_disconnect` | ✅ PASS (10/10 последовательных сессий) |
+| Bounded client soak | Продолжительность ~10 минут; 10 последовательных media cycles, 5 сек hold, интервал 60 сек; **не является тестом конкурентной нагрузки** | ✅ PASS в заданном объёме |
+| Docker resource snapshots | 37 snapshots: backend RAM **39.30 → 40.86 MiB**, max 40.86 MiB; backend PIDs=10; Redis/PostgreSQL/LiveKit без заметного runaway в этом окне | ✅ PASS (наблюдения за 10 минут) |
+| Media recovery health | Prometheus `/metrics`: `stale_revoking_sessions=0`, `pending_usage_recovery_tracks=0`, duration/usage recovery `failed_sessions_total=0`, recovery `scan_errors_total=0` | ✅ PASS (health snapshot, не fault-recovery test) |
+| Webhook transient failure + retry/backoff | Installation 1, `message.created`, delivery `7eb70f60-fa69-44a5-8f49-3da8f2f758f6`: `503` в **12:04:43.231627 UTC** → `200` в **12:04:55.225040 UTC**; `attempt_count=2`, `max_attempts=6`, terminal `success`, ровно 2 attempts в БД | ✅ PASS (end-to-end + PostgreSQL evidence) |
+| Webhook worker attempt accounting | В ходе proof устранено двойное сохранение non-2xx HTTP attempt / двойной инкремент `AttemptCount`; проверенное поведение: одна HTTP-попытка = одна запись attempts | ✅ PASS (для `503 → 200`) |
+| Go runtime goroutines/heap/GC/process metrics | `/metrics` экспортирует прикладные `echotalk_*`, но не содержит стандартные `go_*` / `process_*` series; Docker PIDs **не равны** goroutines | ⬜ NOT VERIFIED |
+| Gateway backlog accumulation/replay under outage | Нет отдельного испытания с накоплением backlog в период серверного сбоя/длительного offline | ⬜ NOT VERIFIED |
+| Redis/PostgreSQL failure windows | Кратковременный отказ и восстановление, отсутствие crash-loop, корректность очередей/сессий | ⬜ NOT VERIFIED |
+| Backend restart in `revoking` + multi-instance | Recovery незавершённого enforced duration revoke, idempotency, отсутствие double usage | ⬜ NOT VERIFIED |
+| LiveKit admin failure + recovery | Реальный admin disconnect failure, retry, terminal transition / audit / usage, отсутствие orphan participant/track | ⬜ NOT VERIFIED |
+| Enforced session/daily duration limit | End-to-end revoke/recovery/duplicate enforcement при выставленных лимитах | ⬜ NOT VERIFIED |
+
+**Evidence:** `p408-2026-11-13T10-09-50-931Z-summary.json`, соответствующий `.jsonl`, 37 снимков Docker resources; логи Node.js test bot и PostgreSQL `bot_event_deliveries` / `bot_event_delivery_attempts`. `verdict=CLIENT_SUBSET_PASS` относится **только** к клиентскому subset, не ко всему P4.0.8.
+
+**Границы и безопасность дальнейшего тестирования:** infrastructure chaos проводить на staging/контролируемом окружении, не останавливая Redis/PostgreSQL/LiveKit на действующем VPS без согласованного окна, снимка состояния и rollback-плана. Секреты, JWT, webhook signature и payload с PII в evidence не сохранять. Установка бота поддерживает **один активный event transport** (`webhook` либо `websocket`); ошибка `gateway_transport_disabled` во время webhook-only proof ожидаема, не является дефектом Gateway.
+
+**Следующее действие P4.0.8:** подготовить staging fault windows и проверить duration revoke/recovery (`revoking` + backend restart, LiveKit admin error), затем Redis/PostgreSQL/LiveKit recovery и backend goroutine/heap/backlog/orphan invariants. По завершении gate перейти к P4.0.10 без расширения feature scope.
+
 2. **P4.0.10 — Release Candidate Checklist / Rollback / Backup Verification**
 - миграции;
 - backup/restore;
@@ -2526,7 +2553,7 @@ Core implementation присутствует:
 - ✅ **P4.0.4** Secret/Token Log Sanitization;
 - ✅ **P4.0.5** SCA / dependency / container security gate;
 - ✅ **P4.0.6** Cross-installation IDOR + scope downgrade regression suite;
-- 🚧 **P4.0.8** Gateway + media enforcement minimal soak/chaos proof — **CURRENT**;
+- 🚧 **P4.0.8** Gateway + media enforcement minimal soak/chaos proof — **CURRENT, PARTIAL PASS (2026-11-13)**: Gateway + media client subset, server resource snapshots, media recovery health, webhook `503 → 200` пройдены; infrastructure/duration recovery и Go runtime evidence ещё не закрыты;
 - ⏭️ **P4.0.10** Release candidate checklist / rollback / backup verification — финальный обязательный gate.
 
 Не являются блокерами 1.0 и перенесены в P4.1/post-release:
@@ -2539,6 +2566,17 @@ Core implementation присутствует:
 
 
 ## Changelog после последнего обновления документации от 2026-06-26
+
+### Актуализация 2026-11-13 — P4.0.8 bounded client proof + Webhook Retry (PARTIAL PASS)
+
+- Gateway client disconnect/reconnect восстановлен за 1260 мс; за 10 минут доставлены 40/40 voice lifecycle events без duplicate event IDs, `invalid_resume=0`;
+- media lifecycle 10/10: created/active/ended, `errors=[]`, `unresolved=[]`, `end_reason=bot_disconnect`;
+- Docker resource snapshots backend/Redis/PostgreSQL/LiveKit без runaway в тестовом окне; это не заменяет Go goroutine/heap metrics и длительный soak;
+- Media Recovery Health проверен через `/metrics`: нет stale revoking sessions, pending usage recovery tracks, failed recovery sessions и scan errors на момент замера;
+- Webhook Retry Proof: временный `503`, последующая попытка `200`, 2/6 attempts, terminal `success`; результат подтверждён SQL и логами Node.js-бота;
+- исправлено двойное сохранение non-2xx HTTP attempt в webhook worker;
+- P4.0.8 остаётся 🚧: Redis/PostgreSQL/LiveKit/backend failure recovery, enforced duration revoke/worker restart, backlog/orphan invariants и Go runtime metrics не завершены;
+- P4.0.10 не начинать как закрытый gate до завершения P4.0.8.
 
 ### Актуализация 2026-11-13 — P4.0.6 закрыт
 
@@ -2625,7 +2663,7 @@ Core implementation присутствует:
 ### Реализовано
 
 - structured runtime logs
-- Prometheus metrics
+- Prometheus application metrics (`echotalk_http_*`, `echotalk_bot_*`); стандартные Go/process collectors пока не подтверждены/не экспортируются
 - runtime protection audit trail
 - gateway diagnostics UI
 - runtime protection diagnostics UI
@@ -2647,6 +2685,8 @@ Core implementation присутствует:
 - voice track control audit `voice.track.mute` / `voice.track.unmute` реализован и включён в diagnostics counters
 - media session expiration audit `bot.voice.media_session.expire` реализован; meta включает `was_active`, `participant_removed`, `usage_finalized`, `grace_period_sec`, `expired_at`
 - expiration disconnect failures фиксируются отдельным `bot.voice.media.disconnect_failure`
+- 2026-11-13: проверены recovery-health counters (`stale_revoking_sessions=0`, `pending_usage_recovery_tracks=0`, recovery errors/failures=0); это snapshot, а не доказательство восстановления после отказа
+- 2026-11-13: Docker CPU/RAM/PIDs sampled в 10-минутном окне; Go `go_goroutines`, heap/GC и process series в `/metrics` отсутствуют — необходимо отдельное измерение
 
 ---
 
@@ -2677,7 +2717,7 @@ EchoTalk Bot Platform уже является практически полно�
 
 P4.0.6 security isolation gate закрыт. Остались только:
 
-1. **P4.0.8** Минимальный Gateway/media soak/chaos + recovery proof.
+1. **P4.0.8** Минимальный Gateway/media soak/chaos + recovery proof — 🚧 частично пройден 2026-11-13 (client subset + webhook retry PASS; chaos/recovery/Go metrics остаются).
 2. **P4.0.10** Release checklist: backup/restore, rollback, migrations, smoke, tag/version.
 
 После этих двух gates формируется RC1. Если RC1 production smoke не выявляет release-blocking дефект, выпускается `v1.0.0`.
@@ -2692,4 +2732,4 @@ P4.0.6 security isolation gate закрыт. Остались только:
 - hosted runtime/billing/releases;
 - ML anomaly detection.
 
-➡️ **Следующий этап: P4.0.8 Gateway + media enforcement minimal soak/chaos proof. Release scope заморожен; после него остаётся только P4.0.10 перед RC1 и v1.0.0 GA.**
+➡️ **Текущий этап: завершить оставшиеся fault/recovery сценарии P4.0.8.** Client subset и Webhook Retry доказаны; полный P4.0.8 не закрыт. Release scope заморожен; далее — P4.0.10 → RC1 → production smoke → v1.0.0 GA.
