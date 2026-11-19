@@ -1,9 +1,9 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-11-13  
+**Дата обновления:** 2026-11-19  
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
-**Базовый релиз:** release 0.22.0; документ также учитывает unreleased hardening/runtime changes, внедрённые после него  
-**Текущий рабочий статус:** функциональный объём Bot Platform для первого GA-релиза заморожен. P4.0.1–P4.0.6 закрыты. **P4.0.8 частично подтверждён 2026-11-13:** Gateway reconnect/client resume, 10/10 media lifecycle, 10-минутный bounded client soak, Docker resource snapshots, Media Recovery Health и Webhook Retry Proof пройдены. **P4.0.8 ещё не закрыт:** остаются failure/recovery windows для инфраструктуры и duration revoke, а также Go runtime/backlog/orphan verification. До Bot Platform 1.0 остаются два release-blocking gate: P4.0.8 и P4.0.10. Новые feature/hardening-задачи до 1.0 не добавляются, если они не выявляют реальный release blocker.
+**Исторический базовый релиз:** release 0.22.0; актуальный backend содержит последующие hardening/runtime changes и работает на VPS. Присвоение backend релизных Docker/Git-тегов не входит в процесс публикации Dev Portal.  
+**Текущий рабочий статус:** backend Bot Platform реализован, развёрнут и прошёл основные функциональные и media/recovery проверки 2026-11-18—19. P4.0.1–P4.0.6 закрыты; **P4.0.8 принят по проверенному объёму duration enforcement/recovery, Gateway и bounded soak**, но infrastructure chaos и часть глубоких метрик/проверок остаются отложенными. **P4.0.10 выполнен частично:** backup/restore, healthchecks, регрессионные и production smoke-пробы пройдены; риски с секретами, миграциями, offsite backup и реальным rollback осознанно отложены. **Следующий этап — аудит понятности и полноты интерфейса Dev Portal, затем сборка, публикация на хостинге, подключение домена и публичный запуск.** Формальный RC1/Git-теги/Docker-тегирование не используются как обязательные шаги процесса выпуска.
 
 ---
 
@@ -74,35 +74,36 @@
 - **P3.9.8.3.4 Contract & Observability Hardening закрыт и проверен.**
 - **P3.9.9.1 Media Session Expiration Enforcement закрыт и end-to-end проверен.**
 - **P3.9.9.2 Active Media Usage Monitor реализован.**
-- **P3.9.9.3 Duration Limit Enforcement / Auto Revoke реализован в runtime; требуется финальная end-to-end/soak фиксация статуса.**
-- **P3.9.9.4 Recovery / Idempotency / Observability реализован ядром: duration revoke recovery worker + recovery health monitor; требуется финальная multi-instance/chaos/soak проверка.**
+- **P3.9.9.3 Duration Limit Enforcement / Auto Revoke закрыт по E2E-сценариям session/daily limits и принудительному revoke (2026-11-18).**
+- **P3.9.9.4 Recovery / Idempotency / Observability закрыт по проверенным сценариям recovery, backend restart, LiveKit error/retry, конкурентного CAS и стабильности usage; отдельные infra chaos/длительные soak-наблюдения отложены.**
 - **P3.9.10 Contract Stabilization частично закрыт: REST OpenAPI + Gateway AsyncAPI + typed event payloads стабилизированы; Media Runtime Limits/Usage UI остаётся отдельным UX-хвостом.**
-- **P4.0 Release Candidate Hardening — финальная стадия перед 1.0.**
+- **P4.0 Backend Hardening — функциональная проверка завершена; не все эксплуатационные риски устранены.**
 - **P4.0.1 OAuth refresh rotation & replay hardening — закрыт.**
 - **P4.0.2 Outbound SSRF protection — закрыт.**
 - **P4.0.3 Event Scope Symmetry & Data Minimization — закрыт.**
 - **P4.0.4 Secret / Token Log Sanitization — закрыт.**
 - **P4.0.5 SCA / dependency / container security gate — закрыт для release gate.**
 - **P4.0.6 Cross-installation IDOR + scope downgrade regression — закрыт.**
-- **P4.0.8 Gateway + media enforcement soak/chaos proof — 🚧 частично подтверждён (2026-11-13); infrastructure/recovery proof остаётся.**
-- **P4.0.10 Release checklist / rollback / backup verification — обязательный финальный этап перед RC1.**
+- **P4.0.8 Gateway + Media Enforcement / Recovery — ✅ принят по проведённым bounded/E2E и integration-тестам; infra fault windows и глубокие Go/backlog метрики отложены.**
+- **P4.0.10 Operational Readiness / Backup / Smoke — ⚠️ частично завершён; пройдены backup/restore, healthchecks, API/Gateway/Slash/Voice smoke, metrics; известные security/infra риски отложены.**
 
-➡️ **Текущий этап: P4.0.8 Gateway + media enforcement minimal soak/chaos proof. Release scope зафиксирован: после P4.0.8 выполняется только P4.0.10, затем RC1 → production smoke → v1.0.0. P4.0.7 mutation idempotency и P4.0.9 formal version/deprecation machinery остаются в post-release backlog, если soak/RC проверки не выявят конкретный release blocker.**
+➡️ **Текущий этап: Dev Portal UX / Developer Onboarding Review → frontend build → hosting/domain → публичный запуск.** Backend пересобирать, тегировать и релизить заново ради формальной процедуры не требуется. Отложенные security/infra вопросы остаются открытыми и не считаются проверенными.
 
-### 0.1 Оценка готовности к первому релизу
+### 0.1 Оценка готовности к первому публичному запуску
 
-Инженерная оценка по текущему состоянию кода и контрактов (не product KPI):
+Статус на 2026-11-19 (инженерная/продуктовая оценка, не KPI). Числовые проценты из снимка 2026-11-13 больше не используются: они не отражают фактическую проверку UX Dev Portal.
 
-| Область | Готовность | Комментарий |
-|---|---:|---|
-| Bot Platform functional core | ~95% | auth/install, commands, interactions, resources, moderation, roles, structure, events, Gateway, voice/media runtime реализованы |
-| REST / Gateway public contracts | ~95% | OpenAPI + AsyncAPI, typed event payloads и examples есть; остаётся release policy/versioning |
-| Security hardening | ~98% | P4.0.1–P4.0.6 закрыты; OAuth/SSRF/event minimization/log sanitization/SCA/isolation/scope-downgrade release gates пройдены |
-| Reliability / operations | ~92% | Gateway/client-media soak и webhook retry end-to-end пройдены 2026-11-13; остаются failure/recovery, Go runtime и orphan/backlog proof |
-| Developer Experience | ~75% | Dev Portal развит; SDK, interaction inspector и release/version management можно вынести после 1.0 |
-| **Итоговая готовность к Bot Platform 1.0** | **~96%** | feature scope заморожен; security isolation gate закрыт, остались bounded soak/chaos proof и release/rollback readiness |
+| Область | Статус | Комментарий |
+|---|---|---|
+| Bot Platform functional core | ✅ Проверено | OAuth/runtime, Gateway, commands, resource API, LiveKit/media функциональность ранее реализованы; в ноябре выполнены контрольные smoke-тесты |
+| REST / Gateway contracts | ✅ Реализовано | OpenAPI/AsyncAPI, typed events и примеры присутствуют; доступность и удобство документации в UI ещё нужно оценить |
+| Media duration/recovery | ✅ Проверено в ограниченных сценариях | E2E duration/daily revoke, stuck `revoking`, restart, LiveKit failure mock, concurrent CAS, usage stability |
+| Operations / recovery | ⚠️ Есть отложенные проверки | backup/restore и readiness пройдены; rollback не запускался, Redis/PostgreSQL outage и глубокий soak не проверялись |
+| Security | ⚠️ Открытые риски | исторические P4.0.1–P4.0.6 закрыты, однако `.env` отслеживается Git, права `644`, backend process `root` |
+| Developer Portal UX / onboarding | 🚧 Следующий этап | необходимо оценить путь разработчика от регистрации бота до установки, команд, событий, документации и диагностики |
+| Публичная публикация Dev Portal | ❌ Ещё не выполнена | frontend build, хостинг, домен, HTTPS, final UX smoke |
 
-**Вывод:** для первого релиза не требуется достраивать весь список будущих возможностей. Feature scope для 1.0 заморожен. P4.0.6 закрыт; после P4.0.8 и P4.0.10 платформа переходит в RC1. При отсутствии новых release-blocking дефектов выполняется production smoke и выпускается v1.0.0. Все прочие улучшения переносятся в post-release backlog.
+**Принятое решение по выпуску:** backend остаётся одной тщательно протестированной рабочей сборкой на VPS; публичный выпуск — это готовый и опубликованный клиент Dev Portal. Формальный RC1, Git-tag и выпуск новых backend-образов не являются обязательными действиями. Отложенные проблемы безопасности и восстановления не исчезают от такого решения и задокументированы отдельно.
 
 Пройденные end-to-end проверки:
 
@@ -249,10 +250,10 @@
 - Speak Runtime Limits реализованы: enforced active limits для speaking bots/tracks, post-check после `track_published`, observe-only duration counters и runtime limit audit
 - `max_active_speaking_bots_per_room` ограничивает количество разных bot installations, публикующих audio в одной voice room
 - `max_active_tracks_per_bot` ограничивает количество активных published tracks одной installation
-- `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` работают в `observe_only` режиме: фиксируют превышение, но не отключают бота
+- `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` поддерживают `observe_only` и `enforced`; auto revoke при enforced-политике подтверждён E2E в ноябре 2026
 - `bot_media_usage_daily` агрегирует daily publish usage по installation/date: audio/video/screen duration и количество опубликованных tracks
 - `usage_accumulated_at` в `bot_media_tracks` защищает duration accounting от двойного начисления при `track_unpublished`, `participant_left` и `room_finished`
-- `media_auto_revoke_on_limit` заложен как policy flag, но auto revoke намеренно выключен до отдельного runtime enforcement worker
+- `media_auto_revoke_on_limit` используется duration enforcement; в режиме `enforced` с включённым auto revoke worker отключает нарушающую session (проверено в P4.0.8)
 - Bot Video Publish Capability реализован: intent `video_publish` создаёт publish-only media session без audio/video subscribe
 - LiveKit join token ограничивает публикацию video session источником `CAMERA` через `CanPublishSources`; `SCREEN_SHARE` не выдаётся
 - для video publish переиспользуются scope `voice.speak`, room policy `allow_speak`, installation/server/room boundary и media runtime limits
@@ -402,7 +403,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий этап: P4.0.8 Gateway + Media Soak / Chaos Proof. Voice/media functional runtime и release security regression уже закрыты; теперь требуется bounded reliability proof перед финальным P4.0.10 release checklist.**
+➡️ **Текущий этап: UX-аудит и подготовка Dev Portal к публикации; результаты P4.0.8/P4.0.10 и отложенные проверки приведены в разделе 9.**
 
 
 ---
@@ -656,7 +657,7 @@
     - media runtime limits: active speaking bots per room, active tracks per bot
     - duration limit modes: `disabled`, `observe_only`, `enforced`
     - speak session / daily speak duration thresholds
-    - `media_auto_revoke_on_limit` заложен, но выключен для текущего observe-only этапа
+    - `media_auto_revoke_on_limit` поддерживает enforced auto revoke; observe-only остаётся отдельным режимом политики
 
 - `BotRuntimeAuditEvent`
     - runtime protection audit trail
@@ -690,7 +691,7 @@
     - уникальный ключ: `installation_id + usage_date`
     - хранит `audio_publish_duration_sec`, `video_publish_duration_sec`, `screen_publish_duration_sec`
     - хранит `published_audio_tracks`, `published_video_tracks`, `published_screen_tracks`
-    - используется для observe-only duration limits, diagnostics, будущих quotas/billing и video/screen runtime
+    - используется для duration accounting в observe-only/enforced режимах, diagnostics, будущих quotas/billing и video/screen runtime
 
 - `LiveKitWebhookEvent`
     - журнал входящих LiveKit webhook events
@@ -1160,7 +1161,8 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Contract & Observability Hardening | ✅ | P3.9.8.3.4: usage/source diagnostics, stale/orphan counters, runtime violations, disconnect failures |
 | Diagnostics Corrective Hardening | ✅ | `live_kit_room` mapping, `last_session_at`, public audit `_ctx` sanitization исправлены и проверены |
 | Media Session Expiration Enforcement | ✅ | P3.9.9.1: active/pending expiration lifecycle, LiveKit participant removal, 30s grace, usage finalization, refresh race hardening проверены end-to-end |
-| Active Media Usage Monitor | ✅ | P3.9.9.2 реализован; remaining reliability proof входит в P4.0.8 soak/chaos gate |
+| Active Media Usage Monitor | ✅ | P3.9.9.2 реализован; duration enforcement/recovery E2E пройдены, infra chaos отдельно отложен |
+| Duration Auto Revoke / Recovery | ✅ | P3.9.9.3 / P3.9.9.4: session/daily limit, restart, retry, concurrent CAS и usage stability проверены |
 
 
 ## 7. Безопасность — текущее состояние
@@ -1217,8 +1219,8 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Voice track control authorization | ✅ | backend проверяет право mute, room boundary, LiveKit participant и track ownership |
 | Voice track control DB sync safety | ✅ | строгий sync по installation/session/room/LiveKit room/participant/track SID; успешный LiveKit mute/unmute не ломается DB sync |
 | Media runtime active limits | ✅ | `max_active_speaking_bots_per_room` и `max_active_tracks_per_bot` проверяются pre-create и post-track-published |
-| Media runtime duration accounting | ✅ | `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` работают observe-only через `bot_media_usage_daily` |
-| Media runtime auto revoke | ⚠️ | flag `media_auto_revoke_on_limit` заложен, но отключён до отдельного enforcement worker |
+| Media runtime duration accounting | ✅ | `bot_media_usage_daily` учитывает duration; `observe_only` и `enforced` поддержаны runtime-политикой |
+| Media runtime auto revoke | ✅ | enforced session/daily duration и принудительный revoke проверены 2026-11-18 |
 | Media session expiration enforcement | ✅ | просроченный active participant удаляется из LiveKit после grace period; session завершается `ended/expired`, usage финализируется |
 | Media session refresh race protection | ✅ | refresh продлевает lease только для refreshable open session; старый expiration не может завершить уже продлённую session |
 | Media expiration multi-instance safety | ✅ | worker использует row locking / `FOR UPDATE SKIP LOCKED`; повторная обработка не должна дублировать terminal transition/usage |
@@ -1360,8 +1362,8 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - видеть синхронизированное состояние `muted` в `bot_media_tracks` для bot tracks
 - корректно переживать moderator kick: session становится `revoked/moderator_kick`, LiveKit disconnect приходит bot client
 - работать под active speak runtime limits: room-level speaking bots и per-bot active tracks
-- попадать в media duration accounting: session duration и daily audio publish duration фиксируются observe-only
-- получать audit/runtime visibility по превышениям media limits без принудительного отключения
+- попадать в media duration accounting: observe-only и enforced режимы доступны для session/daily audio publish duration
+- получать audit/runtime visibility по превышениям; в режиме `observe_only` без отключения, в `enforced` при auto revoke — с отзывом session
 - получать стабильный `media_session` context в `voice.track.published` / `voice.track.unpublished`
 - видеть `intent`, session `status` и terminal `end_reason` прямо в Gateway track lifecycle event
 - работать под strict source contract: `AUDIO/MICROPHONE`, `VIDEO/CAMERA`, `VIDEO/SCREEN_SHARE`
@@ -1373,115 +1375,125 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ---
 
-## 9. Что осталось до первого релиза
+## 9. План публичного запуска и зафиксированные проверки
 
-### Release scope freeze — зафиксировано 2026-11-12
+### 9.1 Принцип релиза (решение 2026-11-19)
 
-С этого момента до Bot Platform 1.0 **не добавляются новые feature/hardening-задачи**, если текущие проверки не выявляют конкретный release-blocking дефект.
+**Backend:** одна актуальная рабочая сборка Go, уже развёрнутая на VPS и проверенная реальными тестами. Не вводим обязательный Git-tag, Docker release-tag, RC1-процедуру и повторное развёртывание ради формальности. Для rollback сохранён отдельный Docker image прежней сборки, но реальный откат пока не тестировался.
 
-Уже закрытые release-gates:
-
-- ✅ **P4.0.1** OAuth refresh rotation & replay hardening;
-- ✅ **P4.0.2** Outbound SSRF protection;
-- ✅ **P4.0.3** Event Scope Symmetry & Data Minimization;
-- ✅ **P4.0.4** Secret / Token Log Sanitization;
-- ✅ **P4.0.5** SCA / dependency / container security gate;
-- ✅ **P4.0.6** Cross-installation IDOR + Scope Downgrade Regression.
-
-P4.0.6 зафиксировал:
-
-- effective scopes берутся из `BotAuthMiddleware`, а не повторно из raw `installation.GrantedScopes`;
-- отсутствие/некорректный effective-scope context обрабатывается fail-closed;
-- batch `permission_check` переиспользует общий `validatePermissionCheckAccess`, включая room visibility самого bot user;
-- cross-server/resource/event boundaries остаются installation/server scoped;
-- interaction `ACK` / `Callback` привязаны к `BotInstallationID + BotID`;
-- media session `List/Get/Refresh/Disconnect` изолированы по `installation_id`;
-- добавлены regression tests для runtime context/server boundary, interaction IDOR и media-session IDOR.
-
-### Обязательно закрыть до RC1
-
-1. **P4.0.8 — Минимальный Gateway + Media Soak / Chaos Proof**
-- Gateway reconnect/resume/backlog/duplicate protection под длительным прогоном;
-- кратковременная недоступность Redis/PostgreSQL без неконтролируемого crash-loop;
-- webhook retry/backoff;
-- media duration revoke + recovery worker;
-- backend restart во время `revoking`;
-- LiveKit admin failure/retry;
-- отсутствие runaway goroutines/memory/backlog/orphan sessions/tracks.
-
-Цель — не построить отдельную chaos-платформу, а доказать стабильность уже реализованного runtime.
-
-#### P4.0.8 — промежуточные результаты на 2026-11-13 (🚧 PARTIAL PASS)
-
-Это **bounded proof, а не итоговый хаос- или нагрузочный тест**. Результаты приведены только для фактически проверенного объёма; исходный P4.0.8 остаётся release blocker до завершения перечисленных ниже сценариев.
-
-| Сценарий | Фактическое доказательство | Статус |
-|---|---|---|
-| Gateway disconnect/reconnect + client resume | 1 преднамеренный client-side WebSocket drop; восстановление за **1260 мс**; `invalid_resume=0`, `server_errors=0` | ✅ PASS (client subset) |
-| Gateway event delivery/duplicate suppression | 40 raw / 40 delivered событий (10× `voice.room.started`, `voice.participant.joined`, `voice.participant.left`, `voice.room.ended`); 0 duplicate event IDs | ✅ PASS (проверенное окно) |
-| Media session lifecycle | 10 create / 10 active / 10 end; `errors=[]`, `unresolved=[]`; штатный terminal `ended/bot_disconnect` | ✅ PASS (10/10 последовательных сессий) |
-| Bounded client soak | Продолжительность ~10 минут; 10 последовательных media cycles, 5 сек hold, интервал 60 сек; **не является тестом конкурентной нагрузки** | ✅ PASS в заданном объёме |
-| Docker resource snapshots | 37 snapshots: backend RAM **39.30 → 40.86 MiB**, max 40.86 MiB; backend PIDs=10; Redis/PostgreSQL/LiveKit без заметного runaway в этом окне | ✅ PASS (наблюдения за 10 минут) |
-| Media recovery health | Prometheus `/metrics`: `stale_revoking_sessions=0`, `pending_usage_recovery_tracks=0`, duration/usage recovery `failed_sessions_total=0`, recovery `scan_errors_total=0` | ✅ PASS (health snapshot, не fault-recovery test) |
-| Webhook transient failure + retry/backoff | Installation 1, `message.created`, delivery `7eb70f60-fa69-44a5-8f49-3da8f2f758f6`: `503` в **12:04:43.231627 UTC** → `200` в **12:04:55.225040 UTC**; `attempt_count=2`, `max_attempts=6`, terminal `success`, ровно 2 attempts в БД | ✅ PASS (end-to-end + PostgreSQL evidence) |
-| Webhook worker attempt accounting | В ходе proof устранено двойное сохранение non-2xx HTTP attempt / двойной инкремент `AttemptCount`; проверенное поведение: одна HTTP-попытка = одна запись attempts | ✅ PASS (для `503 → 200`) |
-| Go runtime goroutines/heap/GC/process metrics | `/metrics` экспортирует прикладные `echotalk_*`, но не содержит стандартные `go_*` / `process_*` series; Docker PIDs **не равны** goroutines | ⬜ NOT VERIFIED |
-| Gateway backlog accumulation/replay under outage | Нет отдельного испытания с накоплением backlog в период серверного сбоя/длительного offline | ⬜ NOT VERIFIED |
-| Redis/PostgreSQL failure windows | Кратковременный отказ и восстановление, отсутствие crash-loop, корректность очередей/сессий | ⬜ NOT VERIFIED |
-| Backend restart in `revoking` + multi-instance | Recovery незавершённого enforced duration revoke, idempotency, отсутствие double usage | ⬜ NOT VERIFIED |
-| LiveKit admin failure + recovery | Реальный admin disconnect failure, retry, terminal transition / audit / usage, отсутствие orphan participant/track | ⬜ NOT VERIFIED |
-| Enforced session/daily duration limit | End-to-end revoke/recovery/duplicate enforcement при выставленных лимитах | ⬜ NOT VERIFIED |
-
-**Evidence:** `p408-2026-11-13T10-09-50-931Z-summary.json`, соответствующий `.jsonl`, 37 снимков Docker resources; логи Node.js test bot и PostgreSQL `bot_event_deliveries` / `bot_event_delivery_attempts`. `verdict=CLIENT_SUBSET_PASS` относится **только** к клиентскому subset, не ко всему P4.0.8.
-
-**Границы и безопасность дальнейшего тестирования:** infrastructure chaos проводить на staging/контролируемом окружении, не останавливая Redis/PostgreSQL/LiveKit на действующем VPS без согласованного окна, снимка состояния и rollback-плана. Секреты, JWT, webhook signature и payload с PII в evidence не сохранять. Установка бота поддерживает **один активный event transport** (`webhook` либо `websocket`); ошибка `gateway_transport_disabled` во время webhook-only proof ожидаема, не является дефектом Gateway.
-
-**Следующее действие P4.0.8:** подготовить staging fault windows и проверить duration revoke/recovery (`revoking` + backend restart, LiveKit admin error), затем Redis/PostgreSQL/LiveKit recovery и backend goroutine/heap/backlog/orphan invariants. По завершении gate перейти к P4.0.10 без расширения feature scope.
-
-2. **P4.0.10 — Release Candidate Checklist / Rollback / Backup Verification**
-- миграции;
-- backup/restore;
-- rollback Docker image;
-- production env/secrets;
-- health/readiness;
-- smoke: OAuth → install → message → interaction → Gateway → voice/media;
-- release tag/version;
-- rollback procedure;
-- финальная фиксация known limitations.
-
-### После выполнения
+**Публичный релиз Bot Platform:** удобный для разработчика, собранный и размещённый на публичном хостинге **Dev Portal**, доступный по домену с HTTPS и понятным процессом регистрации/установки ботов. Не путать готовность backend с готовностью публичного developer experience.
 
 ```text
-P4.0.8
-   ↓
-P4.0.10
-   ↓
-RC1
-   ↓
-Production smoke
-   ↓
-v1.0.0 GA
+Backend: реализован → E2E/regression/smoke проверен → работает на VPS
+                                                   ↓
+Dev Portal: UX/onboarding audit → исправления интерфейса → production build
+                                                  ↓
+                         хостинг + домен + HTTPS + frontend smoke
+                                                  ↓
+                                     официальный публичный запуск
 ```
 
-Если P4.0.8 не выявляет новый release blocker, **дополнительные этапы перед 1.0 не добавляются**.
+### 9.2 Что подтверждено — P4.0.8 (2026-11-13—18)
 
-### Перенесено в post-release backlog / P4.1
+| Проверка | Фактическое доказательство | Статус |
+|---|---|---|
+| Gateway reconnect + client resume | 2026-11-13: 1 контролируемый WS drop, восстановление 1260 мс, `invalid_resume=0` | ✅ PASS (bounded) |
+| Event delivery + duplicate protection | 40/40 доставленных voice lifecycle событий, дубли event ID не обнаружены | ✅ PASS (bounded) |
+| Media lifecycle soak | 10/10 последовательных create/active/end, ~10 минут, 37 Docker snapshots; это не stress/concurrent soak | ✅ PASS (bounded) |
+| Webhook retry/backoff | `message.created`: HTTP `503 → 200`, ровно две попытки, одна запись на HTTP-attempt | ✅ PASS (E2E) |
+| Session duration enforcement | Лимит 10 с, активная media session автоматически `revoked`, причина `runtime_speak_session_duration_limit` | ✅ PASS (E2E) |
+| Daily duration enforcement | Лимит 25 с, auto revoke с причиной `runtime_daily_speak_duration_limit` | ✅ PASS (E2E) |
+| Recovery зависшей `revoking` session | Stale session восстановлена до `revoked`; `participant_removed=true`, `usage_finalized=true` | ✅ PASS (E2E) |
+| Usage/idempotency | Проверена стабильность начислений по повторным замерам без double accounting | ✅ PASS (ограниченный сценарий) |
+| LiveKit admin failure → recovery | Go integration с PostgreSQL + mock LiveKit: первый `RemoveParticipant` завершился ошибкой, повтор — успешно, status `revoked` | ✅ PASS (integration; audit/usage не проверялись в этом тесте) |
+| Backend restart в состоянии `revoking` | 2026-11-18: после restart worker восстановил session, `participant_removed=true`, `usage_finalized=true`, `failed_sessions=0` | ✅ PASS (E2E) |
+| Concurrent Recovery, PostgreSQL CAS | Два конкурентных recovery scan: `checked=2`, `recovered=1`, `failed=0`, `livekit_remove_calls=1`, status `revoked` | ✅ PASS (integration; mock LiveKit) |
+| Redis/PostgreSQL outage / восстановление | Не проводилось контролируемое отключение инфраструктуры | ⏸️ Отложено |
+| Go goroutine/heap/process collectors | `go_*` / `process_*` не были показаны текущим `/metrics`; Docker PIDs не заменяют проверку goroutines | ⏸️ Отложено |
+| Длительное backlog accumulation и orphan invariants под outage | Отдельный стресс/отказный прогон не проводился | ⏸️ Отложено |
 
-- P4.0.7 strict mutation idempotency для всех high-risk endpoints;
-- P4.0.9 formal public API/event versioning & deprecation machinery;
-- Client / TelegramBot non-root hardening;
-- перенос backend TLS termination на Nginx и запуск backend non-root;
+**Итог P4.0.8:** duration enforcement и recovery проверены; bounded Gateway/media/workers пройдены. **Этап принят для перехода к Dev Portal, но не заявляется как полный инфраструктурный chaos/stress proof.** Для Redis/PostgreSQL/LiveKit fault windows нужна отдельная staging-проверка, без остановки сервисов на действующем VPS.
+
+Исторические evidence 2026-11-13: `p408-2026-11-13T10-09-50-931Z-summary.json`, JSONL и 37 Docker resource snapshots; PostgreSQL evidence для webhook retry. Дополнительные 2026-11-18 результаты подтверждены SQL, worker logs и интеграционными тестами (`TestDurationRevoke_LiveKitFailOnceThenRecovery`, `TestDurationRevoke_ConcurrentRecoveryExactlyOnce`).
+
+### 9.3 Что подтверждено — P4.0.10 (2026-11-19)
+
+| Проверка | Фактический результат | Статус |
+|---|---|---|
+| Диск VPS | `/` освобождён с 100% до 88% (2.3 ГБ свободно), Docker data на `/mnt/docker` | ✅ Диагностика и частичная очистка |
+| PostgreSQL backup | `pg_dump` 17.11, custom/gzip, backup `echo_20261119T050907Z.dump` (~820 КБ), 686 TOC entries | ✅ PASS |
+| PostgreSQL restore | Успешно восстановлена отдельная `echo_restore_test`: 69 таблиц, 171 media sessions, 73 media tracks, 14 daily usage rows; тестовая БД удалена | ✅ PASS |
+| Docker rollback preparedness | Сохранён прежний image `530f1044b561`; текущий backend image `b4e1db6f8567`; **реальный rollback не выполнялся** | ⚠️ Image сохранён, rollback не проверен |
+| Healthchecks | Отдельный порт 9090: `/healthz=204`, `/readyz=204`; docker `/healthcheck` exit 0, status `healthy` | ✅ PASS |
+| Go regression | `go test ./services/botplatform`: PASS, 0.032s **без DB integration tests** | ✅ PASS (unit subset) |
+| Auth negative/positive | `GET /bot/me`: без токена `401`, с Bot Access Token `200` | ✅ PASS |
+| Gateway session | `POST /bot/gateway/session` → `200` | ✅ PASS |
+| WebSocket connect/hello | `hello`, `installation_id=1`, `server_id=1`, heartbeat interval 30s | ✅ PASS |
+| Heartbeat | `last_seen_at` был недавним, но изменение непосредственно до/после heartbeat не сравнивалось | ⚠️ Косвенно подтверждено |
+| Gateway disconnect | DB: `status=disconnected`, `last_disconnected_at` обновлён | ✅ PASS |
+| Bot REST API | `GET /bot/servers/1/rooms` → `200`; `GET /bot/events` → `200` | ✅ Доступ проверен; payload/replay content не перепроверялся |
+| Slash command | `/help` выполнена через клиент EchoTalk и вернула корректный ответ | ✅ PASS |
+| Voice/audio | `/voicespeak 94 5000 440`: звук воспроизведён; DB `ended/bot_disconnect`, 2026-11-19 07:00 UTC | ✅ PASS |
+| Metrics/Recovery Health | `/metrics` доступен; 7 recovery/scan error/pending/stale показателей равны 0 | ✅ PASS (snapshot) |
+| Ошибки логов | panic/fatal в просмотренном окне не обнаружены; присутствует `PERMS DEBUG` и единичный TLS handshake EOF | ✅ С замечаниями |
+
+**Границы smoke:** базовые установка/OAuth flow, interactive components, video/screen publish и весь набор RBAC проверялись на более ранних этапах. В ноябрьском финальном прогоне **не переиспытан целиком** полный путь `создать бота → выдать scopes → установить → получить code → exchange token → interaction → media`. Эти сценарии желательно пройти ещё раз именно с точки зрения UX нового разработчика на Dev Portal.
+
+### 9.4 Осознанно отложенные проверки и риски (не считать закрытыми)
+
+| Приоритет | Тема | Что обнаружено или осталось | Текущее решение |
+|---|---|---|---|
+| **Высокий** | Secrets в Git | `.env` и `EchoTalkClient/.env` отслеживаются Git; на VPS имели `644`; содержимое и история не проверялись | Отложено владельцем. Требуются исключение из индекса/истории по плану, ротация секретов и права `600` |
+| **Высокий** | Container privilege | Backend-процесс выполняется от `root`; private TLS key читается приложением | Отложено; отдельно спланировать non-root / TLS termination |
+| **Средний/высокий** | Offsite backup | Есть проверенная локальная копия на том же VPS, но нет подтверждения удалённой резервной копии | Отложено |
+| **Средний/высокий** | Реальный Docker rollback | Старый image сохранён, но сценарий возврата после обновления ещё не выполнялся | Отложено |
+| **Средний** | DB migration rollback | `ConnectDatabase()` при старте вызывает GORM `AutoMigrate`; схема не откатывается при возврате старого образа | Отложено по решению владельца; обратная совместимость обеспечивается перед релизом |
+| **Средний** | Redis/PostgreSQL failure windows | Не тестировали сбой и восстановление основных dependencies | Отложено для staging |
+| **Средний** | Go runtime/backlog/orphan stress | Нет достаточного длинного stress/chaos proof с heap/goroutine и outage backlog | Отложено |
+| **Низкий** | Debug permission logs | В production видны многословные `[PERMS DEBUG]` с набором разрешений | Рекомендуется выключить до публичного запуска |
+
+Подробный отдельный список отложенных работ: `EchoTalk_P4.0.10_deferred_release_preparation.md` (зафиксирован ранее). Это не означает, что все перечисленные риски безопасны; особенно секреты в Git требуют отдельного устранения.
+
+### 9.5 Следующий этап — Dev Portal UX / Developer Onboarding Review 🚧
+
+**Цель:** разработчик, впервые открывший Dev Portal, должен самостоятельно понять, как зарегистрировать Bot App, настроить transport, установить бота на сервер, получить токен, подписаться на события, добавить slash commands и отладить ошибки. До завершения аудита удобство интерфейса **не подтверждено**.
+
+| Путь разработчика | Что проверим в UI | Статус |
+|---|---|---|
+| Первое посещение | Понятное назначение Dev Portal, вход, навигация, документация, очевидная кнопка создания бота | ⏳ UX review |
+| Создание Bot App | Название, описание, иконка, scopes, валидация, ошибки, пустые состояния | ⏳ UX review |
+| Credentials & OAuth | Понятное отличие Client ID/Secret, user JWT, Bot Access/Refresh; безопасное копирование и rotation | ⏳ UX review |
+| Install flow | Как выбрать сервер и разрешения, подтвердить установку, узнать installation ID и дальнейшие действия | ⏳ UX review |
+| Transport | Когда использовать Webhook vs WebSocket; endpoint URL, подпись, subscribe events, connection status | ⏳ UX review |
+| Slash Commands | Command Base URL, создание `/help`, включение, проверка, error/timeout feedback | ⏳ UX review |
+| Event debugging | Deliveries/attempts, replay, Gateway seq/ACK/heartbeat, понятные ошибки и пустые состояния | ⏳ UX review |
+| Runtime Protection | Как увидеть лимиты, блокировки, violations, что делать при `429` | ⏳ UX review |
+| REST / Gateway docs | Доступность OpenAPI/AsyncAPI, Quick Start, примеры request/response и авторизации | ⏳ UX review |
+| Интерфейс | Адаптивность, формулировки, подтверждения опасных действий, состояния загрузки/ошибок, доступность | ⏳ UX review |
+
+UX-аудит может выявить небольшие **публикационные исправления клиента**, но не повод заново расширять backend feature scope.
+
+### 9.6 Публикация Dev Portal — после UX Review
+
+- [ ] Внести UX/контент-исправления в Vue Dev Portal.
+- [ ] Выполнить production frontend build и typecheck/lint.
+- [ ] Проверить маршрутизацию SPA при прямом открытии и перезагрузке URL.
+- [ ] Разместить статическую сборку на выбранном хостинге.
+- [ ] Подключить домен, HTTPS и корректную конфигурацию API/CORS/redirect URLs (строгий allowlist, без wildcard CORS).
+- [ ] Выполнить публичный frontend smoke: login → create → credentials → OAuth/install → commands → events/diagnostics.
+- [ ] Опубликовать Dev Portal и документацию для разработчиков ботов EchoTalk.
+
+**Финал:** публичный Dev Portal доступен по домену и позволяет стороннему разработчику пройти весь путь от создания бота до работы с runtime. Backend остаётся текущей проверенной сборкой; новые теги не требуются.
+
+### 9.7 После запуска / post-release backlog
+
+- P4.0.7 strict mutation idempotency для high-risk endpoints;
+- P4.0.9 formal public API/event versioning и deprecation policy;
 - Media Runtime Limits / Usage UI;
-- daily/global quotas;
-- deferred/autocomplete interactions;
-- specialized user/role/channel selects;
-- interaction inspector;
-- global scoped Search API;
-- official Bot SDK / helpers;
-- advanced analytics;
-- hosted runtime / billing / releases;
-- advanced anomaly / ML-based abuse detection.
-
+- daily/global quotas, deferred/autocomplete, specialized selects, interaction inspector;
+- global scoped Search API, официальный SDK, advanced analytics;
+- hosted runtime/billing/releases и anomaly detection;
+- отложенные operations/security задачи из §9.4 — по отдельному приоритетному плану (не считать выполненными после публикации).
 
 ---
 
@@ -2194,7 +2206,7 @@ Smoke-tested сценарии:
 - `max_active_tracks_per_bot` реализован как enforced per-installation active track limit;
 - media limit error contract отдаёт реальный runtime code вместо generic `media_session_create_failed`;
 - runtime limit modes используются для duration policy: `disabled`, `observe_only`, `enforced`;
-- `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` заложены и работают в observe-only режиме;
+- на момент этапа P3.9.7.3 `max_speak_session_duration_sec` и `max_daily_speak_duration_sec` работали в observe-only режиме; с 2026-11-18 отдельно проверен `enforced` auto revoke;
 - `media_auto_revoke_on_limit` заложен, но отключён по умолчанию;
 - audit/runtime protection events пишутся для deny и observe-only decisions;
 - реализован архитектурный мост к video/screen runtime через `bot_media_tracks` и `bot_media_usage_daily`.
@@ -2497,32 +2509,33 @@ End-to-end проверки от 2026-08-25:
 - violation counters/logging и report cooldown;
 - runtime wiring через `StartBotMediaActiveUsageMonitor`.
 
-#### P3.9.9.3 — Duration Limit Enforcement / Auto Revoke ⚠️
+#### P3.9.9.3 — Duration Limit Enforcement / Auto Revoke ✅
 
-Реализация присутствует в runtime:
+Реализация присутствует в runtime и подтверждена E2E 2026-11-18:
 
-- `enforced` duration decision может вызвать `EnforceBotMediaDurationLimit`;
-- поддерживается `AutoRevoke`;
-- session переводится через controlled `revoking -> revoked`;
-- LiveKit participant removal и usage finalization разделены по lifecycle;
-- session-duration и daily-duration имеют отдельные terminal reasons;
-- monitor считает `AutoRevokedSessions`.
+- `enforced` duration decision вызывает `EnforceBotMediaDurationLimit` и при policy `AutoRevoke` отзывает session;
+- переход состояния `active → revoking → revoked` с контролируемым отключением LiveKit participant;
+- session-duration limit 10 секунд → `runtime_speak_session_duration_limit`;
+- daily-duration limit 25 секунд → `runtime_daily_speak_duration_limit`;
+- worker финализирует usage, предотвращается двойное начисление в проверенных сценариях;
+- режим `observe_only` сохранён как альтернативная политика.
 
-**Остаток до статуса ✅:** зафиксировать отдельный end-to-end + soak regression для session limit, daily limit, duplicate enforcement и LiveKit admin failure.
+**Статус:** ✅ E2E PASS для обоих типов duration limit. Длительный нагрузочный прогон и инфраструктурные fault windows вынесены в отдельный deferred backlog.
 
-#### P3.9.9.4 — Recovery / Idempotency / Observability ⚠️
+#### P3.9.9.4 — Recovery / Idempotency / Observability ✅ (bounded proof)
 
-Core implementation присутствует:
+Реализовано и проверено 2026-11-18—19:
 
-- `StartBotMediaDurationRevokeRecoveryWorker`;
-- recovery зависших `revoking` sessions;
-- retry window и per-operation timeouts;
-- optimistic claim через `updated_at` для multi-instance contention;
-- disconnect failure audit;
-- `BotMediaRecoveryHealthMonitor` запущен отдельным worker;
-- recovery result counters/logging.
+- `StartBotMediaDurationRevokeRecoveryWorker`, периодический recovery зависших `revoking` sessions;
+- optimistic PostgreSQL CAS по `updated_at` для защиты от multi-worker contention;
+- retry после сбоя `LiveKit.RemoveParticipant`, оставление session в `revoking` до успешного завершения;
+- восстановление после реального backend restart (`participant_removed=true`, `usage_finalized=true`);
+- PostgreSQL integration test с mock LiveKit: первый вызов ошибка, retry завершает `revoked`;
+- concurrent integration test: два scan, только один успешный recovery и один вызов `RemoveParticipant`;
+- проверка стабильного usage accounting без двойных начислений;
+- recovery-health/Prometheus snapshot: `stale_revoking_sessions=0`, `pending_usage_recovery_tracks=0`, recovery failed/scan errors `0`.
 
-**Остаток до статуса ✅:** multi-instance/chaos/soak доказательство, restart recovery test и финальная проверка metrics/diagnostics alertability.
+**Статус:** ✅ PASS по перечисленным сценариям. Нет утверждения о полностью проверенной работе при отказе Redis/PostgreSQL, о production multi-instance deployment и о полном длинном soak.
 
 #### P3.9.10 — Media Runtime Dev Portal & Contract Stabilization ⚠️
 
@@ -2541,33 +2554,42 @@ Core implementation присутствует:
 - release/deprecation policy;
 - финальная сверка public voice identifiers / data minimization.
 
-### P4.0 — Release Candidate Hardening 🚧 FINAL STAGE
+### P4.0 — Backend Hardening / Release Preparation ✅ / ⚠️
 
-Цель: довести существующую платформу до безопасного первого GA-релиза без дальнейшего расширения feature scope.
+Цель: стабилизировать существующую функциональность и проверить backend перед публикацией Dev Portal, без расширения bot feature scope.
 
-Статус release gate:
+| Этап | Статус на 2026-11-19 |
+|---|---|
+| P4.0.1 OAuth refresh rotation/replay | ✅ Закрыт |
+| P4.0.2 Outbound SSRF | ✅ Закрыт |
+| P4.0.3 Event Scope Symmetry / Data Minimization | ✅ Закрыт |
+| P4.0.4 Secret/Token Log Sanitization | ✅ Закрыт (для runtime логов; не устраняет обнаруженные `.env` в Git) |
+| P4.0.5 SCA/dependency/container security gate | ✅ Закрыт в исходной проверке 2026-11-12; не означает отсутствие новых CVE позднее |
+| P4.0.6 IDOR + Scope Downgrade | ✅ Закрыт |
+| P4.0.7 Runtime mutation idempotency | ⏸️ Post-release |
+| P4.0.8 Gateway/Media bounded soak + duration recovery | ✅ Проверенный subset закрыт; infra chaos/Go metrics отложены |
+| P4.0.9 Formal API version/deprecation | ⏸️ Post-release |
+| P4.0.10 Backup/Health/Smoke/Operational Readiness | ⚠️ Практические проверки пройдены, security/infra/rollback хвосты отложены |
 
-- ✅ **P4.0.1** OAuth refresh rotation & replay hardening;
-- ✅ **P4.0.2** Outbound SSRF protection for webhook/command callbacks;
-- ✅ **P4.0.3** Event Scope Symmetry & Data Minimization;
-- ✅ **P4.0.4** Secret/Token Log Sanitization;
-- ✅ **P4.0.5** SCA / dependency / container security gate;
-- ✅ **P4.0.6** Cross-installation IDOR + scope downgrade regression suite;
-- 🚧 **P4.0.8** Gateway + media enforcement minimal soak/chaos proof — **CURRENT, PARTIAL PASS (2026-11-13)**: Gateway + media client subset, server resource snapshots, media recovery health, webhook `503 → 200` пройдены; infrastructure/duration recovery и Go runtime evidence ещё не закрыты;
-- ⏭️ **P4.0.10** Release candidate checklist / rollback / backup verification — финальный обязательный gate.
-
-Не являются блокерами 1.0 и перенесены в P4.1/post-release:
-
-- **P4.0.7** Runtime mutation idempotency — кроме конкретного дефекта, обнаруженного regression/soak;
-- **P4.0.9** Formal public API/event versioning & deprecation machinery — текущий public contract выпускается как v1;
-- дополнительные infra/UX hardening-задачи, не влияющие на безопасность и стабильность первого релиза.
-
-**Release rule:** P4.0.6 закрыт. После P4.0.8 → P4.0.10 формируется RC1. Если production smoke не выявляет release blocker, выпускается **Bot Platform v1.0.0 GA**. Новые улучшения до GA не добавляются.
-
+**Принятое решение:** не вводить RC1/Docker-tag/Git-tag как обязательные действия. Следующий непосредственный этап — **Dev Portal UX Review**, затем frontend build, hosting/domain и публичный запуск. См. §9.
 
 ## Changelog после последнего обновления документации от 2026-06-26
 
+### Актуализация 2026-11-19 — backend regression/smoke → Dev Portal publication
+
+- **P4.0.8:** session/daily duration auto revoke, stuck `revoking`, usage idempotency, LiveKit failure/retry (integration mock), backend restart recovery и concurrent CAS recovery проверены; длительные infra fault windows оставлены открытыми.
+- **P4.0.10:** локальный `pg_dump` базы `echo`, restore в `echo_restore_test` и проверка 69 таблиц/171 media sessions/73 media tracks/14 daily usage rows — PASS; тестовая БД удалена.
+- Сохранён rollback image прежней сборки; реальный Docker rollback не выполнялся. Backend текущего VPS проверен как рабочая одиночная сборка, новый release tag не нужен.
+- Добавлены `/healthz`, `/readyz` на metrics-порту 9090 и Docker healthcheck для distroless runtime; HTTP 204/204, Docker healthy, exit code 0 — PASS.
+- `go test ./services/botplatform` — PASS (DB integration subset пропущен), Bot API auth 401/200, rooms/events API 200, Gateway session 200, WS hello/disconnect, `/help`, voice `/voicespeak` → `ended/bot_disconnect` — PASS.
+- Prometheus recovery counters/gauges: 7 проверенных ошибок/stale/pending значений = 0; обязательность дальнейшего длинного наблюдения не снята.
+- Secrets audit: `.env` и `EchoTalkClient/.env` отслеживаются Git, права на момент осмотра 644; backend запущен от root. Миграции через `AutoMigrate`, offsite backup и реальный rollback отложены по решению владельца.
+- **Изменён процесс публикации:** не требуются формальные RC1, Git/Docker release-теги. Следующий этап — аудит Dev Portal для разработчика, исправления UX/контента, production build, хостинг, домен, HTTPS, публичный запуск.
+
+
 ### Актуализация 2026-11-13 — P4.0.8 bounded client proof + Webhook Retry (PARTIAL PASS)
+
+*Историческая запись о состоянии на 2026-11-13. Финальные результаты duration/recovery от 2026-11-18 и дальнейшие решения отражены выше, в актуализации 2026-11-19 и §9.*
 
 - Gateway client disconnect/reconnect восстановлен за 1260 мс; за 10 минут доставлены 40/40 voice lifecycle events без duplicate event IDs, `invalid_resume=0`;
 - media lifecycle 10/10: created/active/ended, `errors=[]`, `unresolved=[]`, `end_reason=bot_disconnect`;
@@ -2593,6 +2615,8 @@ Core implementation присутствует:
 - после P4.0.8 остаётся только P4.0.10 Release Candidate Checklist / Rollback / Backup Verification.
 
 ### Актуализация 2026-11-12 — Release Scope Freeze
+
+*Исторический план на 2026-11-12; процесс релиза позднее изменён решением от 2026-11-19 (см. §9).*
 
 - P4.0.1 OAuth refresh rotation/replay hardening закрыт;
 - P4.0.2 outbound SSRF hardening закрыт;
@@ -2686,50 +2710,30 @@ Core implementation присутствует:
 - media session expiration audit `bot.voice.media_session.expire` реализован; meta включает `was_active`, `participant_removed`, `usage_finalized`, `grace_period_sec`, `expired_at`
 - expiration disconnect failures фиксируются отдельным `bot.voice.media.disconnect_failure`
 - 2026-11-13: проверены recovery-health counters (`stale_revoking_sessions=0`, `pending_usage_recovery_tracks=0`, recovery errors/failures=0); это snapshot, а не доказательство восстановления после отказа
-- 2026-11-13: Docker CPU/RAM/PIDs sampled в 10-минутном окне; Go `go_goroutines`, heap/GC и process series в `/metrics` отсутствуют — необходимо отдельное измерение
+- 2026-11-13: Docker CPU/RAM/PIDs sampled в 10-минутном окне; Go `go_goroutines`, heap/GC и process series в `/metrics` отсутствовали — отдельное измерение отложено
+- 2026-11-19: `/metrics` доступен, все 7 проверенных recovery error/stale/pending значений — `0`; healthz/readyz возвращают `204`, Docker отмечает backend как `healthy`
 
 ---
 
 ## 11. Вывод
 
-### Текущее состояние
+### Текущее состояние на 2026-11-19
 
-EchoTalk Bot Platform уже является практически полной developer platform, а не набором отдельных bot endpoints. Реализованы:
+Backend Bot Platform реализован и работает на VPS: OAuth/install/credentials, webhook/WS Gateway (ACK/resume/replay), slash commands, interactions, resource/context API, RBAC, moderation, roles, voice/media и runtime protection. Существуют REST OpenAPI и Gateway AsyncAPI.
 
-- OAuth/install/credentials и installation-scoped authorization;
-- webhook + WebSocket Gateway с ACK/resume/replay;
-- slash commands, buttons, selects, modals, ephemeral/update callbacks;
-- message/member/resource/context APIs;
-- moderation, roles, room overrides, room/category management;
-- event-driven server runtime;
-- runtime rate limiting / adaptive abuse protection;
-- safe DTO/resource contracts;
-- voice/media sessions, listen/speak, video camera publish, screen share, source policy, track lifecycle, usage accounting, expiration, active usage monitoring, duration enforcement/recovery core;
-- REST OpenAPI + Gateway AsyncAPI developer documentation.
+**Проверено:** в ноябре выполнены session/daily duration revoke, recovery после сбоя/restart/конкурентной гонки, PostgreSQL backup/restore, health/readiness, unit regression subset, HTTP/Gateway/Slash/Voice smoke и Recovery Metrics snapshot. Это достаточный проверенный функциональный объём для начала публикационной работы по Dev Portal, **но не эквивалент полного отказоустойчивого, security- и нагрузочного аудита**.
 
-### Оценка первого релиза
+### Что осталось до публичного запуска
 
-**Ориентировочная инженерная готовность: ~96%.**
+**Основная задача — клиент Dev Portal:** оценить понятность интерфейса для нового разработчика, исправить UX/onboarding проблемы, собрать production frontend, разместить на хостинге, подключить домен и HTTPS, выполнить реальный путь регистрации/установки бота через опубликованную страницу.
 
-Недостающие проценты — в основном не новые пользовательские возможности, а security/reliability hardening. Поэтому дальнейшее добавление фич до закрытия P4.0 будет увеличивать attack surface быстрее, чем повышать готовность к релизу.
+Официальный запуск будет означать **публичную доступность Dev Portal**. Отдельные backend RC1, Git-теги или Docker release-теги для этого не требуются.
 
-### Что блокирует 1.0 GA
+### Что сознательно не закрыто
 
-P4.0.6 security isolation gate закрыт. Остались только:
+- автоматический `AutoMigrate` без отдельного миграционного rollback;
+- offsite backup и реальный Docker rollback;
+- controlled Redis/PostgreSQL fault windows и длительные Go/backlog/orphan стресс-проверки;
+- Media Limits/Usage UI, interaction inspector, официальный SDK, global Search API — после запуска.
 
-1. **P4.0.8** Минимальный Gateway/media soak/chaos + recovery proof — 🚧 частично пройден 2026-11-13 (client subset + webhook retry PASS; chaos/recovery/Go metrics остаются).
-2. **P4.0.10** Release checklist: backup/restore, rollback, migrations, smoke, tag/version.
-
-После этих двух gates формируется RC1. Если RC1 production smoke не выявляет release-blocking дефект, выпускается `v1.0.0`.
-
-### Что можно спокойно оставить после 1.0
-
-- deferred/autocomplete interactions;
-- specialized user/role/channel selects;
-- interaction inspector;
-- global search;
-- official SDK;
-- hosted runtime/billing/releases;
-- ML anomaly detection.
-
-➡️ **Текущий этап: завершить оставшиеся fault/recovery сценарии P4.0.8.** Client subset и Webhook Retry доказаны; полный P4.0.8 не закрыт. Release scope заморожен; далее — P4.0.10 → RC1 → production smoke → v1.0.0 GA.
+➡️ **Текущий этап: Dev Portal — UX Review → frontend build → hosting/domain → официальный запуск.** Подробные сценарии проверки и ограничения — §9.
