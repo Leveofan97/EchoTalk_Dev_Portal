@@ -71,7 +71,7 @@
     <span>{{ tab.label }}</span>
   </button>
 </nav>
-<div v-if="installations.length && tabsWithInstallationContext.includes(activeTab)" class="installation-context">
+<div v-if="activeInstallationsList.length && tabsWithInstallationContext.includes(activeTab)" class="installation-context">
   <div class="installation-context-label">
     <span>Выбранный сервер</span>
     <small>Настройки и подписки относятся к конкретной установке</small>
@@ -84,7 +84,7 @@
   </select>
 </div>
 <section :id="'bot-panel-overview'" role="tabpanel" aria-labelledby="bot-tab-overview" v-show="activeTab === 'overview'" class="bot-tab-panel">
-<div v-if="!credentials.length || !installations.length" class="setup-guide" role="note">
+<div v-if="!credentials.length || !activeInstallations" class="setup-guide" role="note">
           <div>
             <h2>Первые шаги</h2>
             <p>Чтобы бот начал работать, подготовьте данные для подключения и установите его на сервер.</p>
@@ -389,28 +389,63 @@
             </Card>
 </section>
 <section :id="'bot-panel-installations'" role="tabpanel" aria-labelledby="bot-tab-installations" v-show="activeTab === 'installations'" class="bot-tab-panel">
-<Card id="bot-installations" class="section-card">
-              <div class="section-header">
-                <h2 class="section-title"><AppIcon name="server" :size="24" /> Установки на серверы</h2>
-                <p class="section-desc">Серверы, где установлен бот</p>
-              </div>
+  <Card id="bot-installations" class="section-card">
+    <div class="section-header installation-section-header">
+      <div>
+        <h2 class="section-title"><AppIcon name="server" :size="24" /> Установки на серверы</h2>
+        <p class="section-desc">Управляйте подключёнными серверами и отзывайте доступ при необходимости.</p>
+      </div>
+      <div class="installation-toolbar-actions">
+        <Button variant="secondary" size="sm" :loading="isRefreshingInstallations" @click="refreshInstallations">
+          Обновить
+        </Button>
+        <RouterLink v-if="bot?.is_public && bot.status === 'active'" :to="{ name: 'bot-public', params: { id: botId } }" class="installation-open-link">
+          <AppIcon name="plus" :size="18" /> Установить бота
+        </RouterLink>
+      </div>
+    </div>
 
-              <div class="installations-list">
-                <div v-if="installations.length > 0">
-                  <InstallationCard
-                    v-for="installation in installations"
-                    :key="installation.id"
-                    :installation="installation"
-                    @revoke="handleRevokeInstallation"
-                  />
-                </div>
-                <div v-else class="empty-installations">
-                  <AppIcon name="inbox" class="empty-icon" :size="44" />
-                  <p>Бот еще не установлен ни на один сервер</p>
-                  <p class="empty-hint">Установите бота на сервер через страницу бота и OAuth-авторизацию</p>
-                </div>
-              </div>
-            </Card>
+    <div v-if="installations.length" class="installation-filters" aria-label="Фильтр установок">
+      <button type="button" :class="{ 'is-selected': installationFilter === 'all' }" :aria-pressed="installationFilter === 'all'" @click="installationFilter = 'all'">
+        Все <span>{{ installations.length }}</span>
+      </button>
+      <button type="button" :class="{ 'is-selected': installationFilter === 'active' }" :aria-pressed="installationFilter === 'active'" @click="installationFilter = 'active'">
+        Активные <span>{{ activeInstallations }}</span>
+      </button>
+      <button type="button" :class="{ 'is-selected': installationFilter === 'inactive' }" :aria-pressed="installationFilter === 'inactive'" @click="installationFilter = 'inactive'">
+        Неактивные <span>{{ inactiveInstallationsCount }}</span>
+      </button>
+    </div>
+
+    <div class="installations-list">
+      <template v-if="visibleInstallations.length">
+        <InstallationCard
+          v-for="installation in visibleInstallations"
+          :key="installation.id"
+          :installation="installation"
+          :busy="isRevokingInstallation"
+          @configure="handleConfigureInstallation"
+          @revoke="requestRevokeInstallation"
+        />
+      </template>
+      <div v-else-if="installations.length" class="empty-installations">
+        <AppIcon name="search" class="empty-icon" :size="40" />
+        <p>В этой категории установок нет</p>
+        <Button variant="ghost" size="sm" @click="installationFilter = 'all'">Показать все</Button>
+      </div>
+      <div v-else class="empty-installations">
+        <AppIcon name="inbox" class="empty-icon" :size="44" />
+        <p>Бот ещё не установлен ни на один сервер</p>
+        <p class="empty-hint">После установки здесь появятся серверы и доступ к их настройкам.</p>
+        <RouterLink v-if="bot?.is_public && bot.status === 'active'" :to="{ name: 'bot-public', params: { id: botId } }" class="installation-open-link">
+          <AppIcon name="plus" :size="18" /> Перейти к установке
+        </RouterLink>
+      </div>
+    </div>
+    <p v-if="!bot?.is_public || bot?.status !== 'active'" class="installation-help">
+      Чтобы открыть публичную страницу установки, сначала активируйте бота и включите публичность в его настройках.
+    </p>
+  </Card>
 </section>
 <section :id="'bot-panel-connection'" role="tabpanel" aria-labelledby="bot-tab-connection" v-show="activeTab === 'connection'" class="bot-tab-panel">
 <Card id="bot-delivery" class="section-card">
@@ -420,6 +455,9 @@
   </div>
   <div v-if="!selectedWebhookInstallation" class="empty-urls">Выберите активную установку бота.</div>
   <div v-else-if="isLoadingWebhook" class="empty-urls">Загрузка настроек…</div>
+  <div v-else-if="webhookLoadError" class="config-load-error" role="alert">
+    {{ webhookLoadError }} <Button variant="secondary" size="sm" @click="loadInstallationWebhook">Повторить</Button>
+  </div>
   <div v-else class="connection-form">
     <div class="settings-group">
       <h3>Способ доставки</h3>
@@ -483,9 +521,10 @@
                       <p class="field-help">Формат вызова команды: <code>POST {command_base_url}/{command_name}</code></p>
                     </div>
     </div>
+    <p class="settings-save-hint">При сохранении подключения также сохраняются текущие подписки выбранной установки.</p>
     <div class="settings-actions">
       <Button variant="primary" :loading="isSavingWebhook" @click="handleSaveWebhook">Сохранить подключение</Button>
-      <Button v-if="isWebhookTransport && webhookForm.enabled" variant="secondary" :loading="isRotatingWebhookSecret" @click="handleRotateWebhookSecret">Сменить секрет Webhook</Button>
+      <Button v-if="isWebhookTransport && webhookForm.enabled" variant="secondary" :loading="isRotatingWebhookSecret" @click="requestRotateWebhookSecret">Сменить секрет Webhook</Button>
     </div>
     <div
                       v-if="isWebhookTransport && webhookForm.enabled && revealedWebhookSecret"
@@ -515,7 +554,7 @@
                       </div>
                       <div>
                         Последняя доставка:
-                        <strong>{{ installationWebhook.last_delivery_at || '—' }}</strong>
+                        <strong>{{ formatDate(installationWebhook.last_delivery_at) }}</strong>
                       </div>
                     </div>
   </div>
@@ -529,7 +568,11 @@
   </div>
   <div v-if="!selectedWebhookInstallation" class="empty-urls">Выберите активную установку бота.</div>
   <div v-else-if="isLoadingWebhook" class="empty-urls">Загрузка подписок…</div>
+  <div v-else-if="webhookLoadError" class="config-load-error" role="alert">
+    {{ webhookLoadError }} <Button variant="secondary" size="sm" @click="loadInstallationWebhook">Повторить</Button>
+  </div>
   <div v-else class="subscription-form">
+    <p v-if="!installationScopesKnown" class="scope-warning">Сервер не передал права конкретной установки. События отображаются по разрешениям приложения; окончательная проверка выполняется при сохранении.</p>
     <div
                       class="form-group"
                       :class="{ 'is-disabled-block': deliveryMode === 'disabled' }"
@@ -730,14 +773,15 @@
     <p class="section-desc">Последние HTTP-отправки и повторные попытки доставки.</p>
   </div>
   <div v-if="!selectedWebhookInstallation" class="empty-urls">Выберите активную установку бота.</div>
-  <div v-else-if="isLoadingWebhook" class="empty-urls">Загрузка настроек доставки…</div>
-  <div v-else-if="!installationWebhook?.enabled || installationWebhook.event_delivery !== 'webhook'" class="empty-urls">История HTTP-доставок доступна при включённом Webhook.</div>
   <template v-else>
-    <Button variant="secondary" size="sm" :loading="isLoadingDeliveries" @click="loadInstallationDeliveries">Обновить доставки</Button>
+    <p v-if="installationWebhook && (!installationWebhook.enabled || installationWebhook.event_delivery !== 'webhook')" class="delivery-history-note">Webhook сейчас не используется. История предыдущих HTTP-доставок остаётся доступной.</p>
+    <div class="journal-controls"><span>Последние 20 доставок</span><Button variant="secondary" size="sm" :loading="isLoadingDeliveries" @click="loadInstallationDeliveries"><AppIcon name="activity" :size="18" /> Обновить</Button></div>
     <div class="deliveries-block">
                       <h4>Последние доставки</h4>
 
                       <div v-if="isLoadingDeliveries" class="empty-urls">Загрузка доставок...</div>
+
+                      <div v-else-if="deliveriesLoadError" class="config-load-error" role="alert">{{ deliveriesLoadError }} <Button variant="secondary" size="sm" @click="loadInstallationDeliveries">Повторить</Button></div>
 
                       <div v-else-if="installationDeliveries.length === 0" class="empty-urls">
                         Пока нет доставок
@@ -797,14 +841,15 @@
 
                           <div class="delivery-dates">
                             <span>Создана: {{ formatDate(delivery.created_at) }}</span>
-                            <span>Следующая попытка: {{ formatDate(delivery.next_attempt_at) }}</span>
+                            <span v-if="showDeliveryRetryTime(delivery.status)">Следующая попытка: {{ formatDate(delivery.next_attempt_at) }}</span>
                           </div>
 
                           <div v-if="expandedDeliveryId === delivery.id" class="attempts-block">
-                            <div v-if="isLoadingAttempts" class="empty-urls">
-                              Загрузка попыток...
+                            <div v-if="loadingAttemptId === delivery.id" class="empty-urls">Загрузка попыток…</div>
+                            <div v-else-if="attemptLoadErrors[delivery.id]" class="config-load-error" role="alert">
+                              {{ attemptLoadErrors[delivery.id] }}
+                              <Button variant="secondary" size="sm" @click="retryDeliveryAttempts(delivery.id)">Повторить</Button>
                             </div>
-
                             <div
                               v-else-if="
                                 !deliveryAttempts[delivery.id] ||
@@ -891,6 +936,43 @@
       @submit="handleUpdateBot"
     />
 
+    <!-- Confirmation is owned by the page so loading state follows the API request. -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="pendingRevokeInstallation" class="modal-overlay" @click.self="closeRevokeDialog" @keydown.esc="closeRevokeDialog">
+          <div class="modal-content confirm-modal" role="dialog" aria-modal="true" aria-labelledby="revoke-installation-title">
+            <div class="modal-header">
+              <h2 id="revoke-installation-title">Отозвать доступ к серверу?</h2>
+            </div>
+            <div class="modal-body">
+              <p>
+                Бот «{{ bot?.name }}» потеряет доступ к серверу
+                «{{ pendingRevokeInstallation.server_name || `Сервер ${pendingRevokeInstallation.server_id}` }}».
+                Для повторного подключения потребуется новая установка.
+              </p>
+              <div class="modal-actions">
+                <Button variant="ghost" :disabled="isRevokingInstallation" @click="closeRevokeDialog">Отмена</Button>
+                <Button variant="danger" :loading="isRevokingInstallation" @click="confirmRevokeInstallation">Отозвать доступ</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <Teleport to="body"><Transition name="modal">
+      <div v-if="showRotateWebhookSecretDialog" class="modal-overlay" @click.self="closeRotateWebhookSecretDialog" @keydown.esc="closeRotateWebhookSecretDialog">
+        <div class="modal-content confirm-modal" role="dialog" aria-modal="true" aria-labelledby="webhook-rotation-title">
+          <div class="modal-header"><h2 id="webhook-rotation-title">Заменить Webhook Secret?</h2></div>
+          <div class="modal-body">
+            <p>Старый секрет перестанет работать. Обновите проверку подписи X-EchoTalk-Signature в работающем боте. Новый секрет показывается один раз.</p>
+            <label class="credential-confirmation"><input v-model="rotationAcknowledged" type="checkbox" class="ui-checkbox" /><span>Понимаю, что после замены нужно обновить секрет в боте</span></label>
+            <div class="modal-actions"><Button variant="ghost" :disabled="isRotatingWebhookSecret" @click="closeRotateWebhookSecretDialog">Отмена</Button><Button variant="danger" :disabled="!rotationAcknowledged" :loading="isRotatingWebhookSecret" @click="handleRotateWebhookSecret">Заменить секрет</Button></div>
+          </div>
+        </div>
+      </div>
+    </Transition></Teleport>
+
     <!-- Create Credential Confirmation -->
     <Teleport to="body">
       <Transition name="modal">
@@ -954,6 +1036,7 @@ import RuntimeProtectionCard from '@/components/bots/RuntimeProtectionCard.vue'
 import EditBotModal from '@/components/bots/EditBotModal.vue'
 import { scopeTitle } from '@/utils/botScopeCatalog'
 import { botEventTitle } from '@/utils/botEventCatalog'
+import { filterSelectableEvents, showDeliveryRetryTime } from '@/utils/webhookDelivery'
 import type { BotApp, BotCredential } from '@/types'
 import {
   type BotEventDeliveryAttempt,
@@ -976,11 +1059,16 @@ const installationWebhook = ref<InstallationWebhookConfig | null>(null)
 const installationDeliveries = ref<BotEventDelivery[]>([])
 const deliveryAttempts = ref<Record<string, BotEventDeliveryAttempt[]>>({})
 const expandedDeliveryId = ref<string | null>(null)
-const isLoadingAttempts = ref(false)
+const loadingAttemptId = ref<string | null>(null)
+const attemptLoadErrors = ref<Record<string, string>>({})
+const webhookLoadError = ref<string | null>(null)
+const showRotateWebhookSecretDialog = ref(false)
+const rotationAcknowledged = ref(false)
 const isLoadingWebhook = ref(false)
 const isSavingWebhook = ref(false)
 const isRotatingWebhookSecret = ref(false)
 const isLoadingDeliveries = ref(false)
+const deliveriesLoadError = ref<string | null>(null)
 const revealedWebhookSecret = ref<string | null>(null)
 
 const commands = ref<BotCommand[]>([])
@@ -1039,16 +1127,14 @@ const selectedWebhookInstallation = computed(() => {
   )
 })
 
-const grantedScopes = computed(() => {
-  return new Set(selectedWebhookInstallation.value?.granted_scopes ?? [])
-})
-
-const selectableEvents = computed(() => {
-
-  return (bot.value?.available_events ?? []).filter((event) =>
-    event.required_scopes.every((scope) => grantedScopes.value.has(scope)),
-  )
-})
+const installationScopesKnown = computed(() =>
+  Array.isArray(selectedWebhookInstallation.value?.granted_scopes),
+)
+const selectableEvents = computed(() => filterSelectableEvents(
+  bot.value?.available_events ?? [],
+  selectedWebhookInstallation.value?.granted_scopes,
+  bot.value?.scopes ?? [],
+))
 
 const activeInstallationsList = computed(() => {
   return installations.value.filter((i) => i.status === 'active')
@@ -1150,6 +1236,18 @@ const statusLabel = computed(() => {
 // State
 const bot = ref<BotApp | null>(null)
 const installations = ref<BotInstallation[]>([])
+const installationFilter = ref<'all' | 'active' | 'inactive'>('all')
+const isRefreshingInstallations = ref(false)
+const isRevokingInstallation = ref(false)
+const pendingRevokeInstallation = ref<BotInstallation | null>(null)
+const inactiveInstallationsCount = computed(() => installations.value.filter(i => i.status !== 'active').length)
+const visibleInstallations = computed(() => installations.value
+  .filter(i => installationFilter.value === 'all' || (installationFilter.value === 'active' ? i.status === 'active' : i.status !== 'active'))
+  .sort((a, b) => {
+    const statusDifference = Number(b.status === 'active') - Number(a.status === 'active')
+    return statusDifference || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  }),
+)
 const credentials = ref<BotCredential[]>([])
 const isLoading = ref(true)
 const isUpdating = ref(false)
@@ -1254,13 +1352,8 @@ const deliveryMode = computed<DeliveryMode>({
     webhookForm.value.enabled = true
     webhookForm.value.event_delivery = value
 
-    if (value === 'websocket') {
-      webhookForm.value.webhook_url = ''
-      revealedWebhookSecret.value = null
-      installationDeliveries.value = []
-      deliveryAttempts.value = {}
-      expandedDeliveryId.value = null
-    }
+    // Do not clear the unsaved webhook URL or HTTP history on transport change.
+    if (value === 'websocket') revealedWebhookSecret.value = null
   },
 })
 
@@ -1275,10 +1368,12 @@ const loadInstallationWebhook = async () => {
   }
 
   const requestedInstallationId = selectedWebhookInstallationId.value
+  webhookLoadError.value = null
   isLoadingWebhook.value = true
   try {
     const data = await botsStore.fetchInstallationWebhook(requestedInstallationId)
     if (requestedInstallationId !== selectedWebhookInstallationId.value) return
+    if (!data) throw new Error('Сервер не вернул настройки подключения')
     installationWebhook.value = data
 
     webhookForm.value = {
@@ -1290,7 +1385,8 @@ const loadInstallationWebhook = async () => {
     }
   } catch (err: any) {
     if (requestedInstallationId === selectedWebhookInstallationId.value) {
-      toastStore.error(err.message || 'Не удалось загрузить настройки подключения')
+      webhookLoadError.value = err.message || 'Не удалось загрузить настройки подключения'
+      installationWebhook.value = null
     }
   } finally {
     if (requestedInstallationId === selectedWebhookInstallationId.value) {
@@ -1306,14 +1402,18 @@ const loadInstallationDeliveries = async () => {
   }
 
   const requestedInstallationId = selectedWebhookInstallationId.value
+  deliveriesLoadError.value = null
   isLoadingDeliveries.value = true
   try {
     const rows = await botsStore.fetchInstallationDeliveries(requestedInstallationId, 20)
     if (requestedInstallationId !== selectedWebhookInstallationId.value) return
     installationDeliveries.value = rows || []
+    expandedDeliveryId.value = null
+    deliveryAttempts.value = {}
+    attemptLoadErrors.value = {}
   } catch (err: any) {
     if (requestedInstallationId === selectedWebhookInstallationId.value) {
-      toastStore.error(err.message || 'Не удалось загрузить доставки')
+      deliveriesLoadError.value = err.message || 'Не удалось загрузить доставки'
     }
   } finally {
     if (requestedInstallationId === selectedWebhookInstallationId.value) {
@@ -1323,37 +1423,31 @@ const loadInstallationDeliveries = async () => {
 }
 
 const toggleDeliveryAttempts = async (deliveryId: string) => {
-  if (!selectedWebhookInstallationId.value) {
-    return
-  }
-
+  const installationId = selectedWebhookInstallationId.value
+  if (!installationId) return
   if (expandedDeliveryId.value === deliveryId) {
     expandedDeliveryId.value = null
     return
   }
-
   expandedDeliveryId.value = deliveryId
-
-  if (deliveryAttempts.value[deliveryId]) {
-    return
-  }
-
-  isLoadingAttempts.value = true
+  if (deliveryAttempts.value[deliveryId] && !attemptLoadErrors.value[deliveryId]) return
+  loadingAttemptId.value = deliveryId
+  delete attemptLoadErrors.value[deliveryId]
   try {
-    const rows = await botsStore.fetchDeliveryAttempts(
-      selectedWebhookInstallationId.value,
-      deliveryId,
-    )
-
-    deliveryAttempts.value = {
-      ...deliveryAttempts.value,
-      [deliveryId]: rows || [],
-    }
+    const attempts = await botsStore.fetchDeliveryAttempts(installationId, deliveryId)
+    if (installationId !== selectedWebhookInstallationId.value) return
+    deliveryAttempts.value = { ...deliveryAttempts.value, [deliveryId]: attempts }
   } catch (err: any) {
-    toastStore.error(err.message || 'Не удалось загрузить attempts')
+    if (installationId !== selectedWebhookInstallationId.value) return
+    attemptLoadErrors.value = { ...attemptLoadErrors.value, [deliveryId]: err.message || 'Не удалось загрузить попытки' }
   } finally {
-    isLoadingAttempts.value = false
+    if (loadingAttemptId.value === deliveryId) loadingAttemptId.value = null
   }
+}
+const retryDeliveryAttempts = (deliveryId: string) => {
+  expandedDeliveryId.value = null
+  delete deliveryAttempts.value[deliveryId]
+  void toggleDeliveryAttempts(deliveryId)
 }
 
 const handleSelectWebhookInstallation = async () => {
@@ -1361,7 +1455,12 @@ const handleSelectWebhookInstallation = async () => {
   webhookForm.value = createDefaultWebhookForm()
   installationDeliveries.value = []
   revealedWebhookSecret.value = null
+  showRotateWebhookSecretDialog.value = false
+  rotationAcknowledged.value = false
   deliveryAttempts.value = {}
+  attemptLoadErrors.value = {}
+  deliveriesLoadError.value = null
+  loadingAttemptId.value = null
   expandedDeliveryId.value = null
   replayEvents.value = []
   replayAfterSeq.value = 0
@@ -1370,78 +1469,81 @@ const handleSelectWebhookInstallation = async () => {
 }
 
 const handleSaveWebhook = async () => {
-  if (!selectedWebhookInstallationId.value) {
+  const installationId = selectedWebhookInstallationId.value
+  if (!installationId) {
     toastStore.error('Сначала выберите установку')
+    return
+  }
+  if (isSavingWebhook.value || isLoadingWebhook.value || webhookLoadError.value || !installationWebhook.value) return
+
+  // Never discard subscribed events because backend omitted installation grants.
+  if (installationScopesKnown.value) {
+    const allowedTypes = new Set(selectableEvents.value.map(event => event.type))
+    const unavailable = webhookForm.value.subscribed_events.filter(type => !allowedTypes.has(type))
+    if (unavailable.length) {
+      toastStore.error('Часть событий недоступна для установки. Проверьте разрешения перед сохранением.')
+      return
+    }
+  }
+  if (webhookForm.value.enabled && webhookForm.value.event_delivery === 'webhook' && !webhookForm.value.webhook_url.trim()) {
+    toastStore.error('Для Webhook укажите адрес обработчика')
     return
   }
 
   isSavingWebhook.value = true
-
-  const allowedEventTypes = new Set(selectableEvents.value.map((event) => event.type))
-
-  webhookForm.value.subscribed_events = webhookForm.value.subscribed_events.filter((eventType) =>
-    allowedEventTypes.has(eventType),
-  )
-
   try {
     const payload = {
-      webhook_url:
-        webhookForm.value.event_delivery === 'webhook' && webhookForm.value.enabled
-          ? webhookForm.value.webhook_url.trim()
-          : '',
+      webhook_url: webhookForm.value.enabled && webhookForm.value.event_delivery === 'webhook'
+        ? webhookForm.value.webhook_url.trim() : '',
       command_base_url: webhookForm.value.command_base_url.trim(),
       event_delivery: webhookForm.value.event_delivery,
       subscribed_events: [...webhookForm.value.subscribed_events],
       enabled: webhookForm.value.enabled,
     }
-
-    await botsStore.updateInstallationWebhook(selectedWebhookInstallationId.value, payload)
-
+    await botsStore.updateInstallationWebhook(installationId, payload)
+    if (installationId !== selectedWebhookInstallationId.value) return
     await loadInstallationWebhook()
-
-    if (webhookForm.value.event_delivery === 'webhook' && webhookForm.value.enabled) {
-      await loadInstallationDeliveries()
-    } else {
-      installationDeliveries.value = []
-      deliveryAttempts.value = {}
-      expandedDeliveryId.value = null
-    }
-
-    toastStore.success(
-      webhookForm.value.enabled
-        ? `Настройки доставки сохранены (${webhookForm.value.event_delivery === 'websocket' ? 'WebSocket Gateway' : 'Webhook'})`
-        : 'Доставка событий отключена',
-    )
+    await loadInstallationDeliveries()
+    toastStore.success(payload.enabled
+      ? `Настройки доставки сохранены (${payload.event_delivery === 'websocket' ? 'WebSocket Gateway' : 'Webhook'})`
+      : 'Доставка событий отключена')
   } catch (err: any) {
-    toastStore.error(err.message || 'Не удалось сохранить runtime конфигурацию')
+    toastStore.error(err.message || 'Не удалось сохранить настройки доставки')
   } finally {
     isSavingWebhook.value = false
   }
 }
 
+const requestRotateWebhookSecret = () => {
+  if (!selectedWebhookInstallationId.value || isRotatingWebhookSecret.value) return
+  rotationAcknowledged.value = false
+  showRotateWebhookSecretDialog.value = true
+}
+const closeRotateWebhookSecretDialog = () => {
+  if (isRotatingWebhookSecret.value) return
+  showRotateWebhookSecretDialog.value = false
+  rotationAcknowledged.value = false
+}
+
 const handleRotateWebhookSecret = async () => {
-  if (!selectedWebhookInstallationId.value) {
-    toastStore.error('Сначала выберите установку')
-    return
-  }
-
-  if (!confirm('Сгенерировать новый webhook secret? Старый перестанет работать.')) {
-    return
-  }
-
+  const installationId = selectedWebhookInstallationId.value
+  if (!installationId || !showRotateWebhookSecretDialog.value || !rotationAcknowledged.value || isRotatingWebhookSecret.value) return
   isRotatingWebhookSecret.value = true
   try {
-    const secret = await botsStore.rotateInstallationWebhookSecret(
-      selectedWebhookInstallationId.value,
-    )
-    revealedWebhookSecret.value = secret || null
-    toastStore.success('Новый webhook secret сгенерирован')
+    const secret = await botsStore.rotateInstallationWebhookSecret(installationId)
+    if (!secret) throw new Error('Сервер не вернул новый секрет')
+    if (installationId !== selectedWebhookInstallationId.value) return
+    revealedWebhookSecret.value = secret
+    showRotateWebhookSecretDialog.value = false
+    rotationAcknowledged.value = false
+    toastStore.success('Webhook Secret заменён. Сохраните его сейчас.')
   } catch (err: any) {
-    toastStore.error(err.message || 'Не удалось ротировать webhook secret')
+    toastStore.error(err.message || 'Не удалось заменить Webhook Secret')
   } finally {
     isRotatingWebhookSecret.value = false
   }
 }
+
 const loadBot = async () => {
   isLoading.value = true
   error.value = null
@@ -1467,13 +1569,10 @@ const loadBot = async () => {
     const commandsData = await botsStore.fetchBotCommands(botId.value)
     commands.value = commandsData || []
 
-    if (!selectedWebhookInstallationId.value) {
+    if (!(instData || []).some((i) => i.status === 'active' && String(i.id) === String(selectedWebhookInstallationId.value))) {
       const firstActiveInstallation = (instData || []).find((i) => i.status === 'active')
-      if (firstActiveInstallation) {
-        selectedWebhookInstallationId.value = String(firstActiveInstallation.id)
-        await loadInstallationWebhook()
-        await loadInstallationDeliveries()
-      }
+      selectedWebhookInstallationId.value = firstActiveInstallation ? String(firstActiveInstallation.id) : ''
+      await handleSelectWebhookInstallation()
     }
   } catch (err: any) {
     error.value = err.message || 'Ошибка загрузки данных'
@@ -1528,23 +1627,59 @@ const handleCreateCredential = async () => {
   }
 }
 
-const handleRevokeInstallation = async (installationId: string | number) => {
+const refreshInstallations = async () => {
+  if (isRefreshingInstallations.value) return
+  isRefreshingInstallations.value = true
   try {
-    await botsStore.revokeInstallation(installationId)
-    installations.value = installations.value.filter((i) => String(i.id) !== String(installationId))
-
-    if (String(selectedWebhookInstallationId.value) === String(installationId)) {
-      selectedWebhookInstallationId.value = ''
-      installationWebhook.value = null
-      installationDeliveries.value = []
-      deliveryAttempts.value = {}
-      expandedDeliveryId.value = null
-      webhookForm.value = createDefaultWebhookForm()
+    installations.value = await botsStore.fetchBotInstallations(botId.value)
+    const selectedStillActive = activeInstallationsList.value.some(
+      installation => String(installation.id) === String(selectedWebhookInstallationId.value),
+    )
+    if (!selectedStillActive) {
+      const fallback = activeInstallationsList.value[0]
+      selectedWebhookInstallationId.value = fallback ? String(fallback.id) : ''
+      await handleSelectWebhookInstallation()
     }
-
-    toastStore.success('Доступ отозван')
   } catch (err: any) {
-    toastStore.error('Ошибка отзыва доступа: ' + err.message)
+    toastStore.error('Не удалось обновить установки: ' + (err.message || 'Ошибка сети'))
+  } finally {
+    isRefreshingInstallations.value = false
+  }
+}
+
+const handleConfigureInstallation = (installation: BotInstallation) => {
+  selectedWebhookInstallationId.value = String(installation.id)
+  selectTab('connection')
+  void handleSelectWebhookInstallation()
+}
+
+const requestRevokeInstallation = (installation: BotInstallation) => {
+  if (isRevokingInstallation.value || installation.status !== 'active') return
+  pendingRevokeInstallation.value = installation
+}
+
+const closeRevokeDialog = () => {
+  if (isRevokingInstallation.value) return
+  pendingRevokeInstallation.value = null
+}
+
+const confirmRevokeInstallation = async () => {
+  const installation = pendingRevokeInstallation.value
+  if (!installation || isRevokingInstallation.value) return
+  isRevokingInstallation.value = true
+  try {
+    await botsStore.revokeInstallation(installation)
+    // Keep the row visible as revoked, rather than falsely removing the history.
+    installations.value = installations.value.map(item =>
+      item.id === installation.id ? { ...item, status: 'revoked' } : item,
+    )
+    pendingRevokeInstallation.value = null
+    toastStore.success('Доступ к серверу отозван')
+    await refreshInstallations()
+  } catch (err: any) {
+    toastStore.error('Ошибка отзыва доступа: ' + (err.message || 'Ошибка сети'))
+  } finally {
+    isRevokingInstallation.value = false
   }
 }
 
@@ -1938,6 +2073,9 @@ onMounted(() => {
 .connection-form .delivery-mode-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 .connection-form .field-help { font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
 .connection-form .field-help code { font-family: monospace; font-weight: 400; }
+.settings-save-hint, .scope-warning, .delivery-history-note { padding: 12px 14px; margin: 0; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-secondary); color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.config-load-error { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px; border: 1px solid var(--control-error); border-radius: 12px; color: var(--text-primary); }
+.journal-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; color: var(--text-secondary); font-size: 13px; }
 .connection-form .form-input, .connection-form .form-select { background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border-color); }
 .subscription-form .scrollable-events-list { min-height: 260px; height: min(48vh, 460px); max-height: 460px; }
 @media (max-width: 720px) {
@@ -2339,6 +2477,21 @@ onMounted(() => {
   font-size: 12px;
 }
 
+/* Installation management */
+.installation-section-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.installation-toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.installation-open-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 37px; padding: 8px 12px; border-radius: var(--border-radius); background: var(--accent-gradient); color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; transition: filter 160ms ease; }
+.installation-open-link:hover { filter: brightness(1.1); }
+.installation-open-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+.installation-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+.installation-filters button { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-secondary); color: var(--text-secondary); padding: 9px 13px; cursor: pointer; font: inherit; font-size: 13px; transition: background-color 160ms ease, border-color 160ms ease; }
+.installation-filters button span { font-size: 12px; opacity: 0.8; }
+.installation-filters button:hover { border-color: var(--accent-primary); color: var(--text-primary); }
+.installation-filters button.is-selected { border-color: var(--accent-primary); background: var(--glass); color: var(--text-primary); font-weight: 600; }
+.installation-filters button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.installation-help { margin: 18px 0 0; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+@media (prefers-reduced-motion: reduce) { .installation-open-link, .installation-filters button { transition: none; } }
+
 /* Stats */
 .stats-card {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
@@ -2542,8 +2695,8 @@ onMounted(() => {
 }
 
 .delivery-item:hover {
-  border-color: rgba(99, 102, 241, 0.35);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--accent-primary);
+  background: var(--bg-secondary);
 
   transform: translateY(-1px);
 }
@@ -2565,7 +2718,7 @@ onMounted(() => {
 
 .delivery-error {
   margin-top: 8px;
-  color: #b91c1c;
+  color: var(--control-error);
   font-size: 13px;
   word-break: break-word;
 }
@@ -2588,7 +2741,7 @@ onMounted(() => {
 .attempts-block {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed #d1d5db;
+  border-top: 1px dashed var(--border-color);
 }
 
 .attempts-list {
@@ -2598,10 +2751,10 @@ onMounted(() => {
 }
 
 .attempt-item {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 10px;
-  background: #f9fafb;
+  background: var(--bg-secondary);
 }
 
 .attempt-top {
@@ -2622,7 +2775,7 @@ onMounted(() => {
 .attempt-body {
   margin-top: 8px;
   font-size: 12px;
-  color: #374151;
+  color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
 }

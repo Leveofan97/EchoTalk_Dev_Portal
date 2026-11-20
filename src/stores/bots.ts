@@ -148,7 +148,7 @@ export const useBotsStore = defineStore('bots', () => {
       return currentInstallationWebhook.value
     } catch (err: any) {
       error.value = err.message
-      return null
+      throw err
     }
   }
 
@@ -198,7 +198,7 @@ export const useBotsStore = defineStore('bots', () => {
       return currentInstallationDeliveries.value
     } catch (err: any) {
       error.value = err.message
-      return []
+      throw err
     }
   }
 
@@ -213,7 +213,7 @@ export const useBotsStore = defineStore('bots', () => {
       return currentDeliveryAttempts.value
     } catch (err: any) {
       error.value = err.message
-      return []
+      throw err
     }
   }
 
@@ -358,7 +358,7 @@ export const useBotsStore = defineStore('bots', () => {
       return currentBotInstallations.value
     } catch (err: any) {
       error.value = err.message
-      return []
+      throw err
     }
   }
 
@@ -395,16 +395,16 @@ export const useBotsStore = defineStore('bots', () => {
     }
   }
 
-  const revokeInstallation = async (installationId: string | number) => {
+  const revokeInstallation = async (installation: BotInstallation) => {
     try {
-      const response = await botsApi.revokeInstallation(installationId)
+      const response = await botsApi.revokeInstallation(installation)
 
       if (response.error) {
         throw new Error(response.error)
       }
 
-      currentBotInstallations.value = currentBotInstallations.value.filter(
-        (i) => i.id !== installationId,
+      currentBotInstallations.value = currentBotInstallations.value.map((item) =>
+        item.id === installation.id ? { ...item, status: 'revoked' } : item,
       )
     } catch (err: any) {
       error.value = err.message

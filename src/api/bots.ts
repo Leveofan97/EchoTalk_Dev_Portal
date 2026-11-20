@@ -2,6 +2,7 @@
 import { api } from './http'
 import type { BotApp, BotCredential, CreateBotPayload, ServerForInstall } from '@/types'
 import { makeApiRequest } from './http'
+import { revokeBotInstallationPath } from '@/utils/installationRoutes'
 
 export interface CreateCredentialsResponse {
   client_id: string
@@ -19,8 +20,8 @@ export interface BotInstallation {
   server_name: string
   server_avatar?: string
   status: string
-  granted_scopes: string[]
-  event_delivery: string
+  granted_scopes?: string[]
+  event_delivery?: string
   created_at: string
   revoked_at?: string
 }
@@ -279,8 +280,8 @@ export const botsApi = {
     api.get<BotInstallation[]>(`/dev/bots/${id}/installations`),
 
   // Revoke installation (by installation ID)
-  revokeInstallation: (installationId: string | number) =>
-    api.delete(`/bot-installations/${installationId}`),
+  revokeInstallation: (installation: Pick<BotInstallation, 'id' | 'server_id'>) =>
+    api.delete(revokeBotInstallationPath(installation)),
 
   publishBot: (id: string | number) => api.post<BotApp>(`/dev/bots/${id}/publish`),
 

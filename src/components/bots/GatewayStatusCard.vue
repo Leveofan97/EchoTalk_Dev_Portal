@@ -62,7 +62,7 @@
       </div>
     </div>
 
-    <div v-else class="empty-urls">Gateway state пока отсутствует</div>
+    <div v-else class="empty-urls">Данные о подключениях Gateway пока отсутствуют</div>
   </div>
 </template>
 
@@ -110,22 +110,29 @@ const formatDate = (value?: string | null) => {
 }
 
 const load = async () => {
-  if (!props.installationId) return
+  const requestedInstallationId = props.installationId
+  if (!requestedInstallationId) {
+    status.value = null
+    error.value = null
+    return
+  }
 
+  status.value = null
   loading.value = true
   error.value = null
 
   try {
-    const response = await botsApi.getInstallationGatewayStatus(props.installationId)
-
+    const response = await botsApi.getInstallationGatewayStatus(requestedInstallationId)
+    if (requestedInstallationId !== props.installationId) return
     if (response.error || !response.data) {
       throw new Error(response.error || 'Не удалось получить состояние Gateway')
     }
     status.value = response.data
-  } catch (err: any) {
-    error.value = err.message || 'Не удалось загрузить состояние WebSocket Gateway'
+  } catch (err: unknown) {
+    if (requestedInstallationId !== props.installationId) return
+    error.value = err instanceof Error ? err.message : 'Не удалось загрузить состояние Gateway'
   } finally {
-    loading.value = false
+    if (requestedInstallationId === props.installationId) loading.value = false
   }
 }
 
