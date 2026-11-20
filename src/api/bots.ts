@@ -1,12 +1,16 @@
 // api/bots.ts
 import { api } from './http'
-import type { BotApp, CreateBotPayload, ServerForInstall } from '@/types'
+import type { BotApp, BotCredential, CreateBotPayload, ServerForInstall } from '@/types'
 import { makeApiRequest } from './http'
 
 export interface CreateCredentialsResponse {
   client_id: string
   client_secret?: string
   created_at: string
+}
+
+export interface CreatedCredentialsResponse extends CreateCredentialsResponse {
+  client_secret: string
 }
 
 export interface BotInstallation {
@@ -57,6 +61,7 @@ export interface BotAvailableScope {
   required: boolean
   assignable: boolean
   group: string
+  sensitive?: boolean
 }
 
 export interface ExchangeTokenPayload {
@@ -249,10 +254,10 @@ export const botsApi = {
   deleteBot: (id: string | number) => api.delete(`/dev/bots/${id}`),
 
   // Credentials
-  getCredentials: (id: string | number) => api.get(`/dev/bots/${id}/credentials`),
+  getCredentials: (id: string | number) => api.get<BotCredential[]>(`/dev/bots/${id}/credentials`),
 
   createCredentials: (id: string | number, type: 'secret' | 'public_key') =>
-    api.post<CreateCredentialsResponse>(`/dev/bots/${id}/credentials`, { type }),
+    api.post<CreatedCredentialsResponse>(`/dev/bots/${id}/credentials`, { type }),
 
   rotateCredentials: (id: string | number) =>
     api.post<CreateCredentialsResponse>(`/dev/bots/${id}/credentials/rotate`),
@@ -277,7 +282,7 @@ export const botsApi = {
   revokeInstallation: (installationId: string | number) =>
     api.delete(`/bot-installations/${installationId}`),
 
-  publishBot: (id: string | number) => api.post(`/dev/bots/${id}/publish`),
+  publishBot: (id: string | number) => api.post<BotApp>(`/dev/bots/${id}/publish`),
 
   getServersForInstall: (botId: string | number) =>
     api.get<ServerForInstall[]>(`/api/servers-for-bot-install?bot_id=${botId}`),
@@ -296,15 +301,15 @@ export const botsApi = {
     ),
 
   authorizeBot: (data: {
-    client_id: string
+    bot_id: number
     server_id: number
     scopes: string[]
-    redirect_uri: string
     state: string
   }) =>
     api.post<{
       code: string
       state: string
+      client_id: string
       redirect_uri: string
     }>('/oauth/authorize', data),
 
@@ -356,7 +361,7 @@ export const botsApi = {
     ),
 
   getInstallationEvents: (installationId: string | number, afterSeq = 0, limit = 50) =>
-    api.get<BotReplayEventsResponse>(
+    api.get<BotReplayEvent[]>(
       `/dev/installations/${installationId}/events?after_seq=${afterSeq}&limit=${limit}`,
     ),
 }

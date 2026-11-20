@@ -18,7 +18,7 @@ const configuration = computed(() => ({
   url: props.specUrl,
 
   layout: 'modern' as const,
-  theme: 'purple',
+  theme: 'purple' as const,
 
   showSidebar: true,
 

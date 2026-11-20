@@ -10,7 +10,7 @@
           {{ statusText }}
         </span>
       </div>
-      <Badge v-if="bot.is_public || bot.isPublic" variant="success">Public</Badge>
+      <Badge v-if="bot.is_public" variant="success">В каталоге</Badge>
     </div>
 
     <p class="bot-description">{{ description }}</p>

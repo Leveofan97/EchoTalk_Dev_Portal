@@ -39,8 +39,20 @@ defineEmits<{
   border: none;
   border-radius: var(--border-radius);
   cursor: pointer;
-  transition: var(--transition);
+  transition: background-color 170ms ease, border-color 170ms ease,
+    color 170ms ease, box-shadow 170ms ease, transform 170ms ease;
   font-family: inherit;
+  line-height: 1.2;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+.btn:active:not(:disabled) { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .btn:hover:not(:disabled) { transform: none; }
+  .btn__spinner { animation-duration: 2s; }
 }
 
 .btn--sm { padding: 0.5rem 1rem; font-size: 0.875rem; }
@@ -50,12 +62,12 @@ defineEmits<{
 .btn--primary {
   background: var(--accent-gradient);
   color: white;
-  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--accent-primary) 23%, transparent);
 }
 
 .btn--primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--accent-primary) 32%, transparent);
 }
 
 .btn--secondary {

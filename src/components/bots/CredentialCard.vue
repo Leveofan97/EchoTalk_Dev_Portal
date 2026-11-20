@@ -5,11 +5,11 @@
       <div class="credential-info">
         <h4>{{ title }}</h4>
         <Badge v-if="isNew" variant="success" size="sm">Новый</Badge>
-        <Badge v-if="revoked" variant="error" size="sm">Отозван</Badge>
+        <Badge v-if="revoked" variant="danger" size="sm">Отозван</Badge>
       </div>
       <div class="credential-actions">
         <Button
-          v-if="!revealed && !revoked"
+          v-if="sensitive && !revealed && !revoked"
           variant="ghost"
           size="sm"
           @click="revealed = true"
@@ -17,7 +17,7 @@
           Показать
         </Button>
         <Button
-          v-if="revealed && !revoked"
+          v-if="sensitive && revealed && !revoked"
           variant="ghost"
           size="sm"
           @click="revealed = false"
@@ -37,7 +37,7 @@
     </div>
 
     <div class="credential-value">
-      <code v-if="revealed && !revoked">{{ value }}</code>
+      <code v-if="(!sensitive || revealed) && !revoked">{{ value }}</code>
       <code v-else class="masked">••••••••••••••••••••••••••</code>
     </div>
 
@@ -53,13 +53,14 @@ import { useClipboard } from '@/composables/useClipboard'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   title: string
   value: string
   hint?: string
   isNew?: boolean
   revoked?: boolean
-}>()
+  sensitive?: boolean
+}>(), { sensitive: true })
 
 const { copy, copied } = useClipboard()
 const revealed = ref(false)

@@ -2,7 +2,7 @@
   <div class="gateway-status-card">
     <div class="gateway-status-header">
       <div>
-        <h4>Gateway Status</h4>
+        <h4>Состояние WebSocket Gateway</h4>
         <p>Диагностика WebSocket Gateway для выбранной установки</p>
       </div>
 
@@ -87,7 +87,7 @@ const statusBadgeVariant = computed(() => {
     case 'disconnected':
       return 'warning'
     default:
-      return 'secondary'
+      return 'default'
   }
 })
 
@@ -118,9 +118,12 @@ const load = async () => {
   try {
     const response = await botsApi.getInstallationGatewayStatus(props.installationId)
 
-    status.value = response?.data ?? response
+    if (response.error || !response.data) {
+      throw new Error(response.error || 'Не удалось получить состояние Gateway')
+    }
+    status.value = response.data
   } catch (err: any) {
-    error.value = err.message || 'Не удалось загрузить Gateway Status'
+    error.value = err.message || 'Не удалось загрузить состояние WebSocket Gateway'
   } finally {
     loading.value = false
   }

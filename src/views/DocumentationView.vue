@@ -444,7 +444,7 @@
 
 <script setup lang="ts">
 import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import '@stoplight/elements/web-components.min.js'
 import '@stoplight/elements/styles.min.css'
 import AsyncApiReference from '@/views/AsyncApiReference.vue'
@@ -492,7 +492,7 @@ const asyncApiUrl = configuredAsyncApiUrl || '/asyncapi/bot-gateway-asyncapi.yam
 async function setActiveApiReference(view: ApiReferenceView): Promise<void> {
   activeApiReference.value = view
 
-  const query = {
+  const query: LocationQueryRaw = {
     ...route.query,
     view: 'api',
   }

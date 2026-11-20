@@ -80,7 +80,7 @@ export const makeApiRequest = async <T = any>(
     }
 
     if (Array.isArray(responseData)) {
-      return { data: responseData, status: response.status }
+      return { data: responseData as T, status: response.status }
     }
 
     if (responseData.data !== undefined) {

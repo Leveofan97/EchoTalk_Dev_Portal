@@ -1,6 +1,6 @@
 <template>
   <div class="app">
-    <Header @login="showLogin = true" />
+    <Header />
 
     <main class="main">
       <RouterView />
@@ -32,7 +32,7 @@ const authStore = useAuthStore()
 
 onMounted(() => {
   themeStore.initTheme()
-  authStore.initAuth()
+  void authStore.initAuth()
 })
 </script>
 

@@ -2,8 +2,8 @@
   <div class="runtime-protection-card">
     <div class="runtime-protection-header">
       <div>
-        <h4>Runtime Protection</h4>
-        <p>Rate limiting, burst protection и auto-block для выбранной установки</p>
+        <h4>Защита от перегрузки</h4>
+        <p>Лимиты запросов, защита от частых действий и автоматическая блокировка</p>
       </div>
 
       <Button variant="ghost" size="sm" :loading="loading" @click="load"> Обновить </Button>
@@ -70,7 +70,7 @@
       </div>
 
       <div class="runtime-row">
-        <span>Создание gateway-сессий в минуту</span>
+        <span>Создание сессий Gateway в минуту</span>
         <strong>{{ limits.gateway_sessions_per_minute ?? 0 }}</strong>
       </div>
 
@@ -88,7 +88,7 @@
       </div>
 
       <div class="runtime-row">
-        <span>Быстрые interaction-запросы</span>
+        <span>Частые запросы взаимодействий</span>
         <strong
           >{{ limits.burst_interactions_limit ?? 0 }} /
           {{ limits.burst_interactions_window_sec ?? 0 }} сек.</strong
@@ -109,7 +109,7 @@
       </div>
     </div>
 
-    <div v-else class="empty-urls">Runtime Protection пока не настроен</div>
+    <div v-else class="empty-urls">Защита ещё не настроена</div>
   </div>
 </template>
 
@@ -136,13 +136,9 @@ const humanStatus = computed(() => {
 
 const statusBadgeVariant = computed(() => {
   if (stats.value?.blocked) return 'danger'
-  if (limits.value && !limits.value.enabled) return 'secondary'
+  if (limits.value && !limits.value.enabled) return 'default'
   return 'success'
 })
-
-const unwrapData = <T,>(response: any): T => {
-  return response?.data?.data ?? response?.data ?? response
-}
 
 const load = async () => {
   if (!props.installationId) return
@@ -156,11 +152,17 @@ const load = async () => {
       botsApi.getInstallationRuntimeProtectionStats(props.installationId),
     ])
 
-    limits.value = unwrapData<BotRuntimeLimit>(limitsResponse)
-    stats.value = unwrapData<BotRuntimeProtectionStats>(statsResponse)
+    if (limitsResponse.error || !limitsResponse.data) {
+      throw new Error(limitsResponse.error || 'Не удалось загрузить лимиты')
+    }
+    if (statsResponse.error || !statsResponse.data) {
+      throw new Error(statsResponse.error || 'Не удалось загрузить состояние защиты')
+    }
+    limits.value = limitsResponse.data
+    stats.value = statsResponse.data
   } catch (err: any) {
     error.value =
-      err?.response?.data?.error || err?.message || 'Не удалось загрузить Runtime Protection'
+      err?.response?.data?.error || err?.message || 'Не удалось загрузить состояние защиты'
   } finally {
     loading.value = false
   }

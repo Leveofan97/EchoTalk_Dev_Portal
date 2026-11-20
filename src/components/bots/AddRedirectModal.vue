@@ -3,23 +3,25 @@
   <Teleport to="body">
     <Transition name="modal">
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
-        <div class="modal-content">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="add-redirect-title">
           <div class="modal-header">
-            <h2>Добавить Redirect URL</h2>
-            <button class="modal-close" @click="close">×</button>
+            <h2 id="add-redirect-title">Добавить Redirect URI</h2>
+            <button class="modal-close" type="button" aria-label="Закрыть" :disabled="isLoading" @click="close"><AppIcon name="x" :size="21" /></button>
           </div>
 
           <form @submit.prevent="handleSubmit" class="modal-body">
             <div class="form-group">
-              <label>URL *</label>
               <Input
                 v-model="url"
+                id="redirect-uri"
+                label="URL *"
                 placeholder="https://your-app.com/auth/callback"
                 type="url"
                 required
+                maxlength="500"
               />
               <p class="form-hint">
-                URL должен использовать HTTPS (кроме localhost)
+                Допускается HTTPS или HTTP для localhost и loopback IP. Максимум 500 символов.
               </p>
             </div>
 
@@ -46,6 +48,7 @@
 import { ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
 const props = defineProps<{
   isOpen: boolean
@@ -60,6 +63,7 @@ const emit = defineEmits<{
 const url = ref('')
 
 const close = () => {
+  if (props.isLoading) return
   url.value = ''
   emit('close')
 }

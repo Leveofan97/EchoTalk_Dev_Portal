@@ -8,7 +8,7 @@
 
       <!-- Error -->
       <div v-else-if="error" class="error-state">
-        <h2>😕 Бот не найден</h2>
+        <h2 class="icon-heading"><AppIcon name="alert-triangle" :size="30" /> Бот не найден</h2>
         <p>{{ error }}</p>
         <Button variant="primary" @click="$router.push('/explore')"> К каталогу </Button>
       </div>
@@ -74,7 +74,7 @@
 
         <!-- Scopes -->
         <Card class="scopes-section">
-          <h3>🔐 Разрешения</h3>
+          <h3 class="icon-heading"><AppIcon name="key-round" :size="24" /> Разрешения</h3>
           <p class="hint">Этот бот запрашивает следующие разрешения:</p>
 
           <div class="scopes-list">
@@ -90,7 +90,7 @@
 
         <!-- How to use -->
         <Card class="help-section">
-          <h3>📖 Как использовать</h3>
+          <h3 class="icon-heading"><AppIcon name="book-open" :size="24" /> Как использовать</h3>
           <ol>
             <li>Нажмите "Добавить на сервер"</li>
             <li>Выберите сервер из списка</li>
@@ -126,7 +126,7 @@
               </div>
 
               <div v-else-if="botsStore.serversForInstall.length === 0" class="empty-servers">
-                <div class="empty-icon">🏠</div>
+                <AppIcon name="house" class="empty-icon" :size="40" />
                 <p>У вас нет серверов где вы являетесь владельцем</p>
                 <p class="hint">Создайте сервер в EchoTalk</p>
               </div>
@@ -252,6 +252,7 @@
                 </p>
               </div>
 
+              <p v-if="installAuthorizeError" class="install-oauth-error" role="alert">{{ installAuthorizeError }}</p>
               <div class="modal-actions">
                 <Button variant="ghost" @click="backToScopes">Назад</Button>
                 <Button variant="primary" :loading="botsStore.isInstalling" @click="confirmInstall">
@@ -269,7 +270,7 @@
       <Transition name="modal">
         <div v-if="installStep === 'code-issued'" class="modal-overlay">
           <div class="modal-content success-modal">
-            <div class="success-icon">🔑</div>
+            <AppIcon name="key-round" class="success-icon" :size="42" />
             <h2>Код авторизации выдан</h2>
 
             <div class="code-section">
@@ -400,6 +401,7 @@ import { useBotsStore } from '@/stores/bots'
 import { botsApi, type PublicBotDetail } from '@/api/bots'
 import { useClipboard } from '@/composables/useClipboard'
 import Button from '@/components/ui/Button.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import Card from '@/components/ui/Card.vue'
 import type { ServerForInstall } from '@/types'
 
@@ -419,6 +421,7 @@ const installStep = ref<'ready' | 'select-server' | 'select-scopes' | 'confirm' 
 const selectedServer = ref<ServerForInstall | null>(null)
 const selectedScopes = ref<string[]>([])
 const authResponse = ref<{ client_id: string; redirect_uri: string } | null>(null)
+const installAuthorizeError = ref('')
 
 // ================ Debug
 const showBotDebugPanel = computed(() => {
@@ -490,12 +493,14 @@ const toConfirm = () => {
 }
 
 const backToScopes = () => {
+  installAuthorizeError.value = ''
   installStep.value = 'select-scopes'
 }
 
 const confirmInstall = async () => {
   if (!selectedServer.value || !bot.value || selectedScopes.value.length === 0) return
 
+  installAuthorizeError.value = ''
   const state = generateRandomState()
 
   // Исправлено: отправляем только bot_id, server_id, scopes, state
@@ -513,11 +518,13 @@ const confirmInstall = async () => {
       redirect_uri: result.redirect_uri,
     }
     installStep.value = 'code-issued'
+  } else {
+    installAuthorizeError.value = botsStore.error || 'Не удалось выполнить OAuth-авторизацию'
   }
 }
 
 const generateRandomState = () => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  return crypto.randomUUID()
 }
 
 const copyCode = () => {
@@ -687,6 +694,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.icon-heading { display: inline-flex; align-items: center; gap: 10px; }
+.icon-heading svg { color: var(--accent-primary); }
 /* ===== Основные стили страницы ===== */
 .bot-public {
   min-height: 100vh;
@@ -1548,4 +1557,8 @@ onMounted(() => {
   overflow: auto;
   font-size: 0.75rem;
 }
+</style>
+
+<style scoped>
+.install-oauth-error { color: var(--control-error, #e35d6a); border: 1px solid var(--control-error, #e35d6a); border-radius: var(--border-radius); padding: 0.75rem; margin: 1rem 0; font-size: 0.875rem; }
 </style>

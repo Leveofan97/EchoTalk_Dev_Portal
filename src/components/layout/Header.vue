@@ -8,22 +8,39 @@
         </RouterLink>
       </div>
 
-      <nav class="header__nav">
+      <nav
+        id="devportal-main-navigation"
+        class="header__nav"
+        :class="{ 'header__nav--open': isMobileMenuOpen }"
+        aria-label="Основная навигация"
+      >
         <RouterLink
           v-for="item in visibleNavItems"
           :key="item.path"
           :to="item.path"
           class="nav-link"
           active-class="nav-link--active"
+          @click="isMobileMenuOpen = false"
         >
           {{ item.label }}
         </RouterLink>
       </nav>
 
       <div class="header__actions">
+        <button
+          type="button"
+          class="mobile-menu-toggle"
+          :aria-expanded="isMobileMenuOpen"
+          aria-controls="devportal-main-navigation"
+          :aria-label="isMobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'"
+          @click="isMobileMenuOpen = !isMobileMenuOpen"
+        ><AppIcon :name="isMobileMenuOpen ? 'x' : 'menu'" :size="24" /></button>
         <div class="theme-selector">
           <button
             class="theme-btn"
+            type="button"
+            aria-label="Выбрать цветовую тему"
+            :aria-expanded="showThemeMenu"
             @click="showThemeMenu = !showThemeMenu"
           >
             <span class="theme-btn__dot" :style="{ background: currentThemeColor }"></span>
@@ -35,6 +52,7 @@
                 v-for="theme in themeStore.themes"
                 :key="theme.value"
                 class="theme-option"
+                type="button"
                 @click="selectTheme(theme.value)"
               >
                 <span class="theme-option__dot" :style="{ background: theme.preview }"></span>
@@ -50,7 +68,7 @@
               v-if="authStore.user?.avatarURL"
               :src="authStore.user.avatarURL"
               class="user-avatar"
-              alt="Avatar"
+              alt="Аватар пользователя"
             />
             <div v-else class="user-avatar user-avatar--placeholder">
               {{ authStore.user?.login?.charAt(0).toUpperCase() }}
@@ -71,18 +89,19 @@
 
     <LoginModal
       :is-open="showLoginModal"
-      @close="showLoginModal = false"
+      @close="closeLoginModal"
       @success="handleLoginSuccess"
     />
   </header>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import Button from '@/components/ui/Button.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import LoginModal from '@/components/auth/LoginModal.vue'
 import type { Theme } from '@/types'
 
@@ -93,12 +112,13 @@ const route = useRoute()
 
 const showLoginModal = ref(false)
 const showThemeMenu = ref(false)
+const isMobileMenuOpen = ref(false)
 
 // Все возможные пункты навигации
 const allNavItems = [
   { path: '/', label: 'Главная', public: true },
-  { path: '/explore', label: 'Каталог ботов', public: true }, // ← новый пункт, виден всем
-  { path: '/dashboard', label: 'Панель', public: false, requiresAuth: true },
+  { path: '/explore', label: 'Каталог ботов', public: true },
+  { path: '/dashboard', label: 'Панель разработчика', public: false, requiresAuth: true },
   { path: '/bots', label: 'Мои боты', public: false, requiresAuth: true },
   { path: '/docs', label: 'Документация', public: true },
 ]
@@ -115,6 +135,23 @@ const visibleNavItems = computed(() => {
   })
 })
 
+watch(() => route.query.login, (value) => {
+  if (value === '1' && !authStore.isAuthenticated) showLoginModal.value = true
+}, { immediate: true })
+
+watch(() => route.fullPath, () => { isMobileMenuOpen.value = false })
+
+const closeLoginModal = () => {
+  showLoginModal.value = false
+  // При отмене входа не сохраняем незавершённый сценарий создания/установки бота.
+  localStorage.removeItem('redirect_after_login')
+  if (route.query.login === '1') {
+    const query = { ...route.query }
+    delete query.login
+    void router.replace({ path: route.path, query, hash: route.hash })
+  }
+}
+
 const currentThemeColor = computed(() => {
   const theme = themeStore.themes.find(t => t.value === themeStore.currentTheme)
   return theme?.preview || '#6366f1'
@@ -129,23 +166,32 @@ const handleLoginSuccess = () => {
   showLoginModal.value = false
 
   // Проверяем есть ли куда возвращаться
-  const redirectPath = localStorage.getItem('redirect_after_login')
-  if (redirectPath) {
-    localStorage.removeItem('redirect_after_login')
-    router.push(redirectPath)
-  } else {
-    router.push('/dashboard')
+  const storedRedirect = localStorage.getItem('redirect_after_login')
+  localStorage.removeItem('redirect_after_login')
+
+  let redirectPath = '/dashboard'
+  if (storedRedirect) {
+    try {
+      const url = new URL(storedRedirect, window.location.origin)
+      if (url.origin === window.location.origin) {
+        redirectPath = `${url.pathname}${url.search}${url.hash}`
+      }
+    } catch {
+      // Повреждённый redirect игнорируем.
+    }
   }
+  router.push(redirectPath)
 }
 
 const handleLogout = () => {
+  isMobileMenuOpen.value = false
   authStore.logout()
   // Если текущая страница требует авторизацию — редирект на главную
   const authRequiredRoutes = ['/dashboard', '/bots', '/bots/:id/manage']
   const currentPath = route.path
   const needsRedirect = authRequiredRoutes.some(pattern => {
     if (pattern.includes(':')) {
-      return currentPath.startsWith(pattern.split('/:')[0])
+      return currentPath.startsWith(pattern.split('/:')[0] ?? pattern)
     }
     return currentPath === pattern
   })
@@ -340,9 +386,45 @@ const handleLogout = () => {
   transform: translateY(-10px);
 }
 
-@media (max-width: 768px) {
+/* Мобильная навигация не должна исчезать полностью. */
+.mobile-menu-toggle { display: none; }
+@media (max-width: 900px) {
+  .header__container { gap: .7rem; }
   .header__nav {
     display: none;
+    position: absolute;
+    top: 72px;
+    left: 0;
+    right: 0;
+    padding: 1rem max(1rem, calc((100vw - 1200px) / 2));
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    flex-direction: column;
+    gap: .45rem;
   }
+  .header__nav--open { display: flex; }
+  .header__nav .nav-link { padding: .7rem .4rem; }
+  .mobile-menu-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    padding: .45rem .6rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: .85rem;
+  }
+  .header__actions { gap: .65rem; }
+  .user-name { display: none; }
+}
+@media (max-width: 540px) {
+  .logo { font-size: 1.05rem; gap: .4rem; }
+  .logo__icon-img { width: 28px; height: 28px; }
+  .header__actions { gap: .35rem; }
+  .theme-selector { display: none; }
+  .user-menu { gap: .3rem; }
+  .user-avatar { display: none; }
 }
 </style>

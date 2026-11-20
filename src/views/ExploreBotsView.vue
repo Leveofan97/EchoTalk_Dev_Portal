@@ -4,7 +4,7 @@
     <div class="container">
       <div class="page-header">
         <div>
-          <h1>🤖 Каталог ботов</h1>
+          <h1 class="icon-heading"><AppIcon name="package" :size="32" /> Каталог ботов</h1>
           <p>Найдите полезных ботов для ваших серверов EchoTalk</p>
         </div>
         <div class="header-actions">
@@ -12,7 +12,7 @@
             Мои боты
           </Button>
           <Button variant="primary" @click="$router.push('/bots')">
-            + Создать бота
+            <AppIcon name="plus" :size="20" /> Создать бота
           </Button>
         </div>
       </div>
@@ -54,14 +54,14 @@
               </span>
                 {{ bot.owner_name }}
               </span>
-              <span class="servers">🌐 {{ bot.server_count }}</span>
+              <span class="servers"><AppIcon name="globe" :size="18" /> {{ bot.server_count }}</span>
             </div>
 
             <div class="scopes-preview">
               <Badge
                 v-for="scope in bot.scopes.slice(0, 3)"
                 :key="scope"
-                variant="secondary"
+                variant="default"
                 size="sm"
               >
                 {{ scope }}
@@ -76,7 +76,7 @@
 
       <!-- Empty -->
       <div v-if="!loading && !error && bots.length === 0" class="empty-state">
-        <div class="empty-icon">🔍</div>
+        <AppIcon name="search" class="empty-icon" :size="42" />
         <h3>Пока нет публичных ботов</h3>
         <p>Станьте первым, кто создаст бота для EchoTalk!</p>
         <Button variant="primary" @click="$router.push('/bots')">
@@ -93,6 +93,7 @@ import { useRouter } from 'vue-router'
 import { botsApi, type PublicBotInfo } from '@/api/bots'
 import { useToastStore } from '@/stores/toast'
 import Button from '@/components/ui/Button.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import Badge from '@/components/ui/Badge.vue'
 
 const router = useRouter()
@@ -128,6 +129,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.icon-heading, .servers { display: inline-flex; align-items: center; gap: 9px; }
+.icon-heading svg { color: var(--accent-primary); }
 .explore-view {
   padding: 100px 0 60px;
   min-height: 100vh;

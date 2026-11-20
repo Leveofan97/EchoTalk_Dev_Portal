@@ -5,15 +5,14 @@
         <div>
           <h1>Мои боты</h1>
           <p v-if="botsStore.error" class="error-text">{{ botsStore.error }}</p>
-          <p v-else>Управляйте вашими приложениями и интеграциями</p>
+          <p v-else>Создавайте и настраивайте ботов EchoTalk</p>
         </div>
         <Button variant="primary" @click="showCreateModal = true" :loading="botsStore.isLoading">
-          + Создать бота
+          <AppIcon name="plus" :size="22" /> Создать бота
         </Button>
       </div>
 
-      <!-- Stats -->
-      <!-- Stats с защитой -->
+      <!-- Данные только из реального списка ботов -->
       <div class="stats-grid">
         <Card>
           <div class="stat-card">
@@ -29,8 +28,8 @@
         </Card>
         <Card>
           <div class="stat-card">
-            <span class="stat-card__value">-</span>
-            <span class="stat-card__label">Серверов</span>
+            <span class="stat-card__value">{{ draftBots }}</span>
+            <span class="stat-card__label">Черновиков</span>
           </div>
         </Card>
       </div>
@@ -43,7 +42,7 @@
 
       <!-- Error -->
       <div v-else-if="hasError" class="empty-state">
-        <div class="empty-state__icon">⚠️</div>
+        <AppIcon name="alert-triangle" class="empty-state__icon" :size="42" />
         <h3>Ошибка загрузки</h3>
         <p>{{ errorMessage }}</p>
         <Button variant="primary" @click="loadBots">
@@ -53,21 +52,19 @@
 
       <!-- Empty -->
       <div v-else-if="isEmpty" class="empty-state">
-        <div class="empty-state__icon">🤖</div>
+        <AppIcon name="package" class="empty-state__icon" :size="42" />
         <h3>У вас пока нет ботов</h3>
-        <p>Создайте своего первого бота для EchoTalk</p>
-        <Button variant="primary" @click="showCreateModal = true">
-          Создать бота
-        </Button>
+        <p>Укажите имя и разрешения. После создания откроются настройки OAuth, команд и событий.</p>
+        <Button variant="primary" @click="showCreateModal = true">Создать бота</Button>
+        <RouterLink to="/docs" class="docs-link">Посмотреть документацию</RouterLink>
       </div>
 
       <!-- Bots Grid с фильтрацией -->
       <div v-else class="bots-grid">
         <BotCard
           v-for="bot in validBots"
-          :key="bot.id ?? Math.random()"
+          :key="bot.id"
           :bot="bot"
-          @edit="handleEdit"
           @manage="handleManage"
         />
       </div>
@@ -75,34 +72,37 @@
 
     <CreateBotModal
       :is-open="showCreateModal"
-      @close="showCreateModal = false"
+      @close="closeCreateModal"
       @created="handleCreated"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch } from 'vue'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { useBotsStore } from '@/stores/bots'
 import Button from '@/components/ui/Button.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import Card from '@/components/ui/Card.vue'
 import BotCard from '@/components/bots/BotCard.vue'
 import CreateBotModal from '@/components/bots/CreateBotModal.vue'
 import type { BotApp } from '@/types'
 
 const router = useRouter()
+const route = useRoute()
 const botsStore = useBotsStore()
 
-const showCreateModal = ref(false)
+const showCreateModal = ref(route.query.create === '1')
 
 // ✅ Computed с защитой
 const isLoading = computed(() => botsStore.isLoading)
 const hasError = computed(() => !!botsStore.error && botsStore.bots.length === 0)
-const errorMessage = computed(() => botsStore.error || 'Unknown error')
-const isEmpty = computed(() => !botsStore.isLoading && botsStore.bots.length === 0)
-const totalBots = computed(() => botsStore.bots.length)
-const activeBots = computed(() => botsStore.activeBotsCount)
+const errorMessage = computed(() => botsStore.error || 'Не удалось загрузить список ботов')
+const isEmpty = computed(() => !isLoading.value && !hasError.value && validBots.value.length === 0)
+const totalBots = computed(() => validBots.value.length)
+const activeBots = computed(() => validBots.value.filter(bot => bot.status === 'active').length)
+const draftBots = computed(() => validBots.value.filter(bot => bot.status === 'draft').length)
 
 // ✅ Фильтруем только валидные боты
 const validBots = computed(() => {
@@ -114,17 +114,17 @@ const validBots = computed(() => {
   )
 })
 
-onMounted(() => {
-  loadBots()
+watch(() => route.query.create, (value) => {
+  if (value === '1') showCreateModal.value = true
 })
 
-const loadBots = () => {
-  botsStore.fetchBots()
-}
+onMounted(() => { void loadBots() })
 
-const handleEdit = (bot: BotApp) => {
-  if (!bot?.id) return
-  router.push(`/bots/${bot.id}`)
+const loadBots = () => botsStore.fetchBots()
+
+const closeCreateModal = () => {
+  showCreateModal.value = false
+  if (route.query.create === '1') void router.replace({ name: 'bots' })
 }
 
 const handleManage = (bot: BotApp) => {
@@ -132,9 +132,9 @@ const handleManage = (bot: BotApp) => {
   router.push(`/bots/${bot.id}/manage`)
 }
 
-const handleCreated = () => {
-  loadBots()
+const handleCreated = (botId: number) => {
   showCreateModal.value = false
+  void router.push({ name: 'bot-manage', params: { id: botId } })
 }
 </script>
 
@@ -244,10 +244,20 @@ const handleCreated = () => {
   margin-bottom: 1.5rem;
 }
 
+.docs-link {
+  display: inline-block;
+  margin-left: 1rem;
+  color: var(--accent-primary);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: 1fr;
   }
+
+  .bots-grid { grid-template-columns: 1fr; }
 
   .page-header {
     flex-direction: column;

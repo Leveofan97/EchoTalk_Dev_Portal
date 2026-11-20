@@ -68,7 +68,7 @@
 
             <form class="modal__body" @submit.prevent="handle2FA">
               <div class="twofa-info">
-                <span class="twofa-icon">🔐</span>
+                <AppIcon name="key-round" class="twofa-icon" :size="30" />
                 <p>Введите код из приложения-аутентификатора</p>
               </div>
 
@@ -77,6 +77,7 @@
               </div>
 
               <Input
+                v-if="!showBackupCode"
                 v-model="twoFACode"
                 label="Код 2FA"
                 type="text"
@@ -102,6 +103,7 @@
                 label="Резервный код"
                 type="text"
                 placeholder="xxxx-xxxx-xxxx"
+                required
                 :disabled="authStore.isLoading"
               />
 
@@ -134,6 +136,7 @@
 import { reactive, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import Button from '@/components/ui/Button.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import Input from '@/components/ui/Input.vue'
 
 interface Props {
@@ -186,21 +189,18 @@ const close = () => {
 }
 
 const handleLogin = async () => {
-  console.log('Attempting login...')
   const result = await authStore.login({
     email: form.email,
     password: form.password,
     remember: form.remember,
   })
 
-  console.log('Login result:', result)
-
   if (result.requires2FA) {
     show2FA.value = true
   } else if (result.success) {
-    console.log('Login successful, closing modal')
+    // Родитель закрывает окно и выполняет отложенный переход.
+    // Повторный close отменял навигацию после входа.
     emit('success')
-    emit('close')
     // Сброс формы
     form.email = ''
     form.password = ''
@@ -213,8 +213,9 @@ const handle2FA = async () => {
   const result = await authStore.complete2FA(code, showBackupCode.value)
 
   if (result.success) {
+    // Родитель закрывает окно и выполняет отложенный переход.
+    // Повторный close отменял навигацию после входа.
     emit('success')
-    emit('close')
     // Сброс
     show2FA.value = false
     twoFACode.value = ''

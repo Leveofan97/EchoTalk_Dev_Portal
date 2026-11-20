@@ -1,21 +1,33 @@
 <template>
   <div class="input-wrapper">
-    <label v-if="label" class="input-label">{{ label }}</label>
+    <label v-if="label" class="input-label" :for="controlId">{{ label }}</label>
     <input
+      v-bind="$attrs"
+      :id="controlId"
       :type="type"
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
-      class="input"
-      @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+      :aria-invalid="error ? 'true' : undefined"
+      :aria-describedby="describedBy"
+      class="ui-control"
+      @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />
-    <span v-if="error" class="input-error">{{ error }}</span>
+    <span v-if="error" :id="errorId" class="input-error" role="alert">{{ error }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, useAttrs, useId } from 'vue'
+
+// У компонента корневой div. Без inheritAttrs: false / v-bind="$attrs"
+// required, maxlength, autocomplete и другие HTML-атрибуты попадали на div,
+// а не на реальное поле ввода.
+defineOptions({ inheritAttrs: false })
+
 interface Props {
   modelValue: string
+  id?: string
   label?: string
   type?: string
   placeholder?: string
@@ -23,17 +35,27 @@ interface Props {
   error?: string
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   type: 'text',
   label: '',
   placeholder: '',
   disabled: false,
-  error: ''
+  error: '',
 })
 
-defineEmits<{
+const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
+
+const attrs = useAttrs()
+const generatedId = useId()
+const controlId = computed(() => props.id || generatedId)
+const errorId = computed(() => `${controlId.value}-error`)
+const describedBy = computed(() => {
+  const external = attrs['aria-describedby']
+  const ids = [typeof external === 'string' ? external : '', props.error ? errorId.value : '']
+  return ids.filter(Boolean).join(' ') || undefined
+})
 </script>
 
 <style scoped>
@@ -41,6 +63,7 @@ defineEmits<{
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .input-label {
@@ -49,34 +72,8 @@ defineEmits<{
   color: var(--text-secondary);
 }
 
-.input {
-  padding: 0.75rem 1rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  color: var(--text-primary);
-  font-size: 1rem;
-  transition: var(--transition);
-  font-family: inherit;
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.input::placeholder {
-  color: var(--text-muted);
-}
-
-.input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .input-error {
   font-size: 0.75rem;
-  color: #ef4444;
+  color: var(--control-error);
 }
 </style>

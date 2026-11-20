@@ -7,17 +7,17 @@
           {{ serverInitials }}
         </div>
         <div class="server-details">
-          <h4>{{ installation.server_name || 'Unknown Server' }}</h4>
+          <h4>{{ installation.server_name || `Сервер ${installation.server_id}` }}</h4>
           <p>Установлен: {{ formatDate(installation.created_at) }}</p>
         </div>
       </div>
       <div class="installation-actions">
         <Badge :variant="statusVariant" size="sm">
-          {{ installation.status }}
+          {{ statusLabel }}
         </Badge>
         <Button
           v-if="installation.status === 'active'"
-          variant="error"
+          variant="danger"
           size="sm"
           :loading="isRevoking"
           @click="handleRevoke"
@@ -27,20 +27,16 @@
       </div>
     </div>
 
-    <div class="installation-scopes">
-      <p class="scopes-label">Разрешения:</p>
+    <details class="installation-scopes">
+      <summary>Права этой установки <span class="scope-count">{{ scopes.length }}</span></summary>
+      <p class="scopes-explanation">Права выданы при установке на сервер и могут отличаться от настроек приложения.</p>
       <div class="scopes-list">
-        <Badge
-          v-for="scope in scopes"
-          :key="scope"
-          variant="secondary"
-          size="sm"
-        >
-          {{ scope }}
+        <Badge v-for="scope in scopes" :key="scope" variant="default" size="sm">
+          <span :title="scope">{{ scopeTitle({ name: scope, label: '' }) }}</span>
         </Badge>
         <span v-if="!scopes.length" class="no-scopes">Нет разрешений</span>
       </div>
-    </div>
+    </details>
   </div>
 </template>
 
@@ -48,14 +44,15 @@
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
-import type {BotInstallation} from "@/api/bots.ts"
+import type { BotInstallation } from '@/api/bots'
+import { scopeTitle } from '@/utils/botScopeCatalog'
 
 const props = defineProps<{
   installation: BotInstallation
 }>()
 
 const emit = defineEmits<{
-  revoke: [installationId: string]
+  revoke: [installationId: number]
 }>()
 
 const isRevoking = ref(false)
@@ -69,13 +66,19 @@ const statusVariant = computed(() => {
   switch (props.installation.status) {
     case 'active': return 'success'
     case 'paused': return 'warning'
-    case 'revoked': return 'error'
-    default: return 'secondary'
+    case 'revoked': return 'danger'
+    default: return 'default'
   }
 })
 
-const scopes = computed(() => {
-  return props.installation.granted_scopes || []
+const scopes = computed(() => props.installation.granted_scopes || [])
+const statusLabel = computed(() => {
+  switch (props.installation.status) {
+    case 'active': return 'Активна'
+    case 'paused': return 'Приостановлена'
+    case 'revoked': return 'Отозвана'
+    default: return props.installation.status
+  }
 })
 
 const formatDate = (date: string) => {
@@ -111,7 +114,7 @@ const handleRevoke = async () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .server-info {
@@ -153,16 +156,23 @@ const handleRevoke = async () => {
 
 .installation-scopes {
   padding-top: 1rem;
+  margin-top: 1rem;
   border-top: 1px solid var(--border-color);
 }
-
-.scopes-label {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.75rem;
+.installation-scopes summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
 }
+.installation-scopes summary:hover { color: var(--text-primary); }
+.installation-scopes summary:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 4px; }
+.scope-count { padding: 1px 7px; border-radius: 12px; background: var(--glass); }
+.scopes-explanation { margin: 10px 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 
 .scopes-list {
   display: flex;

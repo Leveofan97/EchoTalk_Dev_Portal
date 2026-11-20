@@ -1,0 +1,87 @@
+/* Единый контракт полей для всех тем EchoTalk Developer Portal.
+   Использование: class="ui-control" на input/select/textarea. */
+.ui-control {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--control-radius);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  transition: border-color 160ms ease, background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.ui-control::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.ui-control:hover:not(:disabled):not([readonly]) {
+  border-color: var(--accent-primary);
+}
+
+.ui-control:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.ui-control[aria-invalid="true"] {
+  border-color: var(--control-error);
+}
+
+.ui-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+textarea.ui-control {
+  min-height: 90px;
+  resize: vertical;
+}
+
+select.ui-control {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+select.ui-control.is-placeholder {
+  color: var(--text-secondary);
+}
+
+select.ui-control option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+html[data-theme="lightDay"] select.ui-control,
+html[data-theme="softWarm"] select.ui-control {
+  color-scheme: light;
+}
+
+.ui-checkbox {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.ui-checkbox:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+.ui-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-control { transition: none; }
+}

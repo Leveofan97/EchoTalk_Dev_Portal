@@ -10,7 +10,7 @@ const PENDING_2FA_KEY = 'dev-portal-pending-2fa'
 export const useAuthStore = defineStore('auth', () => {
   // State
   const session = ref<Session | null>(null)
-  const pending2FA = ref<{ userId: string; email: string } | null>(null)
+  const pending2FA = ref<{ userId: string; email: string; remember?: boolean } | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
@@ -20,7 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = computed(() => session.value?.token || null)
 
   // Actions
-  const initAuth = async () => {
+  const restoreAuth = async () => {
     // Пробуем восстановить из localStorage (remember me)
     const savedSession = localStorage.getItem(SESSION_KEY)
     if (savedSession) {
@@ -31,7 +31,6 @@ export const useAuthStore = defineStore('auth', () => {
           session.value = refreshed
           // Обновляем storage с новым токеном
           localStorage.setItem(SESSION_KEY, JSON.stringify(refreshed))
-          console.log('Session restored from localStorage:', refreshed.user.login)
           return
         } else {
           localStorage.removeItem(SESSION_KEY)
@@ -51,7 +50,6 @@ export const useAuthStore = defineStore('auth', () => {
           session.value = refreshed
           // Обновляем sessionStorage с новым токеном
           sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(refreshed))
-          console.log('Session restored from sessionStorage:', refreshed.user.login)
           return
         } else {
           sessionStorage.removeItem(SESSION_STORAGE_KEY)
@@ -72,6 +70,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Единственная попытка восстановления на жизненный цикл приложения.
+  // Это предотвращает параллельные refresh-запросы из разных navigation guards.
+  let initPromise: Promise<void> | null = null
+  const initAuth = (): Promise<void> => {
+    if (!initPromise) {
+      initPromise = restoreAuth()
+    }
+    return initPromise
+  }
+
   // Refresh токена через /refresh endpoint
   const refreshSession = async (oldToken: string): Promise<Session | null> => {
     try {
@@ -83,7 +91,6 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       if (response.error || !response.data) {
-        console.log('Refresh failed:', response.error)
         return null
       }
 
@@ -121,7 +128,6 @@ export const useAuthStore = defineStore('auth', () => {
         },
       }
     } catch (e) {
-      console.error('Session refresh error:', e)
       return null
     }
   }
@@ -141,13 +147,12 @@ export const useAuthStore = defineStore('auth', () => {
         },
       })
 
-      console.log('Login response:', response)
-
       // Требуется 2FA
       if (response.requires2FA) {
         pending2FA.value = {
           userId: response.userId!,
           email: credentials.email,
+          remember: credentials.remember === true,
         }
         localStorage.setItem(PENDING_2FA_KEY, JSON.stringify(pending2FA.value))
         isLoading.value = false
@@ -205,7 +210,6 @@ export const useAuthStore = defineStore('auth', () => {
         pending2FA.value = null
         localStorage.removeItem(PENDING_2FA_KEY)
 
-        console.log('Login successful:', newSession.user.login)
         isLoading.value = false
         return { success: true }
       }
@@ -213,7 +217,6 @@ export const useAuthStore = defineStore('auth', () => {
       isLoading.value = false
       return { error: 'Неизвестная ошибка: неверный формат ответа' }
     } catch (e) {
-      console.error('Login error:', e)
       error.value = 'Произошла ошибка при входе'
       isLoading.value = false
       return { error: 'Произошла ошибка при входе' }
@@ -233,6 +236,7 @@ export const useAuthStore = defineStore('auth', () => {
       password: '', // пароль уже не нужен
       twoFACode: isBackupCode ? '' : code,
       backupCode: isBackupCode ? code : '',
+      remember: pending2FA.value.remember === true,
     })
 
     isLoading.value = false

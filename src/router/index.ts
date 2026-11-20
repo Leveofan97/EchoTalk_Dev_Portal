@@ -46,22 +46,18 @@ const router = createRouter({
   ]
 })
 
-// Глобальный guard для проверки авторизации
-router.beforeEach((to, from, next) => {
+// Ждём восстановления сессии перед проверкой закрытых маршрутов.
+// Авторизация владельца бота дополнительно проверяется backend API.
+router.beforeEach(async (to) => {
+  // Публичные страницы не блокируем ожиданием сетевого refresh.
+  if (!to.meta.requiresAuth) return
+
   const authStore = useAuthStore()
+  await authStore.initAuth()
 
-  // Используем computed getter isAuthenticated вместо прямого чтения storage
-  // Это учитывает и localStorage и sessionStorage и актуальность сессии в state
-  const isAuthenticated = authStore.isAuthenticated
-
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    // Сохраняем куда шли, чтобы вернуть после логина
-    if (to.path !== '/') {
-      localStorage.setItem('redirect_after_login', to.fullPath)
-    }
-    next('/')
-  } else {
-    next()
+  if (!authStore.isAuthenticated) {
+    localStorage.setItem('redirect_after_login', to.fullPath)
+    return { name: 'home', query: { login: '1' } }
   }
 })
 

@@ -4,6 +4,8 @@
   /* Base */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --border-radius: 12px;
+  --control-radius: 10px;
+  --control-error: #dc2626;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Dark Night (default) */

@@ -17,6 +17,7 @@
     "security:gate": "npm run type-check && npm run build && npm run security:audit"
   },
   "dependencies": {
+    "@lucide/vue": "^1.77.0",
     "@scalar/api-reference": "^1.77.0",
     "@stoplight/elements": "^9.0.29",
     "pinia": "^3.0.4",

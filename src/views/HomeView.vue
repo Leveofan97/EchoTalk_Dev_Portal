@@ -1,473 +1,173 @@
 <template>
   <div class="home">
-    <!-- Hero Section -->
     <section class="hero">
-      <div class="hero__bg">
-        <div class="floating-shape shape-1"></div>
-        <div class="floating-shape shape-2"></div>
-        <div class="floating-shape shape-3"></div>
-      </div>
-
-      <div class="container hero__content">
-        <div class="hero__badge animate-slide-up">
-          <Badge variant="info">Beta</Badge>
-          <span>Платформа для разработчиков EchoTalk</span>
+      <div class="container hero__grid">
+        <div class="hero__content">
+          <div class="hero__eyebrow">EchoTalk / Портал разработчика</div>
+          <h1>Создайте бота.<br /><span class="gradient-text">Подключите к EchoTalk.</span></h1>
+          <p class="hero__description">
+            Зарегистрируйте приложение, выберите разрешения, настройте команды и события.
+            Управляйте подключениями к серверам в одном месте.
+          </p>
+          <div class="hero__actions">
+            <Button variant="primary" size="lg" @click="goToCreate">Создать бота</Button>
+            <Button variant="secondary" size="lg" @click="router.push('/docs')">
+              Читать документацию
+            </Button>
+          </div>
+          <p class="hero__note">Для создания бота потребуется учётная запись EchoTalk.</p>
         </div>
 
-        <h1 class="hero__title animate-slide-up">
-          Создавайте ботов для<br />
-          <span class="gradient-text">EchoTalk</span>
-        </h1>
-
-        <p class="hero__subtitle animate-slide-up">
-          Мощная платформа для создания интеграций, автоматизации модерации,<br />
-          музыкальных ботов и многого другого для ваших серверов.
-        </p>
-
-        <div class="hero__actions animate-slide-up">
-          <Button variant="primary" size="lg" @click="$router.push('/dashboard')">
-            Начать разработку
-          </Button>
-          <Button variant="secondary" size="lg" @click="$router.push('/docs')">
-            Документация
-          </Button>
-        </div>
-
-        <div class="hero__stats animate-slide-up">
-          <div class="stat">
-            <span class="stat__value">10K+</span>
-            <span class="stat__label">Активных ботов</span>
+        <div class="start-panel" aria-label="Первые шаги разработчика">
+          <div class="start-panel__heading">
+            <span class="start-panel__caption">Быстрый старт</span>
+            <span class="start-panel__caption">4 шага</span>
           </div>
-          <div class="stat">
-            <span class="stat__value">5M+</span>
-            <span class="stat__label">Серверов</span>
-          </div>
-          <div class="stat">
-            <span class="stat__value">99.9%</span>
-            <span class="stat__label">Uptime</span>
-          </div>
+          <ol class="start-steps">
+            <li v-for="(step, index) in startSteps" :key="step.title">
+              <span class="start-steps__number">{{ String(index + 1).padStart(2, '0') }}</span>
+              <div>
+                <strong>{{ step.title }}</strong>
+                <p>{{ step.description }}</p>
+              </div>
+            </li>
+          </ol>
         </div>
       </div>
     </section>
 
-    <!-- Features Section -->
-    <section class="features">
+    <section class="features" aria-labelledby="features-title">
       <div class="container">
-        <h2 class="section-title">Возможности платформы</h2>
-
-        <div class="grid grid-3">
-          <Card v-for="feature in features" :key="feature.title" hover>
-            <div class="feature">
-              <div class="feature__icon" :style="{ background: feature.gradient }">
-                {{ feature.icon }}
-              </div>
-              <h3>{{ feature.title }}</h3>
-              <p>{{ feature.description }}</p>
-            </div>
+        <div class="section-heading">
+          <span class="section-eyebrow">Возможности</span>
+          <h2 id="features-title">Всё необходимое для интеграции</h2>
+          <p>Управление ботом — в портале. Выполнение команд и обработка событий — в вашем приложении.</p>
+        </div>
+        <div class="feature-grid">
+          <Card v-for="feature in features" :key="feature.title" class="feature-card">
+            <span class="feature-card__index">{{ feature.number }}</span>
+            <h3>{{ feature.title }}</h3>
+            <p>{{ feature.description }}</p>
           </Card>
         </div>
       </div>
     </section>
 
-    <!-- Code Example Section -->
-    <section class="code-section">
-      <div class="container">
-        <div class="code-section__grid">
-          <div class="code-section__content">
-            <h2>Простой API</h2>
-            <p>Начните отправлять сообщения всего за несколько строк кода. Поддержка WebSocket и Webhook для real-time событий.</p>
-            <ul class="feature-list">
-              <li>RESTful API с интуитивной структурой</li>
-              <li>WebSocket Gateway для real-time событий</li>
-              <li>Webhook поддержка с подписью запросов</li>
-              <li>SDK для популярных языков</li>
-            </ul>
+    <section class="integration" aria-labelledby="integration-title">
+      <div class="container integration__grid">
+        <div class="integration__content">
+          <span class="section-eyebrow">REST API</span>
+          <h2 id="integration-title">От первого токена до сообщения</h2>
+          <p>
+            После установки бота на сервер получите его токен доступа через OAuth и
+            используйте Bot API. Ниже — пример настоящего HTTP-запроса без SDK.
+          </p>
+          <p class="integration__hint">
+            <code>ECHOTALK_API_URL</code>, <code>BOT_ACCESS_TOKEN</code> и <code>ROOM_ID</code> —
+            переменные вашего окружения. Токен не следует вставлять в клиентский JavaScript.
+          </p>
+          <Button variant="secondary" @click="router.push('/docs')">Открыть справочник API</Button>
+        </div>
+        <div class="code-panel">
+          <div class="code-panel__header">
+            <span>Отправка сообщения</span>
+            <span>cURL</span>
           </div>
-
-          <div class="code-block">
-            <div class="code-block__header">
-              <span class="code-block__dot"></span>
-              <span class="code-block__dot"></span>
-              <span class="code-block__dot"></span>
-              <span class="code-block__lang">JavaScript</span>
-            </div>
-            <pre class="code-block__content"><code>const bot = new EchoTalkBot({
-  token: 'your-bot-token'
-});
-
-// Отправка сообщения
-await bot.sendMessage({
-  roomId: '123456',
-  content: 'Привет, мир! 👋'
-});
-
-// Обработка событий
-bot.on('message', (msg) => {
-  console.log(`Новое сообщение: ${msg.content}`);
-});</code></pre>
-          </div>
+          <pre><code>{{ messageExample }}</code></pre>
         </div>
       </div>
     </section>
 
-    <!-- CTA Section -->
-    <section class="cta">
-      <div class="container">
-        <Card glass class="cta__card">
-          <div class="cta__content">
-            <h2>Готовы создать своего бота?</h2>
-            <p>Присоединяйтесь к тысячам разработчиков, создающих удивительные интеграции для EchoTalk.</p>
-            <Button variant="primary" size="lg" @click="$router.push('/dashboard')">
-              Создать бота бесплатно
-            </Button>
-          </div>
-        </Card>
+    <section class="closing">
+      <div class="container closing__inner">
+        <div>
+          <h2>Готовы попробовать?</h2>
+          <p>Начните с регистрации бота. Остальные настройки можно добавить позже.</p>
+        </div>
+        <Button variant="primary" size="lg" @click="goToCreate">Создать первого бота</Button>
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Card from '@/components/ui/Card.vue'
-import Badge from '@/components/ui/Badge.vue'
+
+const router = useRouter()
+const goToCreate = () => router.push({ name: 'bots', query: { create: '1' } })
+
+const startSteps = [
+  { title: 'Создайте приложение', description: 'Укажите имя бота и минимально необходимые разрешения.' },
+  { title: 'Настройте доступ', description: 'Создайте OAuth credentials и подключите бота к серверу.' },
+  { title: 'Выберите транспорт', description: 'Настройте webhook либо WebSocket Gateway для событий.' },
+  { title: 'Добавьте команды', description: 'Зарегистрируйте команды и проверьте ответы в EchoTalk.' },
+]
 
 const features = [
-  {
-    icon: '⚡',
-    title: 'Real-time события',
-    description: 'Мгновенная доставка событий через WebSocket или Webhook с гарантией доставки.',
-    gradient: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)'
-  },
-  {
-    icon: '🛡️',
-    title: 'Безопасность',
-    description: 'OAuth2 авторизация, ротация токенов, подпись webhook запросов и минимальные привилегии.',
-    gradient: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)'
-  },
-  {
-    icon: '📊',
-    title: 'Аналитика',
-    description: 'Подробная статистика использования, метрики производительности и логи аудита.',
-    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)'
-  },
-  {
-    icon: '🎯',
-    title: 'Slash команды',
-    description: 'Создавайте интерактивные команды с автодополнением и контекстной помощью.',
-    gradient: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)'
-  },
-  {
-    icon: '🔧',
-    title: 'Гибкая настройка',
-    description: 'Гранулярные permissions, scopes и room overrides для точного контроля доступа.',
-    gradient: 'linear-gradient(135deg, #f97316 0%, #eab308 100%)'
-  },
-  {
-    icon: '🚀',
-    title: 'Масштабируемость',
-    description: 'Автоматическое масштабирование, rate limiting и надёжная доставка сообщений.',
-    gradient: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)'
-  }
+  { number: '01', title: 'Команды и взаимодействия', description: 'Слэш-команды, кнопки, списки выбора, формы и ответы на действия пользователей.' },
+  { number: '02', title: 'События и доставка', description: 'Подписки на события, подписанные webhook-запросы, WebSocket Gateway и повторное чтение событий.' },
+  { number: '03', title: 'Управление сервером', description: 'Сообщения, роли, модерация, комнаты и категории — в рамках выданных разрешений.' },
+  { number: '04', title: 'Голос и медиа', description: 'Подключение к голосовым комнатам и работа с аудио, видео и демонстрацией экрана через LiveKit.' },
+  { number: '05', title: 'Безопасный доступ', description: 'OAuth 2.0, управление credentials, scopes и ограничения действий бота.' },
+  { number: '06', title: 'Диагностика', description: 'Статус Gateway, история доставки событий, повторные попытки и показатели ограничений.' },
 ]
+
+const messageExample = `curl -X POST "$ECHOTALK_API_URL/bot/rooms/$ROOM_ID/messages" \\
+  -H "Authorization: Bearer $BOT_ACCESS_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"content":"Привет из EchoTalk Bot API!"}'`
 </script>
 
 <style scoped>
-.home {
-  flex: 1;
+.home { flex: 1; }
+.hero { padding: 152px 0 104px; }
+.hero__grid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.88fr); gap: clamp(2rem, 6vw, 6rem); align-items: center; }
+.hero__eyebrow, .section-eyebrow { display: inline-block; color: var(--accent-primary); font-size: .82rem; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+.hero h1 { font-size: clamp(2.6rem, 5vw, 4.5rem); letter-spacing: -.055em; line-height: 1.09; margin: 1.2rem 0 1.5rem; }
+.hero__description { max-width: 610px; color: var(--text-secondary); font-size: 1.14rem; line-height: 1.75; }
+.hero__actions { display: flex; flex-wrap: wrap; gap: .85rem; margin-top: 2rem; }
+.hero__note { margin-top: 1.2rem; color: var(--text-muted); font-size: .85rem; }
+.start-panel { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.75rem; box-shadow: var(--shadow); }
+.start-panel__heading { display: flex; justify-content: space-between; gap: .75rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); }
+.start-panel__caption { color: var(--text-secondary); font-size: .82rem; font-weight: 700; }
+.start-steps { list-style: none; padding: 0; margin: 1.5rem 0 0; display: flex; flex-direction: column; gap: 1.35rem; }
+.start-steps li { display: flex; align-items: flex-start; gap: 1rem; }
+.start-steps__number { color: var(--accent-primary); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .83rem; font-weight: 700; margin-top: .17rem; }
+.start-steps strong { display: block; margin-bottom: .25rem; color: var(--text-primary); }
+.start-steps p { margin: 0; color: var(--text-secondary); font-size: .89rem; line-height: 1.55; }
+.features { padding: 88px 0 104px; background: var(--bg-secondary); }
+.section-heading { max-width: 710px; margin-bottom: 2.25rem; }
+.section-heading h2, .integration h2, .closing h2 { font-size: clamp(1.8rem, 3vw, 2.5rem); letter-spacing: -.035em; margin: .85rem 0; }
+.section-heading p, .integration p, .closing p { color: var(--text-secondary); line-height: 1.65; }
+.feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.feature-card { height: 100%; }
+.feature-card__index { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--accent-primary); font-size: .8rem; font-weight: 700; }
+.feature-card h3 { font-size: 1.08rem; margin: 1.1rem 0 .65rem; }
+.feature-card p { color: var(--text-secondary); font-size: .92rem; line-height: 1.6; margin: 0; }
+.integration { padding: 108px 0; }
+.integration__grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(2rem, 5vw, 5rem); }
+.integration__content .btn { margin-top: .75rem; }
+.integration__hint { font-size: .88rem; }
+.integration__hint code { font-size: .83rem; }
+.code-panel { border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-secondary); overflow: hidden; min-width: 0; }
+.code-panel__header { display: flex; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); font-size: .8rem; color: var(--text-secondary); }
+.code-panel pre { margin: 0; padding: 1.5rem; overflow-x: auto; line-height: 1.8; font-size: .85rem; color: var(--text-primary); }
+.code-panel code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.closing { padding: 65px 0; background: var(--bg-secondary); border-top: 1px solid var(--border-color); }
+.closing__inner { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+.closing h2 { margin-top: 0; }
+.closing p { margin-bottom: 0; }
+@media (max-width: 960px) {
+  .hero__grid, .integration__grid { grid-template-columns: 1fr; }
+  .start-panel { max-width: 680px; }
+  .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-/* Hero */
-.hero {
-  position: relative;
-  padding: 140px 0 100px;
-  overflow: hidden;
-  min-height: 90vh;
-  display: flex;
-  align-items: center;
-}
-
-.hero__bg {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.floating-shape {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.5;
-}
-
-.shape-1 {
-  width: 600px;
-  height: 600px;
-  background: var(--accent-primary);
-  top: -200px;
-  right: -200px;
-  animation: float 8s ease-in-out infinite;
-}
-
-.shape-2 {
-  width: 400px;
-  height: 400px;
-  background: var(--accent-secondary);
-  bottom: -100px;
-  left: -100px;
-  animation: float 10s ease-in-out infinite reverse;
-}
-
-.shape-3 {
-  width: 300px;
-  height: 300px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: pulse 4s ease-in-out infinite;
-}
-
-.hero__content {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-}
-
-.hero__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-  padding: 0.5rem 1rem;
-  background: var(--glass);
-  border: 1px solid var(--border-color);
-  border-radius: 50px;
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-}
-
-.hero__title {
-  font-size: 4rem;
-  font-weight: 800;
-  margin-bottom: 1.5rem;
-  line-height: 1.1;
-}
-
-.hero__subtitle {
-  font-size: 1.25rem;
-  color: var(--text-secondary);
-  max-width: 600px;
-  margin: 0 auto 2.5rem;
-}
-
-.hero__actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  margin-bottom: 4rem;
-}
-
-.hero__stats {
-  display: flex;
-  justify-content: center;
-  gap: 4rem;
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.stat__value {
-  font-size: 2.5rem;
-  font-weight: 800;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.stat__label {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-}
-
-/* Features */
-.features {
-  padding: 100px 0;
-  background: var(--bg-secondary);
-}
-
-.section-title {
-  text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 3rem;
-}
-
-.feature {
-  text-align: center;
-}
-
-.feature__icon {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--border-radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  margin: 0 auto 1.5rem;
-}
-
-.feature h3 {
-  margin-bottom: 0.75rem;
-}
-
-.feature p {
-  color: var(--text-secondary);
-  font-size: 0.9375rem;
-  line-height: 1.6;
-}
-
-/* Code Section */
-.code-section {
-  padding: 100px 0;
-}
-
-.code-section__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem;
-  align-items: center;
-}
-
-.code-section__content h2 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-}
-
-.code-section__content p {
-  color: var(--text-secondary);
-  font-size: 1.125rem;
-  margin-bottom: 2rem;
-}
-
-.feature-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.feature-list li {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.feature-list li::before {
-  content: '✓';
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(34, 197, 94, 0.2);
-  color: #22c55e;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.code-block {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  overflow: hidden;
-}
-
-.code-block__header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.code-block__dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #ef4444;
-}
-
-.code-block__dot:nth-child(2) { background: #eab308; }
-.code-block__dot:nth-child(3) { background: #22c55e; }
-
-.code-block__lang {
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.code-block__content {
-  padding: 1.5rem;
-  margin: 0;
-  overflow-x: auto;
-}
-
-.code-block__content code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.875rem;
-  line-height: 1.7;
-  color: var(--text-primary);
-}
-
-/* CTA */
-.cta {
-  padding: 100px 0;
-  background: var(--bg-secondary);
-}
-
-.cta__card {
-  text-align: center;
-  padding: 4rem;
-}
-
-.cta__content h2 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-}
-
-.cta__content p {
-  color: var(--text-secondary);
-  font-size: 1.125rem;
-  max-width: 500px;
-  margin: 0 auto 2rem;
-}
-
-@media (max-width: 968px) {
-  .hero__title {
-    font-size: 2.5rem;
-  }
-
-  .hero__stats {
-    gap: 2rem;
-  }
-
-  .code-section__grid {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-  }
-
-  .cta__card {
-    padding: 2rem;
-  }
+@media (max-width: 620px) {
+  .hero { padding: 112px 0 72px; }
+  .features, .integration { padding: 64px 0; }
+  .feature-grid { grid-template-columns: 1fr; }
+  .closing__inner { flex-direction: column; align-items: flex-start; }
 }
 </style>

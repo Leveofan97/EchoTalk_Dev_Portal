@@ -4,26 +4,25 @@ import { defineStore } from 'pinia'
 import { botsApi } from '@/api/bots'
 import type {
   BotApp,
+  BotCredential,
   CreateBotPayload,
-  BotInstallation,
   ServerForInstall,
-  BotCommand,
 } from '@/types'
 import type {
-  CreateCredentialsResponse,
   BotAvailableScope,
   InstallationWebhookConfig,
   BotEventDelivery,
   BotEventDeliveryAttempt,
   BotReplayEvent,
-  BotReplayEventsResponse,
+  BotInstallation,
+  BotCommand,
 } from '@/api/bots'
 
 export const useBotsStore = defineStore('bots', () => {
   // State
   const bots = ref<BotApp[]>([])
   const currentBot = ref<BotApp | null>(null)
-  const currentBotCredentials = ref<CreateCredentialsResponse[]>([])
+  const currentBotCredentials = ref<BotCredential[]>([])
   const currentBotInstallations = ref<BotInstallation[]>([])
   const currentDeliveryAttempts = ref<BotEventDeliveryAttempt[]>([])
   const currentBotCommands = ref<BotCommand[]>([])
@@ -86,15 +85,14 @@ export const useBotsStore = defineStore('bots', () => {
         return null
       }
 
-      const newBot = response.data || response
-
+      const newBot = response.data
       if (!newBot?.id) {
-        error.value = 'Invalid response from server'
+        error.value = 'Сервер не вернул созданного бота'
         return null
       }
 
-      bots.value.unshift(newBot as BotApp)
-      return newBot as BotApp
+      bots.value.unshift(newBot)
+      return newBot
     } catch (e: any) {
       console.error('Failed to create bot:', e)
       error.value = e.message || 'Failed to create bot'
@@ -116,8 +114,12 @@ export const useBotsStore = defineStore('bots', () => {
         return null
       }
 
-      currentBot.value = response.data || response
-      return currentBot.value
+      if (!response.data) {
+        error.value = 'Сервер не вернул данные бота'
+        return null
+      }
+      currentBot.value = response.data
+      return response.data
     } catch (err: any) {
       error.value = err.message
       return null
@@ -230,13 +232,16 @@ export const useBotsStore = defineStore('bots', () => {
         throw new Error(response.error)
       }
 
-      const updated = response.data || response
+      const updated = response.data
+      if (!updated) {
+        throw new Error('Сервер не вернул обновлённого бота')
+      }
       currentBot.value = updated
 
       // Обновляем в списке
-      const idx = bots.value.findIndex((b) => b.id === botId)
+      const idx = bots.value.findIndex((b) => String(b.id) === String(botId))
       if (idx !== -1) {
-        bots.value[idx] = { ...bots.value[idx], ...updated }
+        bots.value.splice(idx, 1, updated)
       }
 
       return updated
@@ -281,17 +286,18 @@ export const useBotsStore = defineStore('bots', () => {
         throw new Error(response.error)
       }
 
-      const newCred = response.data || response
+      const newCred = response.data
+      if (!newCred?.client_id || !newCred.client_secret || !newCred.created_at) {
+        throw new Error('Некорректный ответ сервера при создании ключа')
+      }
 
-      // ⚠️ Важно: создаем объект для списка credentials (без секрета!)
-      // Секрет показывается только один раз при создании
-      const credentialForList = {
-        id: Date.now(), // Временный ID, пока не перезагрузим список
+      // В списке хранится только открытая часть credential (без client_secret).
+      const credentialForList: BotCredential = {
+        id: Date.now(), // Временный ID до следующего запроса списка
+        client_id: newCred.client_id,
         type,
         is_active: true,
         created_at: newCred.created_at,
-        last_used_at: null,
-        revoked_at: null,
       }
 
       // Добавляем в начало списка
@@ -376,7 +382,8 @@ export const useBotsStore = defineStore('bots', () => {
       // Обновляем в списке тоже
       const idx = bots.value.findIndex((b) => b.id === botId)
       if (idx !== -1) {
-        bots.value[idx].status = updated?.status || 'active'
+        const bot = bots.value[idx]
+        if (bot) bot.status = updated?.status || 'active'
       }
 
       return updated
@@ -425,10 +432,9 @@ export const useBotsStore = defineStore('bots', () => {
   }
 
   const authorizeBotInstallation = async (data: {
-    client_id: string
+    bot_id: number
     server_id: number
     scopes: string[]
-    redirect_uri: string
     state: string
   }) => {
     isInstalling.value = true

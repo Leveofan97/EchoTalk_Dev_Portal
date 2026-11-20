@@ -22,6 +22,7 @@ export interface BotApp {
   scopes?: string[]
   events?: string[]
   available_events?: BotAvailableEvent[]
+  redirect_uris?: string[]
 
   credentials?: BotCredential[]
 }
