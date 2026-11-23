@@ -48,9 +48,11 @@ test('server load errors are not displayed as empty server lists', () => {
   assert.doesNotMatch(publicView, /v-if="botsStore\.isLoading"/)
 })
 
-test('public scope titles are localized and debug token panel is development-only', () => {
+test('public scope titles are localized and public install has no client secret panel', () => {
   assert.match(publicView, /scopeTitle\(\{ name: scope, label: scope \}\)/)
   assert.match(publicView, /onScopeChange\(scope, \$event\)/)
-  assert.match(publicView, /return import\.meta\.env\.DEV/)
-  assert.doesNotMatch(publicView, /VITE_ENABLE_BOT_DEBUG/)
+  assert.doesNotMatch(publicView, /debugClientSecret|showBotDebugPanel|installStep === 'code-issued'/)
+  assert.match(publicView, /window.location.assign\(callback\)/)
+  assert.match(publicView, /bot\.value\?\.oauth_start_url/)
+  assert.match(publicView, /redirect_uri: request.redirectUri/)
 })

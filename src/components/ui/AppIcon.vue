@@ -86,7 +86,6 @@ const iconComponents: Record<AppIconName, Component> = {
   menu: Menu,
   x: X,
   plus: Plus,
-  'chevron-right': ChevronRight,
   search: Search,
   'book-open': BookOpen,
   globe: Globe,

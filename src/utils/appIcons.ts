@@ -2,7 +2,6 @@
 export const appIconNames = [
   'arrow-left',
   'arrow-right',
-  'chevron-right',
   'chevron-left',
   'rocket',
   'alert-triangle',

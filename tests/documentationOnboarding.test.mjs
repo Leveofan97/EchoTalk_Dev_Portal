@@ -17,9 +17,10 @@ test('Quick Start follows the existing bot installation and token exchange contr
   }
 })
 
-test('Docs distinguish between code display and automatic browser redirect', () => {
-  assert.match(view, /Автоматического HTTP-перехода/)
-  assert.match(view, /первый зарегистрированный адрес/)
+test('Docs describe callback redirect and the bot-initiated CSRF state', () => {
+  assert.match(view, /OAuth Start URL/)
+  assert.match(view, /top-level навигацию/)
+  assert.match(view, /HttpOnly\/SameSite=Lax/)
 })
 
 test('Guide mode does not import heavy Stoplight or Scalar SDKs synchronously', () => {

@@ -14,6 +14,7 @@ export interface BotApp {
   name: string
   description: string | null
   readme_md?: string
+  oauth_start_url?: string
   avatar_url: string | null
   is_public: boolean
   status: BotStatus

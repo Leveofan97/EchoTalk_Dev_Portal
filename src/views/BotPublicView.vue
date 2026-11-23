@@ -72,6 +72,8 @@
             >
               Управление
             </Button>
+            <p v-if="!oauthStartRequest && bot.oauth_start_url" class="hint">Установка продолжится на сайте разработчика бота.</p>
+            <p v-if="installLaunchError" class="install-oauth-error" role="alert">{{ installLaunchError }}</p>
           </div>
         </div>
 
@@ -289,131 +291,6 @@
       </Transition>
     </Teleport>
 
-    <!-- Модал: Код выдан -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="installStep === 'code-issued'" class="modal-overlay">
-          <div class="modal-content success-modal">
-            <AppIcon name="key-round" class="success-icon" :size="42" />
-            <h2>Код авторизации выдан</h2>
-
-            <div class="code-section">
-              <label>Authorization Code:</label>
-              <div class="code-block">
-                <code>{{ botsStore.authCode }}</code>
-                <Button variant="ghost" size="sm" @click="copyCode">
-                  <AppIcon v-if="copied" name="check" :size="18" /> {{ copied ? 'Скопировано' : 'Копировать' }}
-                </Button>
-              </div>
-              <p class="code-hint">Действителен 10 минут</p>
-            </div>
-
-            <div class="install-details">
-              <h4>Данные для бота:</h4>
-              <div class="detail-row">
-                <span>Client ID:</span>
-                <code>{{ authResponse?.client_id }}</code>
-              </div>
-              <div class="detail-row">
-                <span>Server ID:</span>
-                <code>{{ selectedServer?.id }}</code>
-              </div>
-              <div class="detail-row">
-                <span>Redirect URI:</span>
-                <code>{{ authResponse?.redirect_uri }}</code>
-              </div>
-            </div>
-
-            <div class="next-steps">
-              <h4>Что дальше?</h4>
-              <p>Бот должен обменять этот код на access token:</p>
-              <pre>
-POST /oauth/token
-{
-  "grant_type": "authorization_code",
-  "code": "{{ botsStore.authCode }}",
-  "client_id": "{{ authResponse?.client_id }}",
-  "client_secret": "YOUR_CLIENT_SECRET",
-  "redirect_uri": "{{ authResponse?.redirect_uri }}"
-}</pre
-              >
-            </div>
-
-            <Button variant="primary" @click="finishInstall">Понятно</Button>
-          </div>
-
-          <div v-if="showBotDebugPanel" class="debug-panel">
-            <h4>Debug Bot Runtime Panel</h4>
-
-            <div class="debug-field">
-              <label>Client Secret</label>
-              <input
-                v-model="debugClientSecret"
-                class="debug-input"
-                placeholder="Введите client_secret"
-              />
-            </div>
-
-            <div class="debug-actions">
-              <Button variant="secondary" @click="exchangeBotToken" :loading="debugExchangeLoading">
-                Exchange token
-              </Button>
-              <Button variant="ghost" @click="testBotMe" :loading="debugRuntimeLoading">
-                Test /bot/me
-              </Button>
-              <Button variant="ghost" @click="testBotServer" :loading="debugRuntimeLoading">
-                Test /bot/server
-              </Button>
-              <Button variant="ghost" @click="testBotRooms" :loading="debugRuntimeLoading">
-                Test /bot/rooms
-              </Button>
-            </div>
-
-            <div class="debug-field">
-              <label>Access Token</label>
-              <textarea v-model="debugAccessToken" class="debug-textarea" rows="4" />
-            </div>
-
-            <div class="debug-field">
-              <label>Refresh Token</label>
-              <textarea v-model="debugRefreshToken" class="debug-textarea" rows="4" />
-            </div>
-
-            <div class="debug-inline">
-              <div class="debug-field">
-                <label>Server ID</label>
-                <input :value="debugServerId" class="debug-input" disabled />
-              </div>
-
-              <div class="debug-field">
-                <label>Room ID</label>
-                <input v-model="debugRoomId" class="debug-input" placeholder="Введите room_id" />
-              </div>
-            </div>
-
-            <div class="debug-field">
-              <label>Message</label>
-              <textarea v-model="debugMessage" class="debug-textarea" rows="3" />
-            </div>
-
-            <div class="debug-actions">
-              <Button variant="primary" @click="testBotSendMessage" :loading="debugRuntimeLoading">
-                Test send message
-              </Button>
-            </div>
-
-            <div v-if="debugError" class="debug-error">
-              {{ debugError }}
-            </div>
-
-            <div v-if="debugResponse" class="debug-response">
-              <label>Response</label>
-              <pre>{{ JSON.stringify(debugResponse, null, 2) }}</pre>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
   </div>
 </template>
 
@@ -423,7 +300,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useBotsStore } from '@/stores/bots'
 import { botsApi, type PublicBotDetail } from '@/api/bots'
-import { useClipboard } from '@/composables/useClipboard'
+import { parseOAuthStartRequest, isSafeBotOAuthURL, validateOAuthCallback } from '@/utils/botOAuthFlow'
 import { scopeTitle, updateBotScopes } from '@/utils/botScopeCatalog'
 import type { BotAvailableScope } from '@/api/bots'
 import Button from '@/components/ui/Button.vue'
@@ -435,7 +312,6 @@ import type { ServerForInstall } from '@/types'
 const route = useRoute()
 const authStore = useAuthStore()
 const botsStore = useBotsStore()
-const { copy, copied } = useClipboard()
 
 const bot = ref<PublicBotDetail | null>(null)
 const authReady = ref(false)
@@ -446,13 +322,10 @@ void authStore.initAuth().then(
 const loading = ref(true)
 const error = ref('')
 
-// Исправленный тип - убран 'success', добавлен 'select-scopes' и 'code-issued'
-const installStep = ref<'ready' | 'select-server' | 'select-scopes' | 'confirm' | 'code-issued'>(
-  'ready',
-)
+const installStep = ref<'ready' | 'select-server' | 'select-scopes' | 'confirm'>('ready')
 const selectedServer = ref<ServerForInstall | null>(null)
 const selectedScopes = ref<string[]>([])
-const authResponse = ref<{ client_id: string; redirect_uri: string } | null>(null)
+const installLaunchError = ref('')
 const installAuthorizeError = ref('')
 const serversLoading = ref(false)
 const serversError = ref('')
@@ -467,24 +340,6 @@ const installScopeCatalog = computed<BotAvailableScope[]>(() =>
     group: 'installation',
   })),
 )
-
-// ================ Debug
-const showBotDebugPanel = computed(() => {
-  return import.meta.env.DEV
-})
-
-const debugClientSecret = ref('')
-const debugAccessToken = ref('')
-const debugRefreshToken = ref('')
-const debugExchangeLoading = ref(false)
-const debugRuntimeLoading = ref(false)
-const debugError = ref('')
-const debugResponse = ref<any>(null)
-
-const debugServerId = computed(() => selectedServer.value?.id || '')
-const debugRoomId = ref('')
-const debugMessage = ref('Hello from bot debug panel')
-// ======================
 
 const botId = computed(() => route.params.id as string)
 const isAuthenticated = computed(() => !!authStore.token)
@@ -533,9 +388,27 @@ const loadInstallServers = async () => {
   }
 }
 
+const oauthStartRequest = computed(() => parseOAuthStartRequest(route.query.state, route.query.redirect_uri))
+
 const startInstall = async () => {
+  installLaunchError.value = ''
   if (!isAuthenticated.value) {
     redirectToLogin()
+    return
+  }
+  if (!oauthStartRequest.value) {
+    // Marketplace installation must first visit the bot's backend so the client
+    // can create an HttpOnly-cookie-bound state before returning to EchoTalk.
+    if (route.query.state !== undefined || route.query.redirect_uri !== undefined) {
+      installLaunchError.value = 'Неверные параметры начала OAuth. Повторите установку с сайта бота.'
+      return
+    }
+    const startURL = bot.value?.oauth_start_url ?? ''
+    if (!startURL || !isSafeBotOAuthURL(startURL)) {
+      installLaunchError.value = 'Разработчик ещё не настроил OAuth Start URL для установки бота.'
+      return
+    }
+    window.location.assign(startURL)
     return
   }
   installStep.value = 'select-server'
@@ -578,50 +451,31 @@ const backToScopes = () => {
 }
 
 const confirmInstall = async () => {
-  if (botsStore.isInstalling || !selectedServer.value || !bot.value || selectedScopes.value.length === 0) return
-
+  if (botsStore.isInstalling || !selectedServer.value || !bot.value || !selectedScopes.value.length) return
   installAuthorizeError.value = ''
-  const state = generateRandomState()
-
-  // Исправлено: отправляем только bot_id, server_id, scopes, state
+  const request = oauthStartRequest.value
+  if (!request) {
+    installAuthorizeError.value = 'OAuth-сессия не найдена. Начните установку заново.'
+    return
+  }
   const result = await botsStore.authorizeBotInstallation({
-    bot_id: parseInt(botId.value),
+    bot_id: Number(botId.value),
     server_id: selectedServer.value.id,
     scopes: selectedScopes.value,
-    state: state,
+    state: request.state,
+    redirect_uri: request.redirectUri,
   })
-
-  if (result) {
-    // Сохраняем ответ для отображения
-    authResponse.value = {
-      client_id: result.client_id,
-      redirect_uri: result.redirect_uri,
-    }
-    installStep.value = 'code-issued'
-  } else {
+  if (!result) {
     installAuthorizeError.value = botsStore.error || 'Не удалось выполнить OAuth-авторизацию'
+    return
   }
-}
-
-const generateRandomState = () => {
-  return crypto.randomUUID()
-}
-
-const copyCode = () => {
-  if (botsStore.authCode) {
-    copy(botsStore.authCode)
+  try {
+    const callback = validateOAuthCallback(result, request)
+    // Browser top-level navigation (not fetch): bot backend receives GET code+state.
+    window.location.assign(callback)
+  } catch (err) {
+    installAuthorizeError.value = err instanceof Error ? err.message : 'Недопустимый OAuth callback'
   }
-}
-
-const finishInstall = () => {
-  installStep.value = 'ready'
-  selectedServer.value = null
-  selectedScopes.value = []
-  authResponse.value = null
-  installAuthorizeError.value = ''
-  botsStore.clearAuthCode()
-
-  resetDebugPanel()
 }
 
 const cancelInstall = () => {
@@ -629,135 +483,8 @@ const cancelInstall = () => {
   selectedServer.value = null
   selectedScopes.value = []
   installAuthorizeError.value = ''
-  authResponse.value = null
   serversError.value = ''
   botsStore.serversForInstall = []
-  botsStore.clearAuthCode()
-  resetDebugPanel()
-}
-
-//==================================================
-const exchangeBotToken = async () => {
-  if (!botsStore.authCode || !authResponse.value?.client_id || !authResponse.value?.redirect_uri) {
-    debugError.value = 'Недостаточно данных для exchange'
-    return
-  }
-
-  if (!debugClientSecret.value.trim()) {
-    debugError.value = 'Введите client_secret'
-    return
-  }
-
-  debugExchangeLoading.value = true
-  debugError.value = ''
-  debugResponse.value = null
-
-  const response = await botsApi.exchangeToken({
-    grant_type: 'authorization_code',
-    code: botsStore.authCode,
-    client_id: authResponse.value.client_id,
-    client_secret: debugClientSecret.value.trim(),
-    redirect_uri: authResponse.value.redirect_uri,
-  })
-
-  debugExchangeLoading.value = false
-
-  if (response.error) {
-    debugError.value = response.error
-    return
-  }
-
-  debugAccessToken.value = response.data?.access_token || ''
-  debugRefreshToken.value = response.data?.refresh_token || ''
-  debugResponse.value = response.data || response
-}
-
-const testBotMe = async () => {
-  if (!debugAccessToken.value) {
-    debugError.value = 'Нет access token'
-    return
-  }
-
-  debugRuntimeLoading.value = true
-  debugError.value = ''
-  const response = await botsApi.botMe(debugAccessToken.value)
-  debugRuntimeLoading.value = false
-
-  if (response.error) {
-    debugError.value = response.error
-    debugResponse.value = response
-    return
-  }
-
-  debugResponse.value = response.data || response
-}
-
-const testBotServer = async () => {
-  if (!debugAccessToken.value || !debugServerId.value) return
-
-  debugRuntimeLoading.value = true
-  debugError.value = ''
-  const response = await botsApi.botServer(debugAccessToken.value, debugServerId.value)
-  debugRuntimeLoading.value = false
-
-  if (response.error) {
-    debugError.value = response.error
-    debugResponse.value = response
-    return
-  }
-
-  debugResponse.value = response.data || response
-}
-
-const testBotRooms = async () => {
-  if (!debugAccessToken.value || !debugServerId.value) return
-
-  debugRuntimeLoading.value = true
-  debugError.value = ''
-  const response = await botsApi.botRooms(debugAccessToken.value, debugServerId.value)
-  debugRuntimeLoading.value = false
-
-  if (response.error) {
-    debugError.value = response.error
-    debugResponse.value = response
-    return
-  }
-
-  debugResponse.value = response.data || response
-}
-
-const testBotSendMessage = async () => {
-  if (!debugAccessToken.value || !debugRoomId.value || !debugMessage.value.trim()) {
-    debugError.value = 'Нужны room_id и message'
-    return
-  }
-
-  debugRuntimeLoading.value = true
-  debugError.value = ''
-  const response = await botsApi.botSendMessage(
-    debugAccessToken.value,
-    debugRoomId.value,
-    debugMessage.value.trim(),
-  )
-  debugRuntimeLoading.value = false
-
-  if (response.error) {
-    debugError.value = response.error
-    debugResponse.value = response
-    return
-  }
-
-  debugResponse.value = response.data || response
-}
-
-const resetDebugPanel = () => {
-  debugClientSecret.value = ''
-  debugAccessToken.value = ''
-  debugRefreshToken.value = ''
-  debugError.value = ''
-  debugResponse.value = null
-  debugRoomId.value = ''
-  debugMessage.value = 'Hello from bot debug panel'
 }
 
 watch(botId, () => {
@@ -1373,140 +1100,6 @@ watch(botId, () => {
   color: var(--text-secondary);
 }
 
-/* ===== Success Modal ===== */
-.success-modal {
-  max-width: 600px;
-  text-align: center;
-  padding: 2rem;
-}
-
-.success-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-}
-
-.success-modal h2 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
-}
-
-/* ===== Code Section ===== */
-.code-section {
-  margin: 1.5rem 0;
-  text-align: left;
-}
-
-.code-section label {
-  display: block;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-}
-
-.code-block {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-}
-
-.code-block code {
-  flex: 1;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.875rem;
-  color: var(--accent-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.code-hint {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-top: 0.5rem;
-}
-
-/* ===== Install Details ===== */
-.install-details {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 1rem;
-  margin: 1.5rem 0;
-  text-align: left;
-  border: 1px solid var(--border-color);
-}
-
-.install-details h4 {
-  margin: 0 0 0.75rem 0;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.detail-row:last-child {
-  border-bottom: none;
-}
-
-.detail-row span {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-}
-
-.detail-row code {
-  font-size: 0.75rem;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--accent-primary);
-  background: rgba(0, 0, 0, 0.3);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-/* ===== Next Steps ===== */
-.next-steps {
-  text-align: left;
-  margin: 1.5rem 0;
-}
-
-.next-steps h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.next-steps p {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.75rem;
-}
-
-.next-steps pre {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 1rem;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  overflow-x: auto;
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  font-family: 'JetBrains Mono', monospace;
-  line-height: 1.5;
-}
-
 /* ===== Modal Transitions ===== */
 .modal-enter-active,
 .modal-leave-active {
@@ -1560,73 +1153,6 @@ watch(botId, () => {
   .spinner { animation: none; }
 }
 
-.debug-panel {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: rgba(99, 102, 241, 0.06);
-  text-align: left;
-}
-
-.debug-panel h4 {
-  margin: 0 0 1rem 0;
-}
-
-.debug-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.debug-inline {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.debug-input,
-.debug-textarea {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-family: inherit;
-}
-
-.debug-textarea {
-  resize: vertical;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-}
-
-.debug-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.debug-error {
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-}
-
-.debug-response pre {
-  margin: 0;
-  padding: 1rem;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.3);
-  overflow: auto;
-  font-size: 0.75rem;
-}
 </style>
 
 <style scoped>

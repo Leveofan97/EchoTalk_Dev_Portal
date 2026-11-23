@@ -44,6 +44,7 @@ export interface PublicBotDetail {
   name: string
   description: string
   readme_md?: string
+  oauth_start_url?: string
   avatar_url: string
   is_public: boolean
   owner: {
@@ -307,12 +308,14 @@ export const botsApi = {
     server_id: number
     scopes: string[]
     state: string
+    redirect_uri: string
   }) =>
     api.post<{
       code: string
       state: string
       client_id: string
       redirect_uri: string
+      redirect_to: string
     }>('/oauth/authorize', data),
 
   exchangeToken: (data: ExchangeTokenPayload) =>

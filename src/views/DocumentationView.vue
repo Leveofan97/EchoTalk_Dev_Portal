@@ -106,7 +106,7 @@
             </li>
             <li>
               <strong>Настройте авторизацию.</strong>
-              На вкладке «Авторизация» получите Client ID и Client Secret, добавьте Redirect URI.
+              На вкладке «Авторизация» получите Client ID и Client Secret, добавьте Redirect URI и OAuth Start URL.
               Сохраните секрет на стороне сервера: после закрытия окна он повторно не отображается.
             </li>
             <li>
@@ -118,44 +118,37 @@
             <li>
               <strong>Авторизуйте установку.</strong>
               На публичной странице бота выберите сервер и разрешения, затем подтвердите установку.
-              Портал выдаст одноразовый код авторизации.
+              После подтверждения браузер перейдёт на backend бота с одноразовым кодом и state.
             </li>
             <li>
               <strong>Получите токен и отправьте сообщение.</strong>
-              Обменяйте код на access/refresh token в backend бота и выполните запрос к
+              Обменяйте полученный callback-код на access/refresh token в backend бота и выполните запрос к
               <code>/bot/rooms/{roomID}/messages</code>.
             </li>
           </ol>
           <div class="callout callout--info">
-            <strong>Особенность текущего OAuth в EchoTalk.</strong>
-            <span>
-              Код авторизации сейчас выдаётся в интерфейсе и ответе API. Автоматического HTTP-перехода
-              на Redirect URI пока нет; зарегистрированный адрес используется для проверки при выдаче
-              кода и его обмене на токен.
-            </span>
+            <strong>Установка из каталога.</strong>
+            <span>EchoTalk сначала переводит пользователя на OAuth Start URL бота. Backend бота создаёт случайный state, сохраняет его в HttpOnly/SameSite=Lax cookie и возвращает пользователя на страницу /explore/&lt;BOT_ID&gt;?state=...&amp;redirect_uri=.... После подтверждения браузер переходит на зарегистрированный callback бота с code и state.</span>
           </div>
         </section>
 
         <section id="oauth-install" class="doc-section">
           <h2>OAuth и установка на сервер</h2>
           <p>
-            Для установки пользователь должен иметь право добавлять ботов на выбранный сервер.
+            Для установки пользователь должен иметь право добавлять ботов на выбранный сервер. Настройте OAuth Start URL и зарегистрированный Redirect URI на backend бота.
             <code>POST /oauth/authorize</code> выполняется от имени авторизованного пользователя,
             а не с Client Secret. В интерфейсе портала этот запрос выполняется при подтверждении установки.
           </p>
-          <p>Параметр <code>state</code> должен быть уникальным, криптографически случайным
-            и связанным с текущей попыткой авторизации.
+          <p>Параметр <code>state</code> формирует backend бота в OAuth Start URL. Он должен быть криптографически случайным и проверяться backend бота на callback до обмена кода.
           </p>
           <CodeBlock title="POST /oauth/authorize · JSON" :code="authorizeExample" @copy="copyCode(authorizeExample)" />
           <p>
             Параметр <code>redirect_uri</code> можно передать явно: он должен в точности совпадать
             с одним из адресов во вкладке «Авторизация». Если его не передать, backend выберет
-            первый зарегистрированный адрес. При отсутствии зарегистрированных адресов код не выдаётся.
+            первый зарегистрированный адрес (только для старых API-клиентов). При отсутствии зарегистрированных адресов код не выдаётся.
           </p>
           <p>
-            Ответ содержит <code>code</code>, <code>state</code>, <code>client_id</code> и
-            <code>redirect_uri</code>. Сверяйте возвращённый <code>state</code> с сохранённым
-            значением текущей попытки авторизации. Код действует 10 минут и может быть использован только один раз.
+            Ответ API содержит <code>code</code>, <code>state</code>, <code>client_id</code>, <code>redirect_uri</code> и <code>redirect_to</code>. После успешного ответа frontend проверяет callback и выполняет top-level навигацию на <code>redirect_to</code>. Backend бота получает <code>GET /oauth/callback?code=...&amp;state=...</code>, проверяет state и обменивает код. Код действует 10 минут и может использоваться один раз.
           </p>
           <h3>Обмен кода на токены</h3>
           <CodeBlock title="POST /oauth/token · JSON" :code="tokenRequestExample" @copy="copyCode(tokenRequestExample)" />

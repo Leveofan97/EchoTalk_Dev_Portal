@@ -38,7 +38,6 @@ export const useBotsStore = defineStore('bots', () => {
 
   const serversForInstall = ref<ServerForInstall[]>([])
   const isInstalling = ref(false)
-  const authCode = ref<string | null>(null)
 
   // Getters
   const activeBotsCount = computed(() => bots.value.filter((b) => b.status === 'active').length)
@@ -436,6 +435,7 @@ export const useBotsStore = defineStore('bots', () => {
     server_id: number
     scopes: string[]
     state: string
+    redirect_uri: string
   }) => {
     isInstalling.value = true
     error.value = null
@@ -446,7 +446,6 @@ export const useBotsStore = defineStore('bots', () => {
         error.value = response.error
         return null
       }
-      authCode.value = response.data?.code || null
       return response.data
     } catch (err: any) {
       error.value = err.message
@@ -567,9 +566,6 @@ export const useBotsStore = defineStore('bots', () => {
     return updateBotCommand(botId, commandId, { is_enabled: isEnabled })
   }
 
-  const clearAuthCode = () => {
-    authCode.value = null
-  }
 
   const clearError = () => {
     error.value = null
@@ -604,10 +600,8 @@ export const useBotsStore = defineStore('bots', () => {
     availableServers,
     fetchAvailableScopes,
     isInstalling,
-    authCode,
     fetchServersForInstall,
     authorizeBotInstallation,
-    clearAuthCode,
     currentInstallationWebhook,
     currentInstallationDeliveries,
     fetchInstallationWebhook,
