@@ -12,10 +12,12 @@
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
-          <Button variant="ghost" @click="router.push({ name: 'bots' })" class="back-btn"><AppIcon name="arrow-left" :size="20" /> К моим ботам</Button>
+          <Button variant="ghost" @click="router.push({ name: 'bots' })" class="back-btn"
+            ><AppIcon name="chevron-left" :size="20" /> К моим ботам</Button
+          >
           <div class="bot-title" v-if="bot">
             <div class="bot-avatar" :style="avatarStyle">
-              {{ bot.name?.[0]?.toUpperCase() || '?' }}
+              <p v-if="!avatarStyle">{{ bot.name?.[0]?.toUpperCase() || '?' }}</p>
             </div>
             <div class="bot-info">
               <h1>{{ bot.name }}</h1>
@@ -32,8 +34,12 @@
           </div>
         </div>
         <div class="header-actions" v-if="bot">
-          <Button variant="secondary" @click="showEditModal = true"><AppIcon name="settings" :size="20" /> Редактировать</Button>
-          <Button variant="secondary" @click="openCreateCredentialDialog"><AppIcon name="key-round" :size="20" /> Создать Client Secret</Button>
+          <Button variant="secondary" @click="showEditModal = true"
+            ><AppIcon name="settings" :size="20" /> Редактировать</Button
+          >
+          <Button variant="secondary" @click="openCreateCredentialDialog"
+            ><AppIcon name="key-round" :size="20" /> Создать Client Secret</Button
+          >
           <Button
             v-if="bot.status === 'draft'"
             variant="primary"
@@ -61,870 +67,1181 @@
 
       <!-- Content -->
       <div v-else-if="bot" class="bot-content">
-<nav class="bot-section-nav" aria-label="Разделы управления ботом" role="tablist">
-  <button v-for="tab in detailTabs" :key="tab.id" :id="`bot-tab-${tab.id}`" type="button" role="tab"
-    :aria-selected="activeTab === tab.id" :aria-controls="`bot-panel-${tab.id}`"
-    :tabindex="activeTab === tab.id ? 0 : -1"
-    :class="{ 'is-active': activeTab === tab.id }"
-    @click="selectTab(tab.id)" @keydown="handleTabKeydown($event, tab.id)">
-    <AppIcon :name="tab.icon" :size="20" />
-    <span>{{ tab.label }}</span>
-  </button>
-</nav>
-<div v-if="activeInstallationsList.length && tabsWithInstallationContext.includes(activeTab)" class="installation-context">
-  <div class="installation-context-label">
-    <span>Выбранный сервер</span>
-    <small>Настройки и подписки относятся к конкретной установке</small>
-  </div>
-  <select v-model="selectedWebhookInstallationId" class="form-select ui-control" :class="{ 'is-placeholder': !selectedWebhookInstallationId }" aria-label="Выберите установку" @change="handleSelectWebhookInstallation">
-    <option value="">Выберите сервер</option>
-    <option v-for="installation in activeInstallationsList" :key="installation.id" :value="String(installation.id)">
-      {{ installation.server_name || `Сервер ${installation.server_id}` }} · #{{ installation.id }}
-    </option>
-  </select>
-</div>
-<section :id="'bot-panel-overview'" role="tabpanel" aria-labelledby="bot-tab-overview" v-show="activeTab === 'overview'" class="bot-tab-panel">
-<div v-if="!credentials.length || !activeInstallations" class="setup-guide" role="note">
-          <div>
-            <h2>Первые шаги</h2>
-            <p>Чтобы бот начал работать, подготовьте данные для подключения и установите его на сервер.</p>
+        <nav class="bot-section-nav" aria-label="Разделы управления ботом" role="tablist">
+          <button
+            v-for="tab in detailTabs"
+            :key="tab.id"
+            :id="`bot-tab-${tab.id}`"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === tab.id"
+            :aria-controls="`bot-panel-${tab.id}`"
+            :tabindex="activeTab === tab.id ? 0 : -1"
+            :class="{ 'is-active': activeTab === tab.id }"
+            @click="selectTab(tab.id)"
+            @keydown="handleTabKeydown($event, tab.id)"
+          >
+            <AppIcon :name="tab.icon" :size="20" />
+            <span>{{ tab.label }}</span>
+          </button>
+        </nav>
+        <div
+          v-if="activeInstallationsList.length && tabsWithInstallationContext.includes(activeTab)"
+          class="installation-context"
+        >
+          <div class="installation-context-label">
+            <span>Выбранный сервер</span>
+            <small>Настройки и подписки относятся к конкретной установке</small>
           </div>
-          <ol>
-            <li :class="{ 'setup-done': activeCredential }">
-              <span>{{ activeCredential ? '✓' : '1' }}</span>
-              <div>
-                <strong>Получите Client ID и Client Secret</strong>
-                <p>Идентификатор и секрет нужны серверному приложению бота для OAuth.</p>
-              </div>
-            </li>
-            <li>
-              <span>2</span>
-              <div>
-                <strong>Проверьте разрешения</strong>
-                <p>Выберите минимально необходимые доступы в настройках бота.</p>
-              </div>
-            </li>
-            <li :class="{ 'setup-done': activeInstallations > 0 }">
-              <span>{{ activeInstallations > 0 ? '✓' : '3' }}</span>
-              <div>
-                <strong>Установите бота и настройте доставку событий</strong>
-                <p>После установки на сервер появятся настройки Webhook и WebSocket Gateway.</p>
-              </div>
-            </li>
-          </ol>
-          <RouterLink :to="{ name: 'docs' }" class="setup-docs-link">Документация по подключению</RouterLink>
+          <select
+            v-model="selectedWebhookInstallationId"
+            class="form-select ui-control"
+            :class="{ 'is-placeholder': !selectedWebhookInstallationId }"
+            aria-label="Выберите установку"
+            @change="handleSelectWebhookInstallation"
+          >
+            <option value="">Выберите сервер</option>
+            <option
+              v-for="installation in activeInstallationsList"
+              :key="installation.id"
+              :value="String(installation.id)"
+            >
+              {{ installation.server_name || `Сервер ${installation.server_id}` }} · #{{
+                installation.id
+              }}
+            </option>
+          </select>
         </div>
-<!-- Сводные показатели показываем перед подробной информацией. -->
-<Card class="section-card stats-card">
-  <div class="quick-stats">
-    <div class="stat-item">
-      <span class="stat-value">{{ installations.length }}</span>
-      <span class="stat-label">Серверов</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-value">{{ activeInstallations }}</span>
-      <span class="stat-label">Активных</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-value">{{ activeCredentialsCount }}</span>
-      <span class="stat-label">Активных ключей</span>
-    </div>
-  </div>
-</Card>
-
-<div class="overview-information-grid">
-  <Card id="bot-scopes" class="section-card overview-info-card">
-    <div class="section-header">
-      <h2 class="section-title"><AppIcon name="shield-check" :size="24" /> Разрешения приложения</h2>
-      <p class="section-desc">Определяют доступ бота к возможностям EchoTalk.</p>
-    </div>
-    <div class="tags-list">
-      <Badge v-for="scope in allowedScopes" :key="scope" variant="info" size="sm">
-        <span :title="scope">{{ scopeDisplayName(scope) }}</span>
-      </Badge>
-      <span v-if="!allowedScopes.length" class="empty-tags">Разрешения не заданы</span>
-    </div>
-  </Card>
-
-  <Card class="section-card overview-info-card">
-    <div class="section-header">
-      <h2 class="section-title"><AppIcon name="list-checks" :size="24" /> События выбранной установки</h2>
-      <p class="section-desc">
-        {{ selectedWebhookInstallation?.server_name || 'Выберите сервер для просмотра сохранённых подписок' }}
-      </p>
-    </div>
-    <div class="tags-list">
-      <Badge v-for="event in savedSubscribedEvents" :key="event" variant="default" size="sm">
-        <span :title="event">{{ eventDisplayName(event) }}</span>
-      </Badge>
-      <span v-if="isLoadingWebhook" class="empty-tags">Загрузка подписок…</span>
-      <span v-else-if="!savedSubscribedEvents.length" class="empty-tags">
-        {{ selectedWebhookInstallation ? 'Для этого сервера подписки не настроены' : 'Выберите установку бота' }}
-      </span>
-    </div>
-    <button type="button" class="text-link" @click="selectTab('subscriptions')">
-      Настроить подписки
-    </button>
-  </Card>
-</div>
-</section>
-<section :id="'bot-panel-auth'" role="tabpanel" aria-labelledby="bot-tab-auth" v-show="activeTab === 'auth'" class="bot-tab-panel">
-<Card id="bot-credentials" class="section-card">
-              <div class="section-header">
-                <h2 class="section-title"><AppIcon name="key-round" :size="24" /> Данные для авторизации</h2>
-                <p class="section-desc">Client ID идентифицирует приложение, а Client Secret подтверждает его подлинность при обмене OAuth-кода на токены.</p>
-              </div>
-
-              <div class="oauth-howto" aria-label="Порядок подключения бота">
-                <div class="oauth-howto-step">
-                  <span class="oauth-step-number">1</span>
-                  <div><strong>Создайте учётные данные</strong><p>Скопируйте Client ID и Client Secret. Секрет показывается только при создании.</p></div>
-                </div>
-                <div class="oauth-howto-step">
-                  <span class="oauth-step-number">2</span>
-                  <div><strong>Установите бота на сервер</strong><p>При установке выберите сервер и разрешения. После подтверждения приложение получает OAuth-код.</p></div>
-                </div>
-                <div class="oauth-howto-step">
-                  <span class="oauth-step-number">3</span>
-                  <div><strong>Подключите серверную часть</strong><p>Обменяйте код на токены через <code>POST /oauth/token</code>. Секрет и токены храните только на сервере бота.</p></div>
-                </div>
-              </div>
-              <div class="oauth-help-links">
-                <RouterLink :to="{ name: 'docs' }" class="text-link">Документация API и OAuth</RouterLink>
-                <button type="button" class="text-link" @click="selectTab('installations')">Перейти к установкам</button>
-              </div>
-
-              <!-- Пустое состояние -->
-              <div
-                v-if="credentials.length === 0 && !freshlyCreatedSecret"
-                class="empty-credentials"
-              >
-                <p>Учётные данные ещё не созданы</p>
-                <Button variant="primary" @click="openCreateCredentialDialog">
-                  Создать Client Secret
-                </Button>
-              </div>
-
-              <!-- Только что созданные (показываем один раз) -->
-              <div v-else-if="freshlyCreatedSecret" class="fresh-secret-banner">
-                <div class="secret-warning">
-                  <strong class="inline-icon-label"><AppIcon name="alert-triangle" :size="20" /> Скопируйте эти данные сейчас!</strong>
-                  <p>Они больше никогда не будут показаны.</p>
-                </div>
-
-                <!-- Client ID -->
-                <CredentialCard
-                  title="Client ID"
-                  :value="freshlyCreatedSecret.client_id"
-                  :sensitive="false"
-                  hint="Публичный идентификатор приложения — его можно указывать в настройках интеграции"
-                />
-
-                <!-- Client Secret -->
-                <CredentialCard
-                  title="Client Secret"
-                  :value="freshlyCreatedSecret.client_secret"
-                  :is-new="true"
-                  :sensitive="true"
-                  hint="Храните в переменных окружения или менеджере секретов серверного приложения, не в Vue-клиенте"
-                />
-
-                <Button variant="secondary" @click="dismissFreshSecret">
-                  Я сохранил данные
-                </Button>
-              </div>
-
-              <!-- Существующие credentials (после закрытия баннера) -->
-              <div v-else class="credentials-list">
-                <CredentialCard
-                  v-if="activeCredential"
-                  title="Client ID"
-                  :value="activeCredential.client_id"
-                  :sensitive="false"
-                  hint="Публичный идентификатор приложения"
-                />
-
-                <div class="secret-placeholder">
-                  <span>Client Secret не показывается повторно</span>
-                  <Button variant="ghost" size="sm" @click="openCreateCredentialDialog">
-                    Создать новый
-                  </Button>
-                </div>
-              </div>
-            </Card>
-            <Card id="bot-redirect-uris" class="section-card redirect-uri-section">
-              <div class="section-header redirect-section-heading">
+        <section
+          :id="'bot-panel-overview'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-overview"
+          v-show="activeTab === 'overview'"
+          class="bot-tab-panel"
+        >
+          <div v-if="!credentials.length || !activeInstallations" class="setup-guide" role="note">
+            <div>
+              <h2>Первые шаги</h2>
+              <p>
+                Чтобы бот начал работать, подготовьте данные для подключения и установите его на
+                сервер.
+              </p>
+            </div>
+            <ol>
+              <li :class="{ 'setup-done': activeCredential }">
+                <span>{{ activeCredential ? '✓' : '1' }}</span>
                 <div>
-                  <h2 class="section-title"><AppIcon name="link-2" :size="24" /> Адреса перенаправления OAuth</h2>
-                  <p class="section-desc">Добавьте разрешённые callback-адреса. Сейчас код авторизации возвращается через API, без автоматического перехода на callback. Адрес проверяется при OAuth-авторизации и обмене кода на токен.</p>
+                  <strong>Получите Client ID и Client Secret</strong>
+                  <p>Идентификатор и секрет нужны серверному приложению бота для OAuth.</p>
                 </div>
-                <Button variant="secondary" :disabled="isSavingRedirectURIs || redirectURIs.length >= 10" @click="showAddRedirectModal = true">
-                  <AppIcon name="plus" :size="19" /> Добавить адрес
-                </Button>
-              </div>
-              <p class="redirect-count">Зарегистрировано: {{ redirectURIs.length }} из 10</p>
-              <div v-if="!redirectURIs.length" class="redirect-empty" role="note">
-                <AppIcon name="alert-triangle" :size="21" />
-                <span>Адреса не зарегистрированы. Получение OAuth-кода недоступно, пока не добавлен хотя бы один Redirect URI.</span>
-              </div>
-              <ul v-else class="redirect-uri-list">
-                <li v-for="(uri, index) in redirectURIs" :key="uri" class="redirect-uri-item">
-                  <div class="redirect-uri-main">
-                    <code>{{ uri }}</code>
-                    <small v-if="index === 0">По умолчанию при установке через Dev Portal</small>
-                  </div>
-                  <div v-if="pendingRedirectURIToRemove === uri" class="redirect-uri-actions">
-                    <span class="redirect-delete-label">Удалить адрес?</span>
-                    <Button variant="ghost" size="sm" :disabled="isSavingRedirectURIs" @click="pendingRedirectURIToRemove = null">Отмена</Button>
-                    <Button variant="danger" size="sm" :loading="isSavingRedirectURIs" @click="removeRedirectURI(uri)">Удалить</Button>
-                  </div>
-                  <Button v-else variant="ghost" size="sm" :disabled="isSavingRedirectURIs" @click="pendingRedirectURIToRemove = uri">
-                    <AppIcon name="trash-2" :size="18" /> Удалить
-                  </Button>
-                </li>
-              </ul>
-            </Card>
-</section>
-<section :id="'bot-panel-commands'" role="tabpanel" aria-labelledby="bot-tab-commands" v-show="activeTab === 'commands'" class="bot-tab-panel">
-<Card id="bot-commands" class="section-card">
-              <div class="section-header">
-                <h2 class="section-title"><AppIcon name="terminal" :size="24" /> Команды бота</h2>
-                <p class="section-desc">Пользователи вызывают команды через /имя_команды в чате. Для выполнения запросов настройте «Адрес обработчика команд» во вкладке «Подключение».</p>
-              </div>
-
-              <div class="commands-section">
-                <div class="command-form">
-                  <div class="form-grid">
-                    <div class="form-group">
-                      <label>Имя команды</label>
-                      <div class="command-name-input">
-                        <span>/</span>
-                        <input
-                          v-model.trim="commandForm.name"
-                          class="form-input ui-control"
-                          type="text"
-                          placeholder="help"
-                          maxlength="32"
-                        />
-                      </div>
-                    </div>
-                    <div class="form-group form-group-full">
-                      <label>Описание</label>
-                      <input
-                        v-model.trim="commandForm.description"
-                        class="form-input ui-control"
-                        type="text"
-                        placeholder="Показать список доступных команд"
-                        maxlength="100"
-                      />
-                    </div>
-
-                    <div class="form-group">
-                      <label class="checkbox-line">
-                        <input v-model="commandForm.is_enabled" type="checkbox" class="ui-checkbox" />
-                        <span>Команда включена</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="test-actions">
-                    <Button variant="primary" :loading="isSavingCommand" @click="handleSaveCommand">
-                      {{ editingCommandId ? 'Сохранить команду' : 'Создать команду' }}
-                    </Button>
-
-                    <Button v-if="editingCommandId" variant="secondary" @click="resetCommandForm">
-                      Отменить редактирование
-                    </Button>
-                  </div>
-                </div>
-
-                <div class="deliveries-block">
-                  <h4>Список команд</h4>
-
-                  <div v-if="isLoadingCommands" class="empty-urls">Загрузка команд...</div>
-
-                  <div v-else-if="commands.length === 0" class="empty-urls">
-                    Команды пока не созданы
-                  </div>
-
-                  <div v-else class="deliveries-list">
-                    <div v-for="command in commands" :key="command.id" class="delivery-item">
-                      <div class="delivery-top">
-                        <strong>/{{ command.name }}</strong>
-
-                        <div class="delivery-actions">
-                          <Badge :variant="command.is_enabled ? 'success' : 'default'" size="sm">
-                            {{ command.is_enabled ? 'Включена' : 'Выключена' }}
-                          </Badge>
-
-                          <Button variant="ghost" size="sm" @click="startEditCommand(command)">
-                            Редактировать
-                          </Button>
-
-                          <Button variant="ghost" size="sm" @click="handleToggleCommand(command)">
-                            {{ command.is_enabled ? 'Выключить' : 'Включить' }}
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            @click="handleDeleteCommand(command.id)"
-                          >
-                            Удалить
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div class="delivery-meta">
-                        <span>{{ command.description }}</span>
-                      </div>
-
-                      <div class="delivery-dates">
-                        <span>Изменена: {{ formatDate(command.updated_at) }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-</section>
-<section :id="'bot-panel-installations'" role="tabpanel" aria-labelledby="bot-tab-installations" v-show="activeTab === 'installations'" class="bot-tab-panel">
-  <Card id="bot-installations" class="section-card">
-    <div class="section-header installation-section-header">
-      <div>
-        <h2 class="section-title"><AppIcon name="server" :size="24" /> Установки на серверы</h2>
-        <p class="section-desc">Управляйте подключёнными серверами и отзывайте доступ при необходимости.</p>
-      </div>
-      <div class="installation-toolbar-actions">
-        <Button variant="secondary" size="sm" :loading="isRefreshingInstallations" @click="refreshInstallations">
-          Обновить
-        </Button>
-        <RouterLink v-if="bot?.is_public && bot.status === 'active'" :to="{ name: 'bot-public', params: { id: botId } }" class="installation-open-link">
-          <AppIcon name="plus" :size="18" /> Установить бота
-        </RouterLink>
-      </div>
-    </div>
-
-    <div v-if="installations.length" class="installation-filters" aria-label="Фильтр установок">
-      <button type="button" :class="{ 'is-selected': installationFilter === 'all' }" :aria-pressed="installationFilter === 'all'" @click="installationFilter = 'all'">
-        Все <span>{{ installations.length }}</span>
-      </button>
-      <button type="button" :class="{ 'is-selected': installationFilter === 'active' }" :aria-pressed="installationFilter === 'active'" @click="installationFilter = 'active'">
-        Активные <span>{{ activeInstallations }}</span>
-      </button>
-      <button type="button" :class="{ 'is-selected': installationFilter === 'inactive' }" :aria-pressed="installationFilter === 'inactive'" @click="installationFilter = 'inactive'">
-        Неактивные <span>{{ inactiveInstallationsCount }}</span>
-      </button>
-    </div>
-
-    <div class="installations-list">
-      <template v-if="visibleInstallations.length">
-        <InstallationCard
-          v-for="installation in visibleInstallations"
-          :key="installation.id"
-          :installation="installation"
-          :busy="isRevokingInstallation"
-          @configure="handleConfigureInstallation"
-          @revoke="requestRevokeInstallation"
-        />
-      </template>
-      <div v-else-if="installations.length" class="empty-installations">
-        <AppIcon name="search" class="empty-icon" :size="40" />
-        <p>В этой категории установок нет</p>
-        <Button variant="ghost" size="sm" @click="installationFilter = 'all'">Показать все</Button>
-      </div>
-      <div v-else class="empty-installations">
-        <AppIcon name="inbox" class="empty-icon" :size="44" />
-        <p>Бот ещё не установлен ни на один сервер</p>
-        <p class="empty-hint">После установки здесь появятся серверы и доступ к их настройкам.</p>
-        <RouterLink v-if="bot?.is_public && bot.status === 'active'" :to="{ name: 'bot-public', params: { id: botId } }" class="installation-open-link">
-          <AppIcon name="plus" :size="18" /> Перейти к установке
-        </RouterLink>
-      </div>
-    </div>
-    <p v-if="!bot?.is_public || bot?.status !== 'active'" class="installation-help">
-      Чтобы открыть публичную страницу установки, сначала активируйте бота и включите публичность в его настройках.
-    </p>
-  </Card>
-</section>
-<section :id="'bot-panel-connection'" role="tabpanel" aria-labelledby="bot-tab-connection" v-show="activeTab === 'connection'" class="bot-tab-panel">
-<Card id="bot-delivery" class="section-card">
-  <div class="section-header">
-    <h2 class="section-title"><AppIcon name="plug-zap" :size="24" /> Подключение бота</h2>
-    <p class="section-desc">Настройте способ доставки событий и адрес обработки команд для выбранной установки.</p>
-  </div>
-  <div v-if="!selectedWebhookInstallation" class="empty-urls">Выберите активную установку бота.</div>
-  <div v-else-if="isLoadingWebhook" class="empty-urls">Загрузка настроек…</div>
-  <div v-else-if="webhookLoadError" class="config-load-error" role="alert">
-    {{ webhookLoadError }} <Button variant="secondary" size="sm" @click="loadInstallationWebhook">Повторить</Button>
-  </div>
-  <div v-else class="connection-form">
-    <div class="settings-group">
-      <h3>Способ доставки</h3>
-      <p class="settings-help">Выберите один режим. Команды работают независимо от доставки событий.</p>
-      <div class="form-group">
-                      <label class="sr-only">Режим доставки событий</label>
-
-
-                      <div class="delivery-mode-list">
-                        <label class="delivery-mode-card">
-                          <input v-model="deliveryMode" type="radio" class="ui-checkbox" value="disabled" />
-                          <div>
-                            <strong>Выключено</strong>
-                            <p>EchoTalk не будет отправлять события этому боту.</p>
-                          </div>
-                        </label>
-
-                        <label class="delivery-mode-card">
-                          <input v-model="deliveryMode" type="radio" class="ui-checkbox" value="webhook" />
-                          <div>
-                            <strong>Webhook</strong>
-                            <p>
-                              EchoTalk отправляет события HTTP POST-запросами на указанный адрес.
-                            </p>
-                          </div>
-                        </label>
-
-                        <label class="delivery-mode-card">
-                          <input v-model="deliveryMode" type="radio" class="ui-checkbox" value="websocket" />
-                          <div>
-                            <strong>WebSocket Gateway</strong>
-                            <p>
-                              Бот поддерживает постоянное соединение WebSocket и получает события в
-                              реальном времени.
-                            </p>
-                          </div>
-                        </label>
-                      </div>
-                    </div>
-    </div>
-    <div class="settings-group">
-      <h3>Адреса интеграции</h3>
-      <p class="settings-help">Укажите публичные HTTPS-адреса сервиса вашего бота.</p>
-      <div v-if="isWebhookTransport" class="form-group">
-                      <label>Адрес Webhook</label>
-                      <input
-                        v-model.trim="webhookForm.webhook_url"
-                        class="form-input ui-control"
-                        type="text"
-                        placeholder="https://your-bot.example.com/webhook"
-                      />
-                    </div>
-      <div class="form-group">
-                      <label>Адрес обработчика команд</label>
-                      <input
-                        v-model.trim="webhookForm.command_base_url"
-                        class="form-input ui-control"
-                        type="text"
-                        placeholder="https://your-bot.example.com/commands"
-                      />
-                      <p class="field-help">Формат вызова команды: <code>POST {command_base_url}/{command_name}</code></p>
-                    </div>
-    </div>
-    <p class="settings-save-hint">При сохранении подключения также сохраняются текущие подписки выбранной установки.</p>
-    <div class="settings-actions">
-      <Button variant="primary" :loading="isSavingWebhook" @click="handleSaveWebhook">Сохранить подключение</Button>
-      <Button v-if="isWebhookTransport && webhookForm.enabled" variant="secondary" :loading="isRotatingWebhookSecret" @click="requestRotateWebhookSecret">Сменить секрет Webhook</Button>
-    </div>
-    <div
-                      v-if="isWebhookTransport && webhookForm.enabled && revealedWebhookSecret"
-                      class="fresh-secret-banner"
-                    >
-                      <div class="secret-warning">
-                        <strong class="inline-icon-label"><AppIcon name="alert-triangle" :size="20" /> Скопируйте секрет Webhook сейчас!</strong>
-                        <p>Он показывается только один раз.</p>
-                      </div>
-
-                      <CredentialCard
-                        title="Webhook Secret"
-                        :value="revealedWebhookSecret"
-                        :is-new="true"
-                        show-reveal
-                        hint="Используйте его для проверки X-EchoTalk-Signature"
-                      />
-
-                      <Button variant="secondary" @click="revealedWebhookSecret = null">
-                        Я сохранил секрет
-                      </Button>
-                    </div>
-    <div v-if="installationWebhook" class="field-hint">
-                      <div>
-                        Последняя ошибка:
-                        <strong>{{ installationWebhook.last_delivery_error || 'нет' }}</strong>
-                      </div>
-                      <div>
-                        Последняя доставка:
-                        <strong>{{ formatDate(installationWebhook.last_delivery_at) }}</strong>
-                      </div>
-                    </div>
-  </div>
-</Card>
-</section>
-<section :id="'bot-panel-subscriptions'" role="tabpanel" aria-labelledby="bot-tab-subscriptions" v-show="activeTab === 'subscriptions'" class="bot-tab-panel">
-<Card id="bot-subscriptions" class="section-card">
-  <div class="section-header">
-    <h2 class="section-title"><AppIcon name="list-checks" :size="24" /> Подписки на события</h2>
-    <p class="section-desc">Отметьте события, которые бот должен получать после установки на сервер. Доступность зависит от разрешений установки.</p>
-  </div>
-  <div v-if="!selectedWebhookInstallation" class="empty-urls">Выберите активную установку бота.</div>
-  <div v-else-if="isLoadingWebhook" class="empty-urls">Загрузка подписок…</div>
-  <div v-else-if="webhookLoadError" class="config-load-error" role="alert">
-    {{ webhookLoadError }} <Button variant="secondary" size="sm" @click="loadInstallationWebhook">Повторить</Button>
-  </div>
-  <div v-else class="subscription-form">
-    <p v-if="!installationScopesKnown" class="scope-warning">Сервер не передал права конкретной установки. События отображаются по разрешениям приложения; окончательная проверка выполняется при сохранении.</p>
-    <div
-                      class="form-group"
-                      :class="{ 'is-disabled-block': deliveryMode === 'disabled' }"
-                    >
-                      <label>Доступные события</label>
-
-                      <div class="event-subscription-panel">
-                        <div class="event-subscription-toolbar">
-                          <input
-                            v-model.trim="eventSearchQuery"
-                            class="form-input ui-control"
-                            type="text"
-                            placeholder="Поиск по названию или коду события"
-                          />
-
-                          <div class="event-subscription-counter" title="Показано из доступных событий">
-                            {{ filteredSelectableEvents.length }} / {{ selectableEvents.length }}
-                          </div>
-                        </div>
-
-                        <div class="webhook-events-list scrollable-events-list">
-                          <label
-                            v-for="event in filteredSelectableEvents"
-                            :key="event.type"
-                            class="checkbox-line event-subscription-item"
-                          >
-                            <input
-                              v-model="webhookForm.subscribed_events"
-                              type="checkbox"
-                              class="ui-checkbox"
-                              :value="event.type"
-                            />
-
-                            <span>
-                              <strong>{{ eventDisplayName(event.type) }}</strong>
-                              <small class="event-type">{{ event.type }}</small>
-                            </span>
-                          </label>
-
-                          <p v-if="selectableEvents.length === 0" class="field-help">
-                            Нет событий, доступных при текущих разрешениях бота.
-                          </p>
-
-                          <p
-                            v-else-if="filteredSelectableEvents.length === 0"
-                            class="field-help event-search-empty"
-                          >
-                            По запросу ничего не найдено.
-                          </p>
-                        </div>
-                      </div>
-
-                      <p v-if="deliveryMode === 'disabled'" class="field-help">
-                        Список событий сохранится, но события не будут доставляться, пока режим
-                        доставки выключен.
-                      </p>
-                    </div>
-    <div class="settings-actions">
-      <span class="selected-count">Выбрано: {{ webhookForm.subscribed_events.length }}</span>
-      <Button variant="primary" :loading="isSavingWebhook" @click="handleSaveWebhook">Сохранить подписки</Button>
-    </div>
-  </div>
-</Card>
-</section>
-<section :id="'bot-panel-journal'" role="tabpanel" aria-labelledby="bot-tab-journal" v-show="activeTab === 'journal'" class="bot-tab-panel">
-<Card v-if="selectedWebhookInstallationId" id="bot-replay" class="section-card replay-card">
-              <div class="section-header replay-header">
+              </li>
+              <li>
+                <span>2</span>
                 <div>
-                  <h2 class="section-title"><AppIcon name="scroll-text" :size="24" /> Журнал событий</h2>
-                  <p class="section-desc">
-                    История событий выбранной установки. Можно запросить события после указанного номера (seq).
+                  <strong>Проверьте разрешения</strong>
+                  <p>Выберите минимально необходимые доступы в настройках бота.</p>
+                </div>
+              </li>
+              <li :class="{ 'setup-done': activeInstallations > 0 }">
+                <span>{{ activeInstallations > 0 ? '✓' : '3' }}</span>
+                <div>
+                  <strong>Установите бота и настройте доставку событий</strong>
+                  <p>После установки на сервер появятся настройки Webhook и WebSocket Gateway.</p>
+                </div>
+              </li>
+            </ol>
+            <RouterLink :to="{ name: 'docs' }" class="setup-docs-link"
+              >Документация по подключению</RouterLink
+            >
+          </div>
+          <!-- Сводные показатели показываем перед подробной информацией. -->
+          <Card class="section-card stats-card">
+            <div class="quick-stats">
+              <div class="stat-item">
+                <span class="stat-value">{{ installations.length }}</span>
+                <span class="stat-label">Серверов</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ activeInstallations }}</span>
+                <span class="stat-label">Активных</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ activeCredentialsCount }}</span>
+                <span class="stat-label">Активных ключей</span>
+              </div>
+            </div>
+          </Card>
+
+          <div class="overview-information-grid">
+            <Card id="bot-scopes" class="section-card overview-info-card">
+              <div class="section-header">
+                <h2 class="section-title">
+                  <AppIcon name="shield-check" :size="24" /> Разрешения приложения
+                </h2>
+                <p class="section-desc">Определяют доступ бота к возможностям EchoTalk.</p>
+              </div>
+              <div class="tags-list">
+                <Badge v-for="scope in allowedScopes" :key="scope" variant="info" size="sm">
+                  <span :title="scope">{{ scopeDisplayName(scope) }}</span>
+                </Badge>
+                <span v-if="!allowedScopes.length" class="empty-tags">Разрешения не заданы</span>
+              </div>
+            </Card>
+
+            <Card class="section-card overview-info-card">
+              <div class="section-header">
+                <h2 class="section-title">
+                  <AppIcon name="list-checks" :size="24" /> События выбранной установки
+                </h2>
+                <p class="section-desc">
+                  {{
+                    selectedWebhookInstallation?.server_name ||
+                    'Выберите сервер для просмотра сохранённых подписок'
+                  }}
+                </p>
+              </div>
+              <div class="tags-list">
+                <Badge
+                  v-for="event in savedSubscribedEvents"
+                  :key="event"
+                  variant="default"
+                  size="sm"
+                >
+                  <span :title="event">{{ eventDisplayName(event) }}</span>
+                </Badge>
+                <span v-if="isLoadingWebhook" class="empty-tags">Загрузка подписок…</span>
+                <span v-else-if="!savedSubscribedEvents.length" class="empty-tags">
+                  {{
+                    selectedWebhookInstallation
+                      ? 'Для этого сервера подписки не настроены'
+                      : 'Выберите установку бота'
+                  }}
+                </span>
+              </div>
+              <button type="button" class="text-link" @click="selectTab('subscriptions')">
+                Настроить подписки
+              </button>
+            </Card>
+          </div>
+        </section>
+        <section
+          id="bot-panel-readme"
+          role="tabpanel"
+          aria-labelledby="bot-tab-readme"
+          v-show="activeTab === 'readme'"
+          class="bot-tab-panel"
+        >
+          <Card class="section-card">
+            <BotReadmeEditor
+              v-model="readmeDraft"
+              :saved-value="bot.readme_md ?? ''"
+              :is-saving="isSavingReadme"
+              @save="saveReadme"
+            />
+          </Card>
+        </section>
+        <section
+          :id="'bot-panel-auth'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-auth"
+          v-show="activeTab === 'auth'"
+          class="bot-tab-panel"
+        >
+          <Card id="bot-credentials" class="section-card">
+            <div class="section-header">
+              <h2 class="section-title">
+                <AppIcon name="key-round" :size="24" /> Данные для авторизации
+              </h2>
+              <p class="section-desc">
+                Client ID идентифицирует приложение, а Client Secret подтверждает его подлинность
+                при обмене OAuth-кода на токены.
+              </p>
+            </div>
+
+            <div class="oauth-howto" aria-label="Порядок подключения бота">
+              <div class="oauth-howto-step">
+                <span class="oauth-step-number">1</span>
+                <div>
+                  <strong>Создайте учётные данные</strong>
+                  <p>
+                    Скопируйте Client ID и Client Secret. Секрет показывается только при создании.
                   </p>
                 </div>
+              </div>
+              <div class="oauth-howto-step">
+                <span class="oauth-step-number">2</span>
+                <div>
+                  <strong>Установите бота на сервер</strong>
+                  <p>
+                    При установке выберите сервер и разрешения. После подтверждения приложение
+                    получает OAuth-код.
+                  </p>
+                </div>
+              </div>
+              <div class="oauth-howto-step">
+                <span class="oauth-step-number">3</span>
+                <div>
+                  <strong>Подключите серверную часть</strong>
+                  <p>
+                    Обменяйте код на токены через <code>POST /oauth/token</code>. Секрет и токены
+                    храните только на сервере бота.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="oauth-help-links">
+              <RouterLink :to="{ name: 'docs' }" class="text-link"
+                >Документация API и OAuth</RouterLink
+              >
+              <button type="button" class="text-link" @click="selectTab('installations')">
+                Перейти к установкам
+              </button>
+            </div>
 
-                <div class="replay-header-badges">
-                  <Badge variant="default" size="sm"
-                    >Установка #{{ selectedWebhookInstallationId }}</Badge
+            <!-- Пустое состояние -->
+            <div v-if="credentials.length === 0 && !freshlyCreatedSecret" class="empty-credentials">
+              <p>Учётные данные ещё не созданы</p>
+              <Button variant="primary" @click="openCreateCredentialDialog">
+                Создать Client Secret
+              </Button>
+            </div>
+
+            <!-- Только что созданные (показываем один раз) -->
+            <div v-else-if="freshlyCreatedSecret" class="fresh-secret-banner">
+              <div class="secret-warning">
+                <strong class="inline-icon-label"
+                  ><AppIcon name="alert-triangle" :size="20" /> Скопируйте эти данные
+                  сейчас!</strong
+                >
+                <p>Они больше никогда не будут показаны.</p>
+              </div>
+
+              <!-- Client ID -->
+              <CredentialCard
+                title="Client ID"
+                :value="freshlyCreatedSecret.client_id"
+                :sensitive="false"
+                hint="Публичный идентификатор приложения — его можно указывать в настройках интеграции"
+              />
+
+              <!-- Client Secret -->
+              <CredentialCard
+                title="Client Secret"
+                :value="freshlyCreatedSecret.client_secret"
+                :is-new="true"
+                :sensitive="true"
+                hint="Храните в переменных окружения или менеджере секретов серверного приложения, не в Vue-клиенте"
+              />
+
+              <Button variant="secondary" @click="dismissFreshSecret"> Я сохранил данные </Button>
+            </div>
+
+            <!-- Существующие credentials (после закрытия баннера) -->
+            <div v-else class="credentials-list">
+              <CredentialCard
+                v-if="activeCredential"
+                title="Client ID"
+                :value="activeCredential.client_id"
+                :sensitive="false"
+                hint="Публичный идентификатор приложения"
+              />
+
+              <div class="secret-placeholder">
+                <span>Client Secret не показывается повторно</span>
+                <Button variant="ghost" size="sm" @click="openCreateCredentialDialog">
+                  Создать новый
+                </Button>
+              </div>
+            </div>
+          </Card>
+          <Card id="bot-redirect-uris" class="section-card redirect-uri-section">
+            <div class="section-header redirect-section-heading">
+              <div>
+                <h2 class="section-title">
+                  <AppIcon name="link-2" :size="24" /> Адреса перенаправления OAuth
+                </h2>
+                <p class="section-desc">
+                  Добавьте разрешённые callback-адреса. Сейчас код авторизации возвращается через
+                  API, без автоматического перехода на callback. Адрес проверяется при
+                  OAuth-авторизации и обмене кода на токен.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                :disabled="isSavingRedirectURIs || redirectURIs.length >= 10"
+                @click="showAddRedirectModal = true"
+              >
+                <AppIcon name="plus" :size="19" /> Добавить адрес
+              </Button>
+            </div>
+            <p class="redirect-count">Зарегистрировано: {{ redirectURIs.length }} из 10</p>
+            <div v-if="!redirectURIs.length" class="redirect-empty" role="note">
+              <AppIcon name="alert-triangle" :size="21" />
+              <span
+                >Адреса не зарегистрированы. Получение OAuth-кода недоступно, пока не добавлен хотя
+                бы один Redirect URI.</span
+              >
+            </div>
+            <ul v-else class="redirect-uri-list">
+              <li v-for="(uri, index) in redirectURIs" :key="uri" class="redirect-uri-item">
+                <div class="redirect-uri-main">
+                  <code>{{ uri }}</code>
+                  <small v-if="index === 0">По умолчанию при установке через Dev Portal</small>
+                </div>
+                <div v-if="pendingRedirectURIToRemove === uri" class="redirect-uri-actions">
+                  <span class="redirect-delete-label">Удалить адрес?</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    :disabled="isSavingRedirectURIs"
+                    @click="pendingRedirectURIToRemove = null"
+                    >Отмена</Button
                   >
-                  <Badge v-if="replayEvents.length > 0" variant="info" size="sm">
-                    {{ replayEvents.length }} событий
-                  </Badge>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    :loading="isSavingRedirectURIs"
+                    @click="removeRedirectURI(uri)"
+                    >Удалить</Button
+                  >
+                </div>
+                <Button
+                  v-else
+                  variant="ghost"
+                  size="sm"
+                  :disabled="isSavingRedirectURIs"
+                  @click="pendingRedirectURIToRemove = uri"
+                >
+                  <AppIcon name="trash-2" :size="18" /> Удалить
+                </Button>
+              </li>
+            </ul>
+          </Card>
+        </section>
+        <section
+          :id="'bot-panel-commands'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-commands"
+          v-show="activeTab === 'commands'"
+          class="bot-tab-panel"
+        >
+          <Card id="bot-commands" class="section-card">
+            <div class="section-header">
+              <h2 class="section-title"><AppIcon name="terminal" :size="24" /> Команды бота</h2>
+              <p class="section-desc">
+                Пользователи вызывают команды через /имя_команды в чате. Для выполнения запросов
+                настройте «Адрес обработчика команд» во вкладке «Подключение».
+              </p>
+            </div>
+
+            <div class="commands-section">
+              <div class="command-form">
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>Имя команды</label>
+                    <div class="command-name-input">
+                      <span>/</span>
+                      <input
+                        v-model.trim="commandForm.name"
+                        class="form-input ui-control"
+                        type="text"
+                        placeholder="help"
+                        maxlength="32"
+                      />
+                    </div>
+                  </div>
+                  <div class="form-group form-group-full">
+                    <label>Описание</label>
+                    <input
+                      v-model.trim="commandForm.description"
+                      class="form-input ui-control"
+                      type="text"
+                      placeholder="Показать список доступных команд"
+                      maxlength="100"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label class="checkbox-line">
+                      <input v-model="commandForm.is_enabled" type="checkbox" class="ui-checkbox" />
+                      <span>Команда включена</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="test-actions">
+                  <Button variant="primary" :loading="isSavingCommand" @click="handleSaveCommand">
+                    {{ editingCommandId ? 'Сохранить команду' : 'Создать команду' }}
+                  </Button>
+
+                  <Button v-if="editingCommandId" variant="secondary" @click="resetCommandForm">
+                    Отменить редактирование
+                  </Button>
                 </div>
               </div>
 
-              <div class="replay-toolbar">
-                <div class="form-group replay-input">
-                  <label>После номера (after_seq)</label>
-                  <input v-model.number="replayAfterSeq" class="form-input ui-control" type="number" min="0" />
+              <div class="deliveries-block">
+                <h4>Список команд</h4>
+
+                <div v-if="isLoadingCommands" class="empty-urls">Загрузка команд...</div>
+
+                <div v-else-if="commands.length === 0" class="empty-urls">
+                  Команды пока не созданы
                 </div>
 
-                <div class="form-group replay-input">
-                  <label>Количество (limit)</label>
+                <div v-else class="deliveries-list">
+                  <div v-for="command in commands" :key="command.id" class="delivery-item">
+                    <div class="delivery-top">
+                      <strong>/{{ command.name }}</strong>
+
+                      <div class="delivery-actions">
+                        <Badge :variant="command.is_enabled ? 'success' : 'default'" size="sm">
+                          {{ command.is_enabled ? 'Включена' : 'Выключена' }}
+                        </Badge>
+
+                        <Button variant="ghost" size="sm" @click="startEditCommand(command)">
+                          Редактировать
+                        </Button>
+
+                        <Button variant="ghost" size="sm" @click="handleToggleCommand(command)">
+                          {{ command.is_enabled ? 'Выключить' : 'Включить' }}
+                        </Button>
+
+                        <Button variant="ghost" size="sm" @click="handleDeleteCommand(command.id)">
+                          Удалить
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div class="delivery-meta">
+                      <span>{{ command.description }}</span>
+                    </div>
+
+                    <div class="delivery-dates">
+                      <span>Изменена: {{ formatDate(command.updated_at) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </section>
+        <section
+          :id="'bot-panel-installations'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-installations"
+          v-show="activeTab === 'installations'"
+          class="bot-tab-panel"
+        >
+          <Card id="bot-installations" class="section-card">
+            <div class="section-header installation-section-header">
+              <div>
+                <h2 class="section-title">
+                  <AppIcon name="server" :size="24" /> Установки на серверы
+                </h2>
+                <p class="section-desc">
+                  Управляйте подключёнными серверами и отзывайте доступ при необходимости.
+                </p>
+              </div>
+              <div class="installation-toolbar-actions">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  :loading="isRefreshingInstallations"
+                  @click="refreshInstallations"
+                >
+                  Обновить
+                </Button>
+                <RouterLink
+                  v-if="bot?.is_public && bot.status === 'active'"
+                  :to="{ name: 'bot-public', params: { id: botId } }"
+                  class="installation-open-link"
+                >
+                  <AppIcon name="plus" :size="18" /> Установить бота
+                </RouterLink>
+              </div>
+            </div>
+
+            <div
+              v-if="installations.length"
+              class="installation-filters"
+              aria-label="Фильтр установок"
+            >
+              <button
+                type="button"
+                :class="{ 'is-selected': installationFilter === 'all' }"
+                :aria-pressed="installationFilter === 'all'"
+                @click="installationFilter = 'all'"
+              >
+                Все <span>{{ installations.length }}</span>
+              </button>
+              <button
+                type="button"
+                :class="{ 'is-selected': installationFilter === 'active' }"
+                :aria-pressed="installationFilter === 'active'"
+                @click="installationFilter = 'active'"
+              >
+                Активные <span>{{ activeInstallations }}</span>
+              </button>
+              <button
+                type="button"
+                :class="{ 'is-selected': installationFilter === 'inactive' }"
+                :aria-pressed="installationFilter === 'inactive'"
+                @click="installationFilter = 'inactive'"
+              >
+                Неактивные <span>{{ inactiveInstallationsCount }}</span>
+              </button>
+            </div>
+
+            <div class="installations-list">
+              <template v-if="visibleInstallations.length">
+                <InstallationCard
+                  v-for="installation in visibleInstallations"
+                  :key="installation.id"
+                  :installation="installation"
+                  :busy="isRevokingInstallation"
+                  @configure="handleConfigureInstallation"
+                  @revoke="requestRevokeInstallation"
+                />
+              </template>
+              <div v-else-if="installations.length" class="empty-installations">
+                <AppIcon name="search" class="empty-icon" :size="40" />
+                <p>В этой категории установок нет</p>
+                <Button variant="ghost" size="sm" @click="installationFilter = 'all'"
+                  >Показать все</Button
+                >
+              </div>
+              <div v-else class="empty-installations">
+                <AppIcon name="inbox" class="empty-icon" :size="44" />
+                <p>Бот ещё не установлен ни на один сервер</p>
+                <p class="empty-hint">
+                  После установки здесь появятся серверы и доступ к их настройкам.
+                </p>
+                <RouterLink
+                  v-if="bot?.is_public && bot.status === 'active'"
+                  :to="{ name: 'bot-public', params: { id: botId } }"
+                  class="installation-open-link"
+                >
+                  <AppIcon name="plus" :size="18" /> Перейти к установке
+                </RouterLink>
+              </div>
+            </div>
+            <p v-if="!bot?.is_public || bot?.status !== 'active'" class="installation-help">
+              Чтобы открыть публичную страницу установки, сначала активируйте бота и включите
+              публичность в его настройках.
+            </p>
+          </Card>
+        </section>
+        <section
+          :id="'bot-panel-connection'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-connection"
+          v-show="activeTab === 'connection'"
+          class="bot-tab-panel"
+        >
+          <Card id="bot-delivery" class="section-card">
+            <div class="section-header">
+              <h2 class="section-title"><AppIcon name="plug-zap" :size="24" /> Подключение бота</h2>
+              <p class="section-desc">
+                Настройте способ доставки событий и адрес обработки команд для выбранной установки.
+              </p>
+            </div>
+            <div v-if="!selectedWebhookInstallation" class="empty-urls">
+              Выберите активную установку бота.
+            </div>
+            <div v-else-if="isLoadingWebhook" class="empty-urls">Загрузка настроек…</div>
+            <div v-else-if="webhookLoadError" class="config-load-error" role="alert">
+              {{ webhookLoadError }}
+              <Button variant="secondary" size="sm" @click="loadInstallationWebhook"
+                >Повторить</Button
+              >
+            </div>
+            <div v-else class="connection-form">
+              <div class="settings-group">
+                <h3>Способ доставки</h3>
+                <p class="settings-help">
+                  Выберите один режим. Команды работают независимо от доставки событий.
+                </p>
+                <div class="form-group">
+                  <label class="sr-only">Режим доставки событий</label>
+
+                  <div class="delivery-mode-list">
+                    <label class="delivery-mode-card">
+                      <input
+                        v-model="deliveryMode"
+                        type="radio"
+                        class="ui-checkbox"
+                        value="disabled"
+                      />
+                      <div>
+                        <strong>Выключено</strong>
+                        <p>EchoTalk не будет отправлять события этому боту.</p>
+                      </div>
+                    </label>
+
+                    <label class="delivery-mode-card">
+                      <input
+                        v-model="deliveryMode"
+                        type="radio"
+                        class="ui-checkbox"
+                        value="webhook"
+                      />
+                      <div>
+                        <strong>Webhook</strong>
+                        <p>EchoTalk отправляет события HTTP POST-запросами на указанный адрес.</p>
+                      </div>
+                    </label>
+
+                    <label class="delivery-mode-card">
+                      <input
+                        v-model="deliveryMode"
+                        type="radio"
+                        class="ui-checkbox"
+                        value="websocket"
+                      />
+                      <div>
+                        <strong>WebSocket Gateway</strong>
+                        <p>
+                          Бот поддерживает постоянное соединение WebSocket и получает события в
+                          реальном времени.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="settings-group">
+                <h3>Адреса интеграции</h3>
+                <p class="settings-help">Укажите публичные HTTPS-адреса сервиса вашего бота.</p>
+                <div v-if="isWebhookTransport" class="form-group">
+                  <label>Адрес Webhook</label>
                   <input
-                    v-model.number="replayLimit"
+                    v-model.trim="webhookForm.webhook_url"
                     class="form-input ui-control"
-                    type="number"
-                    min="1"
-                    max="200"
+                    type="text"
+                    placeholder="https://your-bot.example.com/webhook"
                   />
                 </div>
-
-                <div class="replay-actions">
-                  <Button
-                    variant="primary"
-                    :loading="isLoadingReplayEvents"
-                    @click="loadReplayEvents"
-                  >
-                    Запросить события
-                  </Button>
-
-                  <Button
-                    v-if="hasMoreReplayEvents"
-                    variant="secondary"
-                    :loading="isLoadingReplayEvents"
-                    @click="loadNextReplayEvents"
-                  >
-                    Следующая пачка
-                  </Button>
+                <div class="form-group">
+                  <label>Адрес обработчика команд</label>
+                  <input
+                    v-model.trim="webhookForm.command_base_url"
+                    class="form-input ui-control"
+                    type="text"
+                    placeholder="https://your-bot.example.com/commands"
+                  />
+                  <p class="field-help">
+                    Формат вызова команды: <code>POST {command_base_url}/{command_name}</code>
+                  </p>
                 </div>
               </div>
-
-              <div v-if="replayEvents.length > 0" class="replay-meta-line">
-                <span
-                  >Загружено: <strong>{{ replayEvents.length }}</strong></span
-                >
-                <span
-                  >Следующий after_seq: <strong>{{ nextReplayAfterSeq }}</strong></span
-                >
-              </div>
-
-              <div v-if="isLoadingReplayEvents" class="empty-urls replay-empty">
-                Загрузка событий...
-              </div>
-
-              <div v-else-if="replayEvents.length === 0" class="empty-urls replay-empty">
-                События не найдены
-              </div>
-
-              <div v-else class="replay-events-list">
-                <article
-                  v-for="event in replayEvents"
-                  :key="event.event_id"
-                  class="replay-event-card"
-                >
-                  <div class="replay-event-main">
-                    <div class="replay-event-icon"><AppIcon :name="botEventIcon(event.type)" :size="24" /></div>
-
-                    <div class="replay-event-content">
-                      <div class="replay-event-title-row">
-                        <div>
-                          <h3>{{ eventDisplayName(event.type) }}</h3>
-                          <code class="replay-event-code">{{ event.type }}</code>
-                          <p>#{{ event.seq }} · {{ formatDate(event.occurred_at) }}</p>
-                        </div>
-
-                        <Badge variant="default" size="sm">v{{ event.version }}</Badge>
-                      </div>
-
-                      <div class="replay-event-meta-grid">
-                        <div>
-                          <span>Сервер</span>
-                          <strong>{{ event.payload?.payload?.server_id ?? '—' }}</strong>
-                        </div>
-
-                        <div>
-                          <span>Комната</span>
-                          <strong>{{ event.payload?.payload?.room_id ?? '—' }}</strong>
-                        </div>
-
-                        <div>
-                          <span>Инициатор</span>
-                          <strong>{{ event.payload?.payload?.actor_user_id ?? '—' }}</strong>
-                        </div>
-
-                        <div>
-                          <span>Тип инициатора</span>
-                          <strong>{{ event.payload?.payload?.actor_type ?? '—' }}</strong>
-                        </div>
-                      </div>
-
-                      <div v-if="event.payload?.payload?.data" class="replay-event-data">
-                        <div class="replay-data-title">Данные события</div>
-                        <pre>{{ JSON.stringify(event.payload.payload.data, null, 2) }}</pre>
-                      </div>
-
-                      <details class="replay-raw">
-                        <summary>Исходные данные JSON</summary>
-                        <pre>{{ JSON.stringify(event.payload, null, 2) }}</pre>
-                      </details>
-                    </div>
-                  </div>
-                </article>
-              </div>
-            </Card>
-<Card class="section-card">
-  <div class="section-header">
-    <h2 class="section-title"><AppIcon name="link-2" :size="24" /> Доставки Webhook</h2>
-    <p class="section-desc">Последние HTTP-отправки и повторные попытки доставки.</p>
-  </div>
-  <div v-if="!selectedWebhookInstallation" class="empty-urls">Выберите активную установку бота.</div>
-  <template v-else>
-    <p v-if="installationWebhook && (!installationWebhook.enabled || installationWebhook.event_delivery !== 'webhook')" class="delivery-history-note">Webhook сейчас не используется. История предыдущих HTTP-доставок остаётся доступной.</p>
-    <div class="journal-controls"><span>Последние 20 доставок</span><Button variant="secondary" size="sm" :loading="isLoadingDeliveries" @click="loadInstallationDeliveries"><AppIcon name="activity" :size="18" /> Обновить</Button></div>
-    <div class="deliveries-block">
-                      <h4>Последние доставки</h4>
-
-                      <div v-if="isLoadingDeliveries" class="empty-urls">Загрузка доставок...</div>
-
-                      <div v-else-if="deliveriesLoadError" class="config-load-error" role="alert">{{ deliveriesLoadError }} <Button variant="secondary" size="sm" @click="loadInstallationDeliveries">Повторить</Button></div>
-
-                      <div v-else-if="installationDeliveries.length === 0" class="empty-urls">
-                        Пока нет доставок
-                      </div>
-
-                      <div v-else class="deliveries-list">
-                        <div
-                          v-for="delivery in installationDeliveries"
-                          :key="delivery.id"
-                          class="delivery-item"
-                        >
-                          <div class="delivery-top">
-                            <div class="delivery-event-title">
-                              <strong>{{ eventDisplayName(delivery.event_type) }}</strong>
-                              <code>{{ delivery.event_type }}</code>
-                            </div>
-                            <div class="delivery-actions">
-                              <Badge
-                                :variant="
-                                  delivery.status === 'success'
-                                    ? 'success'
-                                    : delivery.status === 'failed'
-                                      ? 'danger'
-                                      : 'warning'
-                                "
-                                size="sm"
-                              >
-                                {{ deliveryStatusLabel(delivery.status) }}
-                              </Badge>
-
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                @click="toggleDeliveryAttempts(delivery.id)"
-                              >
-                                {{
-                                  expandedDeliveryId === delivery.id
-                                    ? 'Скрыть попытки'
-                                    : 'Попытки доставки'
-                                }}
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div class="delivery-meta">
-                            <span
-                              >Попытки: {{ delivery.attempt_count }}/{{
-                                delivery.max_attempts
-                              }}</span
-                            >
-                            <span>HTTP: {{ delivery.last_response_code ?? '—' }}</span>
-                          </div>
-
-                          <div v-if="delivery.last_error" class="delivery-error">
-                            {{ delivery.last_error }}
-                          </div>
-
-                          <div class="delivery-dates">
-                            <span>Создана: {{ formatDate(delivery.created_at) }}</span>
-                            <span v-if="showDeliveryRetryTime(delivery.status)">Следующая попытка: {{ formatDate(delivery.next_attempt_at) }}</span>
-                          </div>
-
-                          <div v-if="expandedDeliveryId === delivery.id" class="attempts-block">
-                            <div v-if="loadingAttemptId === delivery.id" class="empty-urls">Загрузка попыток…</div>
-                            <div v-else-if="attemptLoadErrors[delivery.id]" class="config-load-error" role="alert">
-                              {{ attemptLoadErrors[delivery.id] }}
-                              <Button variant="secondary" size="sm" @click="retryDeliveryAttempts(delivery.id)">Повторить</Button>
-                            </div>
-                            <div
-                              v-else-if="
-                                !deliveryAttempts[delivery.id] ||
-                                (deliveryAttempts[delivery.id]?.length ?? 0) === 0
-                              "
-                              class="empty-urls"
-                            >
-                              Попыток доставки нет
-                            </div>
-
-                            <div v-else class="attempts-list">
-                              <div
-                                v-for="attempt in deliveryAttempts[delivery.id]"
-                                :key="attempt.id"
-                                class="attempt-item"
-                              >
-                                <div class="attempt-top">
-                                  <strong>Попытка #{{ attempt.attempt_no }}</strong>
-                                  <span>HTTP: {{ attempt.response_status ?? '—' }}</span>
-                                </div>
-
-                                <div class="attempt-meta">
-                                  <span>Длительность: {{ attempt.duration_ms }} мс</span>
-                                  <span>Создана: {{ formatDate(attempt.created_at) }}</span>
-                                </div>
-
-                                <div v-if="attempt.error_text" class="delivery-error">
-                                  {{ attempt.error_text }}
-                                </div>
-
-                                <div v-if="attempt.response_body_excerpt" class="attempt-body">
-                                  {{ attempt.response_body_excerpt }}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-  </template>
-</Card>
-</section>
-<section :id="'bot-panel-diagnostics'" role="tabpanel" aria-labelledby="bot-tab-diagnostics" v-show="activeTab === 'diagnostics'" class="bot-tab-panel">
-<div v-if="!selectedWebhookInstallation" class="empty-urls">Выберите активную установку бота.</div>
-<div v-else id="bot-protection" class="bot-diagnostics">
-              <h2 class="section-title"><AppIcon name="shield-check" :size="24" /> Защита и диагностика установки</h2>
-              <p class="section-desc">
-                Показатели обновляются по запросу. Состояние WebSocket доступно при выбранном режиме Gateway.
+              <p class="settings-save-hint">
+                При сохранении подключения также сохраняются текущие подписки выбранной установки.
               </p>
-              <GatewayStatusCard
-                v-if="deliveryMode === 'websocket'"
-                :installation-id="Number(selectedWebhookInstallationId)"
-              />
-              <RuntimeProtectionCard
-                :installation-id="Number(selectedWebhookInstallationId)"
-              />
-            </div>
-</section>
-<section :id="'bot-panel-danger'" role="tabpanel" aria-labelledby="bot-tab-danger" v-show="activeTab === 'danger'" class="bot-tab-panel">
-<Card id="bot-danger" class="section-card danger-card">
-              <div class="section-header">
-                <h2 class="section-title"><AppIcon name="trash-2" :size="24" /> Опасная зона</h2>
+              <div class="settings-actions">
+                <Button variant="primary" :loading="isSavingWebhook" @click="handleSaveWebhook"
+                  >Сохранить подключение</Button
+                >
+                <Button
+                  v-if="isWebhookTransport && webhookForm.enabled"
+                  variant="secondary"
+                  :loading="isRotatingWebhookSecret"
+                  @click="requestRotateWebhookSecret"
+                  >Сменить секрет Webhook</Button
+                >
               </div>
-              <div class="danger-actions">
-                <div class="danger-item">
-                  <div>
-                    <h4>Удалить бота</h4>
-                    <p>Это действие нельзя отменить. Все данные будут удалены.</p>
-                  </div>
-                  <Button variant="danger" @click="handleDeleteBot"> Удалить </Button>
+              <div
+                v-if="isWebhookTransport && webhookForm.enabled && revealedWebhookSecret"
+                class="fresh-secret-banner"
+              >
+                <div class="secret-warning">
+                  <strong class="inline-icon-label"
+                    ><AppIcon name="alert-triangle" :size="20" /> Скопируйте секрет Webhook
+                    сейчас!</strong
+                  >
+                  <p>Он показывается только один раз.</p>
+                </div>
+
+                <CredentialCard
+                  title="Webhook Secret"
+                  :value="revealedWebhookSecret"
+                  :is-new="true"
+                  show-reveal
+                  hint="Используйте его для проверки X-EchoTalk-Signature"
+                />
+
+                <Button variant="secondary" @click="revealedWebhookSecret = null">
+                  Я сохранил секрет
+                </Button>
+              </div>
+              <div v-if="installationWebhook" class="field-hint">
+                <div>
+                  Последняя ошибка:
+                  <strong>{{ installationWebhook.last_delivery_error || 'нет' }}</strong>
+                </div>
+                <div>
+                  Последняя доставка:
+                  <strong>{{ formatDate(installationWebhook.last_delivery_at) }}</strong>
                 </div>
               </div>
-            </Card>
-</section>
-</div>
+            </div>
+          </Card>
+        </section>
+        <section
+          :id="'bot-panel-subscriptions'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-subscriptions"
+          v-show="activeTab === 'subscriptions'"
+          class="bot-tab-panel"
+        >
+          <Card id="bot-subscriptions" class="section-card">
+            <div class="section-header">
+              <h2 class="section-title">
+                <AppIcon name="list-checks" :size="24" /> Подписки на события
+              </h2>
+              <p class="section-desc">
+                Отметьте события, которые бот должен получать после установки на сервер. Доступность
+                зависит от разрешений установки.
+              </p>
+            </div>
+            <div v-if="!selectedWebhookInstallation" class="empty-urls">
+              Выберите активную установку бота.
+            </div>
+            <div v-else-if="isLoadingWebhook" class="empty-urls">Загрузка подписок…</div>
+            <div v-else-if="webhookLoadError" class="config-load-error" role="alert">
+              {{ webhookLoadError }}
+              <Button variant="secondary" size="sm" @click="loadInstallationWebhook"
+                >Повторить</Button
+              >
+            </div>
+            <div v-else class="subscription-form">
+              <p v-if="!installationScopesKnown" class="scope-warning">
+                Сервер не передал права конкретной установки. События отображаются по разрешениям
+                приложения; окончательная проверка выполняется при сохранении.
+              </p>
+              <div class="form-group" :class="{ 'is-disabled-block': deliveryMode === 'disabled' }">
+                <label>Доступные события</label>
+
+                <div class="event-subscription-panel">
+                  <div class="event-subscription-toolbar">
+                    <input
+                      v-model.trim="eventSearchQuery"
+                      class="form-input ui-control"
+                      type="text"
+                      placeholder="Поиск по названию или коду события"
+                    />
+
+                    <div class="event-subscription-counter" title="Показано из доступных событий">
+                      {{ filteredSelectableEvents.length }} / {{ selectableEvents.length }}
+                    </div>
+                  </div>
+
+                  <div class="webhook-events-list scrollable-events-list">
+                    <label
+                      v-for="event in filteredSelectableEvents"
+                      :key="event.type"
+                      class="checkbox-line event-subscription-item"
+                    >
+                      <input
+                        v-model="webhookForm.subscribed_events"
+                        type="checkbox"
+                        class="ui-checkbox"
+                        :value="event.type"
+                      />
+
+                      <span>
+                        <strong>{{ eventDisplayName(event.type) }}</strong>
+                        <small class="event-type">{{ event.type }}</small>
+                      </span>
+                    </label>
+
+                    <p v-if="selectableEvents.length === 0" class="field-help">
+                      Нет событий, доступных при текущих разрешениях бота.
+                    </p>
+
+                    <p
+                      v-else-if="filteredSelectableEvents.length === 0"
+                      class="field-help event-search-empty"
+                    >
+                      По запросу ничего не найдено.
+                    </p>
+                  </div>
+                </div>
+
+                <p v-if="deliveryMode === 'disabled'" class="field-help">
+                  Список событий сохранится, но события не будут доставляться, пока режим доставки
+                  выключен.
+                </p>
+              </div>
+              <div class="settings-actions">
+                <span class="selected-count"
+                  >Выбрано: {{ webhookForm.subscribed_events.length }}</span
+                >
+                <Button variant="primary" :loading="isSavingWebhook" @click="handleSaveWebhook"
+                  >Сохранить подписки</Button
+                >
+              </div>
+            </div>
+          </Card>
+        </section>
+        <section
+          :id="'bot-panel-journal'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-journal"
+          v-show="activeTab === 'journal'"
+          class="bot-tab-panel"
+        >
+          <Card
+            v-if="selectedWebhookInstallationId"
+            id="bot-replay"
+            class="section-card replay-card"
+          >
+            <div class="section-header replay-header">
+              <div>
+                <h2 class="section-title">
+                  <AppIcon name="scroll-text" :size="24" /> Журнал событий
+                </h2>
+                <p class="section-desc">
+                  История событий выбранной установки. Можно запросить события после указанного
+                  номера (seq).
+                </p>
+              </div>
+
+              <div class="replay-header-badges">
+                <Badge variant="default" size="sm"
+                  >Установка #{{ selectedWebhookInstallationId }}</Badge
+                >
+                <Badge v-if="replayEvents.length > 0" variant="info" size="sm">
+                  {{ replayEvents.length }} событий
+                </Badge>
+              </div>
+            </div>
+
+            <div class="replay-toolbar">
+              <div class="form-group replay-input">
+                <label>После номера (after_seq)</label>
+                <input
+                  v-model.number="replayAfterSeq"
+                  class="form-input ui-control"
+                  type="number"
+                  min="0"
+                />
+              </div>
+
+              <div class="form-group replay-input">
+                <label>Количество (limit)</label>
+                <input
+                  v-model.number="replayLimit"
+                  class="form-input ui-control"
+                  type="number"
+                  min="1"
+                  max="200"
+                />
+              </div>
+
+              <div class="replay-actions">
+                <Button
+                  variant="primary"
+                  :loading="isLoadingReplayEvents"
+                  @click="loadReplayEvents"
+                >
+                  Запросить события
+                </Button>
+
+                <Button
+                  v-if="hasMoreReplayEvents"
+                  variant="secondary"
+                  :loading="isLoadingReplayEvents"
+                  @click="loadNextReplayEvents"
+                >
+                  Следующая пачка
+                </Button>
+              </div>
+            </div>
+
+            <div v-if="replayEvents.length > 0" class="replay-meta-line">
+              <span
+                >Загружено: <strong>{{ replayEvents.length }}</strong></span
+              >
+              <span
+                >Следующий after_seq: <strong>{{ nextReplayAfterSeq }}</strong></span
+              >
+            </div>
+
+            <div v-if="isLoadingReplayEvents" class="empty-urls replay-empty">
+              Загрузка событий...
+            </div>
+
+            <div v-else-if="replayEvents.length === 0" class="empty-urls replay-empty">
+              События не найдены
+            </div>
+
+            <div v-else class="replay-events-list">
+              <article
+                v-for="event in replayEvents"
+                :key="event.event_id"
+                class="replay-event-card"
+              >
+                <div class="replay-event-main">
+                  <div class="replay-event-icon">
+                    <AppIcon :name="botEventIcon(event.type)" :size="24" />
+                  </div>
+
+                  <div class="replay-event-content">
+                    <div class="replay-event-title-row">
+                      <div>
+                        <h3>{{ eventDisplayName(event.type) }}</h3>
+                        <code class="replay-event-code">{{ event.type }}</code>
+                        <p>#{{ event.seq }} · {{ formatDate(event.occurred_at) }}</p>
+                      </div>
+
+                      <Badge variant="default" size="sm">v{{ event.version }}</Badge>
+                    </div>
+
+                    <div class="replay-event-meta-grid">
+                      <div>
+                        <span>Сервер</span>
+                        <strong>{{ event.payload?.payload?.server_id ?? '—' }}</strong>
+                      </div>
+
+                      <div>
+                        <span>Комната</span>
+                        <strong>{{ event.payload?.payload?.room_id ?? '—' }}</strong>
+                      </div>
+
+                      <div>
+                        <span>Инициатор</span>
+                        <strong>{{ event.payload?.payload?.actor_user_id ?? '—' }}</strong>
+                      </div>
+
+                      <div>
+                        <span>Тип инициатора</span>
+                        <strong>{{ event.payload?.payload?.actor_type ?? '—' }}</strong>
+                      </div>
+                    </div>
+
+                    <div v-if="event.payload?.payload?.data" class="replay-event-data">
+                      <div class="replay-data-title">Данные события</div>
+                      <pre>{{ JSON.stringify(event.payload.payload.data, null, 2) }}</pre>
+                    </div>
+
+                    <details class="replay-raw">
+                      <summary>Исходные данные JSON</summary>
+                      <pre>{{ JSON.stringify(event.payload, null, 2) }}</pre>
+                    </details>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </Card>
+          <Card class="section-card">
+            <div class="section-header">
+              <h2 class="section-title"><AppIcon name="link-2" :size="24" /> Доставки Webhook</h2>
+              <p class="section-desc">Последние HTTP-отправки и повторные попытки доставки.</p>
+            </div>
+            <div v-if="!selectedWebhookInstallation" class="empty-urls">
+              Выберите активную установку бота.
+            </div>
+            <template v-else>
+              <p
+                v-if="
+                  installationWebhook &&
+                  (!installationWebhook.enabled || installationWebhook.event_delivery !== 'webhook')
+                "
+                class="delivery-history-note"
+              >
+                Webhook сейчас не используется. История предыдущих HTTP-доставок остаётся доступной.
+              </p>
+              <div class="journal-controls">
+                <span>Последние 20 доставок</span
+                ><Button
+                  variant="secondary"
+                  size="sm"
+                  :loading="isLoadingDeliveries"
+                  @click="loadInstallationDeliveries"
+                  ><AppIcon name="activity" :size="18" /> Обновить</Button
+                >
+              </div>
+              <div class="deliveries-block">
+                <h4>Последние доставки</h4>
+
+                <div v-if="isLoadingDeliveries" class="empty-urls">Загрузка доставок...</div>
+
+                <div v-else-if="deliveriesLoadError" class="config-load-error" role="alert">
+                  {{ deliveriesLoadError }}
+                  <Button variant="secondary" size="sm" @click="loadInstallationDeliveries"
+                    >Повторить</Button
+                  >
+                </div>
+
+                <div v-else-if="installationDeliveries.length === 0" class="empty-urls">
+                  Пока нет доставок
+                </div>
+
+                <div v-else class="deliveries-list">
+                  <div
+                    v-for="delivery in installationDeliveries"
+                    :key="delivery.id"
+                    class="delivery-item"
+                  >
+                    <div class="delivery-top">
+                      <div class="delivery-event-title">
+                        <strong>{{ eventDisplayName(delivery.event_type) }}</strong>
+                        <code>{{ delivery.event_type }}</code>
+                      </div>
+                      <div class="delivery-actions">
+                        <Badge
+                          :variant="
+                            delivery.status === 'success'
+                              ? 'success'
+                              : delivery.status === 'failed'
+                                ? 'danger'
+                                : 'warning'
+                          "
+                          size="sm"
+                        >
+                          {{ deliveryStatusLabel(delivery.status) }}
+                        </Badge>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          @click="toggleDeliveryAttempts(delivery.id)"
+                        >
+                          {{
+                            expandedDeliveryId === delivery.id
+                              ? 'Скрыть попытки'
+                              : 'Попытки доставки'
+                          }}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div class="delivery-meta">
+                      <span>Попытки: {{ delivery.attempt_count }}/{{ delivery.max_attempts }}</span>
+                      <span>HTTP: {{ delivery.last_response_code ?? '—' }}</span>
+                    </div>
+
+                    <div v-if="delivery.last_error" class="delivery-error">
+                      {{ delivery.last_error }}
+                    </div>
+
+                    <div class="delivery-dates">
+                      <span>Создана: {{ formatDate(delivery.created_at) }}</span>
+                      <span v-if="showDeliveryRetryTime(delivery.status)"
+                        >Следующая попытка: {{ formatDate(delivery.next_attempt_at) }}</span
+                      >
+                    </div>
+
+                    <div v-if="expandedDeliveryId === delivery.id" class="attempts-block">
+                      <div v-if="loadingAttemptId === delivery.id" class="empty-urls">
+                        Загрузка попыток…
+                      </div>
+                      <div
+                        v-else-if="attemptLoadErrors[delivery.id]"
+                        class="config-load-error"
+                        role="alert"
+                      >
+                        {{ attemptLoadErrors[delivery.id] }}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          @click="retryDeliveryAttempts(delivery.id)"
+                          >Повторить</Button
+                        >
+                      </div>
+                      <div
+                        v-else-if="
+                          !deliveryAttempts[delivery.id] ||
+                          (deliveryAttempts[delivery.id]?.length ?? 0) === 0
+                        "
+                        class="empty-urls"
+                      >
+                        Попыток доставки нет
+                      </div>
+
+                      <div v-else class="attempts-list">
+                        <div
+                          v-for="attempt in deliveryAttempts[delivery.id]"
+                          :key="attempt.id"
+                          class="attempt-item"
+                        >
+                          <div class="attempt-top">
+                            <strong>Попытка #{{ attempt.attempt_no }}</strong>
+                            <span>HTTP: {{ attempt.response_status ?? '—' }}</span>
+                          </div>
+
+                          <div class="attempt-meta">
+                            <span>Длительность: {{ attempt.duration_ms }} мс</span>
+                            <span>Создана: {{ formatDate(attempt.created_at) }}</span>
+                          </div>
+
+                          <div v-if="attempt.error_text" class="delivery-error">
+                            {{ attempt.error_text }}
+                          </div>
+
+                          <div v-if="attempt.response_body_excerpt" class="attempt-body">
+                            {{ attempt.response_body_excerpt }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </Card>
+        </section>
+        <section
+          :id="'bot-panel-diagnostics'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-diagnostics"
+          v-show="activeTab === 'diagnostics'"
+          class="bot-tab-panel"
+        >
+          <div v-if="!selectedWebhookInstallation" class="empty-urls">
+            Выберите активную установку бота.
+          </div>
+          <div v-else id="bot-protection" class="bot-diagnostics">
+            <h2 class="section-title">
+              <AppIcon name="shield-check" :size="24" /> Защита и диагностика установки
+            </h2>
+            <p class="section-desc">
+              Состояние соединения и лимиты показаны для выбранного сервера. Нажмите «Обновить»,
+              чтобы получить актуальные данные.
+            </p>
+            <div class="diagnostics-panels">
+              <GatewayStatusCard
+                :installation-id="Number(selectedWebhookInstallationId)"
+                :transport-active="deliveryMode === 'websocket'"
+              />
+              <RuntimeProtectionCard :installation-id="Number(selectedWebhookInstallationId)" />
+            </div>
+          </div>
+        </section>
+        <section
+          :id="'bot-panel-danger'"
+          role="tabpanel"
+          aria-labelledby="bot-tab-danger"
+          v-show="activeTab === 'danger'"
+          class="bot-tab-panel"
+        >
+          <Card id="bot-danger" class="section-card danger-card">
+            <div class="section-header">
+              <h2 class="section-title"><AppIcon name="trash-2" :size="24" /> Опасная зона</h2>
+            </div>
+            <div class="danger-actions">
+              <div class="danger-item">
+                <div>
+                  <h4>Удалить бота</h4>
+                  <p>Это действие нельзя отменить. Все данные будут удалены.</p>
+                </div>
+                <Button variant="danger" @click="handleDeleteBot"> Удалить </Button>
+              </div>
+            </div>
+          </Card>
+        </section>
+      </div>
     </div>
 
     <!-- Modals -->
@@ -939,20 +1256,41 @@
     <!-- Confirmation is owned by the page so loading state follows the API request. -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="pendingRevokeInstallation" class="modal-overlay" @click.self="closeRevokeDialog" @keydown.esc="closeRevokeDialog">
-          <div class="modal-content confirm-modal" role="dialog" aria-modal="true" aria-labelledby="revoke-installation-title">
+        <div
+          v-if="pendingRevokeInstallation"
+          class="modal-overlay"
+          @click.self="closeRevokeDialog"
+          @keydown.esc="closeRevokeDialog"
+        >
+          <div
+            class="modal-content confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="revoke-installation-title"
+          >
             <div class="modal-header">
               <h2 id="revoke-installation-title">Отозвать доступ к серверу?</h2>
             </div>
             <div class="modal-body">
               <p>
-                Бот «{{ bot?.name }}» потеряет доступ к серверу
-                «{{ pendingRevokeInstallation.server_name || `Сервер ${pendingRevokeInstallation.server_id}` }}».
-                Для повторного подключения потребуется новая установка.
+                Бот «{{ bot?.name }}» потеряет доступ к серверу «{{
+                  pendingRevokeInstallation.server_name ||
+                  `Сервер ${pendingRevokeInstallation.server_id}`
+                }}». Для повторного подключения потребуется новая установка.
               </p>
               <div class="modal-actions">
-                <Button variant="ghost" :disabled="isRevokingInstallation" @click="closeRevokeDialog">Отмена</Button>
-                <Button variant="danger" :loading="isRevokingInstallation" @click="confirmRevokeInstallation">Отозвать доступ</Button>
+                <Button
+                  variant="ghost"
+                  :disabled="isRevokingInstallation"
+                  @click="closeRevokeDialog"
+                  >Отмена</Button
+                >
+                <Button
+                  variant="danger"
+                  :loading="isRevokingInstallation"
+                  @click="confirmRevokeInstallation"
+                  >Отозвать доступ</Button
+                >
               </div>
             </div>
           </div>
@@ -960,18 +1298,52 @@
       </Transition>
     </Teleport>
 
-    <Teleport to="body"><Transition name="modal">
-      <div v-if="showRotateWebhookSecretDialog" class="modal-overlay" @click.self="closeRotateWebhookSecretDialog" @keydown.esc="closeRotateWebhookSecretDialog">
-        <div class="modal-content confirm-modal" role="dialog" aria-modal="true" aria-labelledby="webhook-rotation-title">
-          <div class="modal-header"><h2 id="webhook-rotation-title">Заменить Webhook Secret?</h2></div>
-          <div class="modal-body">
-            <p>Старый секрет перестанет работать. Обновите проверку подписи X-EchoTalk-Signature в работающем боте. Новый секрет показывается один раз.</p>
-            <label class="credential-confirmation"><input v-model="rotationAcknowledged" type="checkbox" class="ui-checkbox" /><span>Понимаю, что после замены нужно обновить секрет в боте</span></label>
-            <div class="modal-actions"><Button variant="ghost" :disabled="isRotatingWebhookSecret" @click="closeRotateWebhookSecretDialog">Отмена</Button><Button variant="danger" :disabled="!rotationAcknowledged" :loading="isRotatingWebhookSecret" @click="handleRotateWebhookSecret">Заменить секрет</Button></div>
+    <Teleport to="body"
+      ><Transition name="modal">
+        <div
+          v-if="showRotateWebhookSecretDialog"
+          class="modal-overlay"
+          @click.self="closeRotateWebhookSecretDialog"
+          @keydown.esc="closeRotateWebhookSecretDialog"
+        >
+          <div
+            class="modal-content confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="webhook-rotation-title"
+          >
+            <div class="modal-header">
+              <h2 id="webhook-rotation-title">Заменить Webhook Secret?</h2>
+            </div>
+            <div class="modal-body">
+              <p>
+                Старый секрет перестанет работать. Обновите проверку подписи X-EchoTalk-Signature в
+                работающем боте. Новый секрет показывается один раз.
+              </p>
+              <label class="credential-confirmation"
+                ><input v-model="rotationAcknowledged" type="checkbox" class="ui-checkbox" /><span
+                  >Понимаю, что после замены нужно обновить секрет в боте</span
+                ></label
+              >
+              <div class="modal-actions">
+                <Button
+                  variant="ghost"
+                  :disabled="isRotatingWebhookSecret"
+                  @click="closeRotateWebhookSecretDialog"
+                  >Отмена</Button
+                ><Button
+                  variant="danger"
+                  :disabled="!rotationAcknowledged"
+                  :loading="isRotatingWebhookSecret"
+                  @click="handleRotateWebhookSecret"
+                  >Заменить секрет</Button
+                >
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </Transition></Teleport>
+      </Transition></Teleport
+    >
 
     <!-- Create Credential Confirmation -->
     <Teleport to="body">
@@ -982,24 +1354,41 @@
           @click.self="closeCreateCredentialDialog"
           @keydown.esc="closeCreateCredentialDialog"
         >
-          <div class="modal-content confirm-modal" role="dialog" aria-modal="true" aria-labelledby="credential-dialog-title">
+          <div
+            class="modal-content confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="credential-dialog-title"
+          >
             <div class="modal-header">
-              <h2 id="credential-dialog-title">{{ activeCredential ? 'Заменить Client Secret?' : 'Создать Client Secret?' }}</h2>
+              <h2 id="credential-dialog-title">
+                {{ activeCredential ? 'Заменить Client Secret?' : 'Создать Client Secret?' }}
+              </h2>
             </div>
             <div class="modal-body">
               <p v-if="activeCredential">
-                Новый секрет заменит действующий. Интеграции со старым секретом могут потерять доступ,
-                пока вы не обновите их конфигурацию.
+                Новый секрет заменит действующий. Интеграции со старым секретом могут потерять
+                доступ, пока вы не обновите их конфигурацию.
               </p>
               <p v-else>
-                Новый секрет будет показан только один раз после создания. Сохраните его в защищённом хранилище.
+                Новый секрет будет показан только один раз после создания. Сохраните его в
+                защищённом хранилище.
               </p>
               <label v-if="activeCredential" class="credential-confirmation">
-                <input v-model="credentialRotationAcknowledged" type="checkbox" class="ui-checkbox" />
+                <input
+                  v-model="credentialRotationAcknowledged"
+                  type="checkbox"
+                  class="ui-checkbox"
+                />
                 <span>Понимаю, что потребуется обновить секрет в работающих интеграциях</span>
               </label>
               <div class="modal-actions">
-                <Button variant="ghost" :disabled="isCreatingCredential" @click="closeCreateCredentialDialog">Отмена</Button>
+                <Button
+                  variant="ghost"
+                  :disabled="isCreatingCredential"
+                  @click="closeCreateCredentialDialog"
+                  >Отмена</Button
+                >
                 <Button
                   variant="primary"
                   :disabled="!!activeCredential && !credentialRotationAcknowledged"
@@ -1034,6 +1423,8 @@ import InstallationCard from '@/components/bots/InstallationCard.vue'
 import GatewayStatusCard from '@/components/bots/GatewayStatusCard.vue'
 import RuntimeProtectionCard from '@/components/bots/RuntimeProtectionCard.vue'
 import EditBotModal from '@/components/bots/EditBotModal.vue'
+import BotReadmeEditor from '@/components/bots/BotReadmeEditor.vue'
+import { MAX_BOT_README_BYTES, readmeByteLength } from '@/utils/botReadme'
 import { scopeTitle } from '@/utils/botScopeCatalog'
 import { botEventTitle } from '@/utils/botEventCatalog'
 import { filterSelectableEvents, showDeliveryRetryTime } from '@/utils/webhookDelivery'
@@ -1130,11 +1521,13 @@ const selectedWebhookInstallation = computed(() => {
 const installationScopesKnown = computed(() =>
   Array.isArray(selectedWebhookInstallation.value?.granted_scopes),
 )
-const selectableEvents = computed(() => filterSelectableEvents(
-  bot.value?.available_events ?? [],
-  selectedWebhookInstallation.value?.granted_scopes,
-  bot.value?.scopes ?? [],
-))
+const selectableEvents = computed(() =>
+  filterSelectableEvents(
+    bot.value?.available_events ?? [],
+    selectedWebhookInstallation.value?.granted_scopes,
+    bot.value?.scopes ?? [],
+  ),
+)
 
 const activeInstallationsList = computed(() => {
   return installations.value.filter((i) => i.status === 'active')
@@ -1149,9 +1542,9 @@ computed(() => {
 })
 const botId = computed(() => route.params.id as string)
 
-// Each tab is a separate visible workspace; v-show preserves unsaved form state.
 const detailTabs = [
   { id: 'overview', label: 'Обзор', icon: 'layout-dashboard' },
+  { id: 'readme', label: 'README', icon: 'book-open' },
   { id: 'auth', label: 'Авторизация', icon: 'key-round' },
   { id: 'commands', label: 'Команды', icon: 'terminal' },
   { id: 'installations', label: 'Установки', icon: 'server' },
@@ -1165,27 +1558,38 @@ const detailTabs = [
 type BotDetailTab = (typeof detailTabs)[number]['id']
 const activeTab = ref<BotDetailTab>('overview')
 const tabsWithInstallationContext: BotDetailTab[] = [
-  'overview', 'connection', 'subscriptions', 'journal', 'diagnostics',
+  'overview',
+  'connection',
+  'subscriptions',
+  'journal',
+  'diagnostics',
 ]
 const selectTab = (tab: BotDetailTab) => {
   activeTab.value = tab
-  // The selected tab is reflected in the URL for direct links and refresh.
   void router.replace({ query: { ...route.query, tab } })
 }
 const handleTabKeydown = (event: KeyboardEvent, current: BotDetailTab) => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
   const index = detailTabs.findIndex((tab) => tab.id === current)
-  const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? detailTabs.length - 1
-    : (index + (event.key === 'ArrowRight' ? 1 : detailTabs.length - 1)) % detailTabs.length
+  const nextIndex =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? detailTabs.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : detailTabs.length - 1)) % detailTabs.length
   const next = detailTabs[nextIndex]
   if (!next) return
   selectTab(next.id)
   document.getElementById(`bot-tab-${next.id}`)?.focus()
 }
-watch(() => route.query.tab, (tab) => {
-  activeTab.value = detailTabs.find((item) => item.id === tab)?.id ?? 'overview'
-}, { immediate: true })
+watch(
+  () => route.query.tab,
+  (tab) => {
+    activeTab.value = detailTabs.find((item) => item.id === tab)?.id ?? 'overview'
+  },
+  { immediate: true },
+)
 
 const scopeDisplayName = (name: string) => scopeTitle({ name, label: '' })
 
@@ -1196,12 +1600,18 @@ const eventDisplayName = (type: string): string => {
 
 const deliveryStatusLabel = (status: string): string => {
   switch (status) {
-    case 'success': return 'Доставлено'
-    case 'failed': return 'Ошибка'
-    case 'pending': return 'В очереди'
-    case 'processing': return 'Отправляется'
-    case 'retry': return 'Повторная попытка'
-    default: return status
+    case 'success':
+      return 'Доставлено'
+    case 'failed':
+      return 'Ошибка'
+    case 'pending':
+      return 'В очереди'
+    case 'processing':
+      return 'Отправляется'
+    case 'retry':
+      return 'Повторная попытка'
+    default:
+      return status
   }
 }
 
@@ -1233,20 +1643,57 @@ const statusLabel = computed(() => {
   }
 })
 
-// State
 const bot = ref<BotApp | null>(null)
+const readmeDraft = ref('')
+const isSavingReadme = ref(false)
+watch(
+  () => bot.value?.id,
+  () => {
+    readmeDraft.value = bot.value?.readme_md ?? ''
+  },
+)
+
+const saveReadme = async () => {
+  if (!bot.value || isSavingReadme.value || readmeDraft.value === (bot.value.readme_md ?? ''))
+    return
+  if (readmeByteLength(readmeDraft.value) > MAX_BOT_README_BYTES) {
+    toastStore.error('README превышает допустимый размер 64 КБ')
+    return
+  }
+  isSavingReadme.value = true
+  const value = readmeDraft.value
+  const requestedBotId = botId.value
+  try {
+    await botsStore.updateBot(requestedBotId, { readme_md: value })
+    if (bot.value && String(bot.value.id) === requestedBotId) {
+      bot.value = { ...bot.value, readme_md: value }
+      toastStore.success('README сохранён')
+    }
+  } catch (err: any) {
+    toastStore.error(err.message || 'Не удалось сохранить README')
+  } finally {
+    isSavingReadme.value = false
+  }
+}
 const installations = ref<BotInstallation[]>([])
 const installationFilter = ref<'all' | 'active' | 'inactive'>('all')
 const isRefreshingInstallations = ref(false)
 const isRevokingInstallation = ref(false)
 const pendingRevokeInstallation = ref<BotInstallation | null>(null)
-const inactiveInstallationsCount = computed(() => installations.value.filter(i => i.status !== 'active').length)
-const visibleInstallations = computed(() => installations.value
-  .filter(i => installationFilter.value === 'all' || (installationFilter.value === 'active' ? i.status === 'active' : i.status !== 'active'))
-  .sort((a, b) => {
-    const statusDifference = Number(b.status === 'active') - Number(a.status === 'active')
-    return statusDifference || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  }),
+const inactiveInstallationsCount = computed(
+  () => installations.value.filter((i) => i.status !== 'active').length,
+)
+const visibleInstallations = computed(() =>
+  installations.value
+    .filter(
+      (i) =>
+        installationFilter.value === 'all' ||
+        (installationFilter.value === 'active' ? i.status === 'active' : i.status !== 'active'),
+    )
+    .sort((a, b) => {
+      const statusDifference = Number(b.status === 'active') - Number(a.status === 'active')
+      return statusDifference || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }),
 )
 const credentials = ref<BotCredential[]>([])
 const isLoading = ref(true)
@@ -1260,7 +1707,6 @@ const freshlyCreatedSecret = ref<{
 } | null>(null)
 const isPublishing = ref(false)
 
-// Modals
 const showEditModal = ref(false)
 const showCreateCredential = ref(false)
 const credentialRotationAcknowledged = ref(false)
@@ -1273,7 +1719,6 @@ const saveRedirectURIs = async (uris: string[]): Promise<boolean> => {
   if (isSavingRedirectURIs.value) return false
   isSavingRedirectURIs.value = true
   try {
-    // Update uses PUT with an optional list; the remaining bot fields stay unchanged.
     const updated = await botsStore.updateBot(botId.value, { redirect_uris: uris })
     const details = await botsStore.fetchBotDetails(botId.value)
     if (!details) throw new Error('Не удалось загрузить обновлённые адреса')
@@ -1312,7 +1757,6 @@ const closeCreateCredentialDialog = () => {
   credentialRotationAcknowledged.value = false
 }
 
-// Computed
 const avatarStyle = computed(() => {
   if (bot.value?.avatar_url) {
     return { backgroundImage: `url(${bot.value.avatar_url})`, backgroundSize: 'cover' }
@@ -1337,7 +1781,6 @@ const activeCredential = computed(() => {
 })
 const activeCredentialsCount = computed(() => credentials.value.filter((c) => c.is_active).length)
 
-// Methods
 const deliveryMode = computed<DeliveryMode>({
   get() {
     if (!webhookForm.value.enabled) return 'disabled'
@@ -1352,7 +1795,6 @@ const deliveryMode = computed<DeliveryMode>({
     webhookForm.value.enabled = true
     webhookForm.value.event_delivery = value
 
-    // Do not clear the unsaved webhook URL or HTTP history on transport change.
     if (value === 'websocket') revealedWebhookSecret.value = null
   },
 })
@@ -1439,7 +1881,10 @@ const toggleDeliveryAttempts = async (deliveryId: string) => {
     deliveryAttempts.value = { ...deliveryAttempts.value, [deliveryId]: attempts }
   } catch (err: any) {
     if (installationId !== selectedWebhookInstallationId.value) return
-    attemptLoadErrors.value = { ...attemptLoadErrors.value, [deliveryId]: err.message || 'Не удалось загрузить попытки' }
+    attemptLoadErrors.value = {
+      ...attemptLoadErrors.value,
+      [deliveryId]: err.message || 'Не удалось загрузить попытки',
+    }
   } finally {
     if (loadingAttemptId.value === deliveryId) loadingAttemptId.value = null
   }
@@ -1474,18 +1919,31 @@ const handleSaveWebhook = async () => {
     toastStore.error('Сначала выберите установку')
     return
   }
-  if (isSavingWebhook.value || isLoadingWebhook.value || webhookLoadError.value || !installationWebhook.value) return
+  if (
+    isSavingWebhook.value ||
+    isLoadingWebhook.value ||
+    webhookLoadError.value ||
+    !installationWebhook.value
+  )
+    return
 
-  // Never discard subscribed events because backend omitted installation grants.
   if (installationScopesKnown.value) {
-    const allowedTypes = new Set(selectableEvents.value.map(event => event.type))
-    const unavailable = webhookForm.value.subscribed_events.filter(type => !allowedTypes.has(type))
+    const allowedTypes = new Set(selectableEvents.value.map((event) => event.type))
+    const unavailable = webhookForm.value.subscribed_events.filter(
+      (type) => !allowedTypes.has(type),
+    )
     if (unavailable.length) {
-      toastStore.error('Часть событий недоступна для установки. Проверьте разрешения перед сохранением.')
+      toastStore.error(
+        'Часть событий недоступна для установки. Проверьте разрешения перед сохранением.',
+      )
       return
     }
   }
-  if (webhookForm.value.enabled && webhookForm.value.event_delivery === 'webhook' && !webhookForm.value.webhook_url.trim()) {
+  if (
+    webhookForm.value.enabled &&
+    webhookForm.value.event_delivery === 'webhook' &&
+    !webhookForm.value.webhook_url.trim()
+  ) {
     toastStore.error('Для Webhook укажите адрес обработчика')
     return
   }
@@ -1493,8 +1951,10 @@ const handleSaveWebhook = async () => {
   isSavingWebhook.value = true
   try {
     const payload = {
-      webhook_url: webhookForm.value.enabled && webhookForm.value.event_delivery === 'webhook'
-        ? webhookForm.value.webhook_url.trim() : '',
+      webhook_url:
+        webhookForm.value.enabled && webhookForm.value.event_delivery === 'webhook'
+          ? webhookForm.value.webhook_url.trim()
+          : '',
       command_base_url: webhookForm.value.command_base_url.trim(),
       event_delivery: webhookForm.value.event_delivery,
       subscribed_events: [...webhookForm.value.subscribed_events],
@@ -1504,9 +1964,11 @@ const handleSaveWebhook = async () => {
     if (installationId !== selectedWebhookInstallationId.value) return
     await loadInstallationWebhook()
     await loadInstallationDeliveries()
-    toastStore.success(payload.enabled
-      ? `Настройки доставки сохранены (${payload.event_delivery === 'websocket' ? 'WebSocket Gateway' : 'Webhook'})`
-      : 'Доставка событий отключена')
+    toastStore.success(
+      payload.enabled
+        ? `Настройки доставки сохранены (${payload.event_delivery === 'websocket' ? 'WebSocket Gateway' : 'Webhook'})`
+        : 'Доставка событий отключена',
+    )
   } catch (err: any) {
     toastStore.error(err.message || 'Не удалось сохранить настройки доставки')
   } finally {
@@ -1527,7 +1989,13 @@ const closeRotateWebhookSecretDialog = () => {
 
 const handleRotateWebhookSecret = async () => {
   const installationId = selectedWebhookInstallationId.value
-  if (!installationId || !showRotateWebhookSecretDialog.value || !rotationAcknowledged.value || isRotatingWebhookSecret.value) return
+  if (
+    !installationId ||
+    !showRotateWebhookSecretDialog.value ||
+    !rotationAcknowledged.value ||
+    isRotatingWebhookSecret.value
+  )
+    return
   isRotatingWebhookSecret.value = true
   try {
     const secret = await botsStore.rotateInstallationWebhookSecret(installationId)
@@ -1549,7 +2017,6 @@ const loadBot = async () => {
   error.value = null
 
   try {
-    // Load bot details
     const botData = await botsStore.fetchBotDetails(botId.value)
     if (botData) {
       bot.value = botData
@@ -1558,20 +2025,25 @@ const loadBot = async () => {
       return
     }
 
-    // Load credentials
     const credsData = await botsStore.fetchBotCredentials(botId.value)
     credentials.value = credsData || []
 
-    // Load installations
     const instData = await botsStore.fetchBotInstallations(botId.value)
     installations.value = instData || []
 
     const commandsData = await botsStore.fetchBotCommands(botId.value)
     commands.value = commandsData || []
 
-    if (!(instData || []).some((i) => i.status === 'active' && String(i.id) === String(selectedWebhookInstallationId.value))) {
+    if (
+      !(instData || []).some(
+        (i) =>
+          i.status === 'active' && String(i.id) === String(selectedWebhookInstallationId.value),
+      )
+    ) {
       const firstActiveInstallation = (instData || []).find((i) => i.status === 'active')
-      selectedWebhookInstallationId.value = firstActiveInstallation ? String(firstActiveInstallation.id) : ''
+      selectedWebhookInstallationId.value = firstActiveInstallation
+        ? String(firstActiveInstallation.id)
+        : ''
       await handleSelectWebhookInstallation()
     }
   } catch (err: any) {
@@ -1602,21 +2074,17 @@ const handleCreateCredential = async () => {
 
   isCreatingCredential.value = true
   try {
-    // createCredential добавит в список новую запись (без секрета)
     const newCred = await botsStore.createCredential(botId.value, 'secret')
 
-    // Сохраняем секрет отдельно, чтобы показать один раз
     freshlyCreatedSecret.value = {
       client_id: newCred.client_id,
       client_secret: newCred.client_secret,
       createdAt: newCred.created_at,
     }
 
-    // Only close the dialog when the server confirmed creation.
     showCreateCredential.value = false
     credentialRotationAcknowledged.value = false
     await loadBot()
-    // The secret is revealed once: bring the user directly to the authorization tab.
     selectTab('auth')
 
     toastStore.success('Client Secret создан. Сохраните его сейчас!')
@@ -1633,7 +2101,7 @@ const refreshInstallations = async () => {
   try {
     installations.value = await botsStore.fetchBotInstallations(botId.value)
     const selectedStillActive = activeInstallationsList.value.some(
-      installation => String(installation.id) === String(selectedWebhookInstallationId.value),
+      (installation) => String(installation.id) === String(selectedWebhookInstallationId.value),
     )
     if (!selectedStillActive) {
       const fallback = activeInstallationsList.value[0]
@@ -1669,8 +2137,7 @@ const confirmRevokeInstallation = async () => {
   isRevokingInstallation.value = true
   try {
     await botsStore.revokeInstallation(installation)
-    // Keep the row visible as revoked, rather than falsely removing the history.
-    installations.value = installations.value.map(item =>
+    installations.value = installations.value.map((item) =>
       item.id === installation.id ? { ...item, status: 'revoked' } : item,
     )
     pendingRevokeInstallation.value = null
@@ -1738,7 +2205,6 @@ const loadReplayEvents = async () => {
       replayAfterSeq.value,
       replayLimit.value,
     )
-
 
     replayEvents.value = Array.isArray(result) ? result : []
   } catch (err: any) {
@@ -1928,7 +2394,10 @@ onMounted(() => {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 170ms ease, color 170ms ease, box-shadow 170ms ease;
+  transition:
+    background-color 170ms ease,
+    color 170ms ease,
+    box-shadow 170ms ease;
 }
 .bot-section-nav button:hover,
 .bot-section-nav button:focus-visible {
@@ -1941,30 +2410,74 @@ onMounted(() => {
   box-shadow: inset 0 -2px var(--accent-primary);
   font-weight: 600;
 }
-.bot-section-nav button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
-.bot-section-nav button[aria-selected="true"] svg { color: var(--accent-primary); }
-.section-title, .inline-icon-label { display: inline-flex; align-items: center; gap: 10px; }
-.section-title svg { color: var(--accent-primary); }
-.inline-icon-label svg { color: currentColor; }
-.bot-detail .back-btn { gap: 8px; }
-.bot-detail .back-btn:hover svg { transform: translateX(-2px); }
-.bot-detail .back-btn svg { transition: transform 160ms ease; }
-.bot-detail .section-card { transition: border-color 180ms ease, background-color 180ms ease; }
-.bot-detail .section-card:focus-within { border-color: var(--accent-primary); }
-.bot-detail .section-card:hover { border-color: color-mix(in srgb, var(--accent-primary) 32%, var(--border-color)); }
+.bot-section-nav button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+.bot-section-nav button[aria-selected='true'] svg {
+  color: var(--accent-primary);
+}
+.section-title,
+.inline-icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title svg {
+  color: var(--accent-primary);
+}
+.inline-icon-label svg {
+  color: currentColor;
+}
+.bot-detail .back-btn {
+  gap: 8px;
+}
+.bot-detail .back-btn:hover svg {
+  transform: translateX(-2px);
+}
+.bot-detail .back-btn svg {
+  transition: transform 160ms ease;
+}
+.bot-detail .section-card {
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+.bot-detail .section-card:focus-within {
+  border-color: var(--accent-primary);
+}
+.bot-detail .section-card:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 32%, var(--border-color));
+}
 @media (prefers-reduced-motion: reduce) {
-  .bot-detail .back-btn svg, .bot-detail .section-card { transition: none; }
-  .bot-tab-panel { animation: none; }
+  .bot-detail .back-btn svg,
+  .bot-detail .section-card {
+    transition: none;
+  }
+  .bot-tab-panel {
+    animation: none;
+  }
 }
 .bot-tab-panel {
-  width: 100%; min-width: 0; max-width: none; margin: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
   animation: bot-panel-enter 180ms ease-out both;
 }
 @keyframes bot-panel-enter {
-  from { opacity: 0.72; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0.72;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.bot-tab-panel[style*="display: none"] { display: none; }
+.bot-tab-panel[style*='display: none'] {
+  display: none;
+}
 /* Единая ширина для всех вкладок, как у панели навигации. */
 .overview-information-grid {
   display: grid;
@@ -1976,7 +2489,9 @@ onMounted(() => {
   min-width: 0;
   margin-bottom: 0;
 }
-.overview-information-grid .tags-list { align-content: flex-start; }
+.overview-information-grid .tags-list {
+  align-content: flex-start;
+}
 .overview-information-grid .tags-list .badge {
   max-width: 100%;
   white-space: normal;
@@ -1984,11 +2499,25 @@ onMounted(() => {
   text-transform: none;
   line-height: 1.35;
 }
-.overview-information-grid .text-link { display: inline-block; margin-top: 16px; }
-.delivery-event-title { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.delivery-event-title code { font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.overview-information-grid .text-link {
+  display: inline-block;
+  margin-top: 16px;
+}
+.delivery-event-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.delivery-event-title code {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
 @media (max-width: 850px) {
-  .overview-information-grid { grid-template-columns: minmax(0, 1fr); }
+  .overview-information-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .installation-context {
   display: flex;
@@ -2001,9 +2530,20 @@ onMounted(() => {
   border-radius: 12px;
   background: var(--glass);
 }
-.installation-context-label { display: flex; flex-direction: column; gap: 3px; }
-.installation-context-label span { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-.installation-context-label small { font-size: 12px; color: var(--text-secondary); }
+.installation-context-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.installation-context-label span {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.installation-context-label small {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
 /* Select подстраивается под любую из тем портала через CSS-переменные. */
 .installation-context .form-select {
   width: min(100%, 360px);
@@ -2016,7 +2556,9 @@ onMounted(() => {
   font: inherit;
   font-size: 14px;
   color-scheme: dark;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 .installation-context .form-select.is-placeholder {
   color: var(--text-secondary);
@@ -2025,12 +2567,12 @@ onMounted(() => {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
 }
-.installation-context .form-select option[value=""] {
+.installation-context .form-select option[value=''] {
   color: var(--text-secondary);
 }
 /* Системное выпадающее меню должно быть светлым в светлых темах. */
-:global(html[data-theme="lightDay"]) .installation-context .form-select,
-:global(html[data-theme="softWarm"]) .installation-context .form-select {
+:global(html[data-theme='lightDay']) .installation-context .form-select,
+:global(html[data-theme='softWarm']) .installation-context .form-select {
   color-scheme: light;
 }
 .installation-context .form-select:hover {
@@ -2040,50 +2582,230 @@ onMounted(() => {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
-.scope-context { margin: -4px 0 10px; font-size: 12px; color: var(--text-secondary); }
-.text-link { margin-top: 10px; padding: 0; border: 0; background: transparent; color: var(--accent-primary); font: inherit; font-size: 13px; cursor: pointer; }
-.text-link:hover { text-decoration: underline; }
-.text-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 4px; }
-.connection-form, .subscription-form { display: flex; flex-direction: column; gap: 24px; }
-.settings-group { display: flex; flex-direction: column; gap: 14px; padding-bottom: 24px; border-bottom: 1px solid var(--border-color); }
-.settings-group h3 { margin: 0; color: var(--text-primary); font-weight: 600; font-size: 15px; }
-.settings-help { margin: -8px 0 4px; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
-.settings-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 10px; }
-.selected-count { margin-right: auto; color: var(--text-secondary); font-size: 13px; }
-.connection-form .delivery-mode-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.connection-form .delivery-mode-card { display: flex; gap: 10px; padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--glass); cursor: pointer; transition: border-color 160ms ease, background 160ms ease; }
-.connection-form .delivery-mode-card:hover { border-color: var(--accent-primary); }
-.connection-form .delivery-mode-card:has(input:checked) { border-color: var(--accent-primary); background: var(--bg-secondary); }
-.connection-form .delivery-mode-card input { margin: 3px 0 0; accent-color: var(--accent-primary); }
-.connection-form .delivery-mode-card div { min-width: 0; }
-.connection-form .delivery-mode-card p { margin: 4px 0 0; }
-.connection-form .field-hint { display: grid; gap: 6px; border-top: 1px solid var(--border-color); padding-top: 12px; color: var(--text-secondary); }
-.connection-form .field-hint strong { font-weight: 500; color: var(--text-primary); overflow-wrap: anywhere; }
-.connection-form .settings-group .form-group label { color: var(--text-primary); font-size: 13px; font-weight: 500; }
-.subscription-form .event-subscription-item strong { font-weight: 500; }
-.subscription-form .form-input, .replay-card .form-input { background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border-color); }
-.subscription-form .form-input::placeholder { color: var(--text-secondary); }
-.subscription-form .event-subscription-item { border-bottom: 1px solid var(--border-color); border-radius: 0; }
-.subscription-form .event-subscription-item:last-of-type { border-bottom: 0; }
-.bot-tab-panel .section-card { margin-bottom: 18px; }
-.bot-tab-panel .section-desc { line-height: 1.6; max-width: 78ch; }
-.bot-tab-panel .form-select:focus-visible, .bot-tab-panel .form-input:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
-.connection-form .delivery-mode-card { align-items: flex-start; min-width: 0; margin: 0; }
-.connection-form .delivery-mode-card strong { font-size: 13px; font-weight: 600; }
-.connection-form .delivery-mode-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
-.connection-form .field-help { font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
-.connection-form .field-help code { font-family: monospace; font-weight: 400; }
-.settings-save-hint, .scope-warning, .delivery-history-note { padding: 12px 14px; margin: 0; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-secondary); color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
-.config-load-error { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px; border: 1px solid var(--control-error); border-radius: 12px; color: var(--text-primary); }
-.journal-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; color: var(--text-secondary); font-size: 13px; }
-.connection-form .form-input, .connection-form .form-select { background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border-color); }
-.subscription-form .scrollable-events-list { min-height: 260px; height: min(48vh, 460px); max-height: 460px; }
-@media (max-width: 720px) {
-  .installation-context { flex-direction: column; align-items: stretch; }
-  .installation-context .form-select { width: 100%; }
-  .connection-form .delivery-mode-list { grid-template-columns: 1fr; }
+.scope-context {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
-@media (prefers-reduced-motion: reduce) { .bot-section-nav button { transition: none; } }
+.text-link {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.text-link:hover {
+  text-decoration: underline;
+}
+.text-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 4px;
+}
+.connection-form,
+.subscription-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+.settings-group h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 15px;
+}
+.settings-help {
+  margin: -8px 0 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.selected-count {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.connection-form .delivery-mode-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.connection-form .delivery-mode-card {
+  display: flex;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--glass);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+.connection-form .delivery-mode-card:hover {
+  border-color: var(--accent-primary);
+}
+.connection-form .delivery-mode-card:has(input:checked) {
+  border-color: var(--accent-primary);
+  background: var(--bg-secondary);
+}
+.connection-form .delivery-mode-card input {
+  margin: 3px 0 0;
+  accent-color: var(--accent-primary);
+}
+.connection-form .delivery-mode-card div {
+  min-width: 0;
+}
+.connection-form .delivery-mode-card p {
+  margin: 4px 0 0;
+}
+.connection-form .field-hint {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+  color: var(--text-secondary);
+}
+.connection-form .field-hint strong {
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.connection-form .settings-group .form-group label {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.subscription-form .event-subscription-item strong {
+  font-weight: 500;
+}
+.subscription-form .form-input,
+.replay-card .form-input {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+.subscription-form .form-input::placeholder {
+  color: var(--text-secondary);
+}
+.subscription-form .event-subscription-item {
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0;
+}
+.subscription-form .event-subscription-item:last-of-type {
+  border-bottom: 0;
+}
+.bot-tab-panel .section-card {
+  margin-bottom: 18px;
+}
+.bot-tab-panel .section-desc {
+  line-height: 1.6;
+  max-width: 78ch;
+}
+.bot-tab-panel .form-select:focus-visible,
+.bot-tab-panel .form-input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+.connection-form .delivery-mode-card {
+  align-items: flex-start;
+  min-width: 0;
+  margin: 0;
+}
+.connection-form .delivery-mode-card strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.connection-form .delivery-mode-card p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.connection-form .field-help {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.connection-form .field-help code {
+  font-family: monospace;
+  font-weight: 400;
+}
+.settings-save-hint,
+.scope-warning,
+.delivery-history-note {
+  padding: 12px 14px;
+  margin: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.config-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--control-error);
+  border-radius: 12px;
+  color: var(--text-primary);
+}
+.journal-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.connection-form .form-input,
+.connection-form .form-select {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+.subscription-form .scrollable-events-list {
+  min-height: 260px;
+  height: min(48vh, 460px);
+  max-height: 460px;
+}
+@media (max-width: 720px) {
+  .installation-context {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .installation-context .form-select {
+    width: 100%;
+  }
+  .connection-form .delivery-mode-list {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot-section-nav button {
+    transition: none;
+  }
+}
 
 .setup-guide {
   display: flex;
@@ -2169,6 +2891,20 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+.diagnostics-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+
+@media (max-width: 1180px) {
+  .diagnostics-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .replay-event-code {
   color: var(--text-secondary);
   font-size: 12px;
@@ -2176,8 +2912,12 @@ onMounted(() => {
 }
 
 @media (max-width: 800px) {
-  .setup-guide ol { grid-template-columns: 1fr; }
-  .bot-section-nav { top: 72px; }
+  .setup-guide ol {
+    grid-template-columns: 1fr;
+  }
+  .bot-section-nav {
+    top: 72px;
+  }
 }
 
 .test-runtime-section {
@@ -2332,14 +3072,52 @@ onMounted(() => {
   color: var(--accent-primary);
   font-weight: 700;
 }
-.oauth-howto-step strong { color: var(--text-primary); font-size: 0.9rem; }
-.oauth-howto-step p { margin: 0.35rem 0 0; font-size: 0.82rem; line-height: 1.55; color: var(--text-secondary); }
-.oauth-howto-step code { overflow-wrap: anywhere; color: var(--text-primary); }
-.oauth-help-links { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0 0 1.5rem; }
-.oauth-help-links .text-link { cursor: pointer; background: none; border: 0; padding: 0; font: inherit; font-size: 0.875rem; }
-.credential-confirmation { display: flex; align-items: flex-start; gap: 0.75rem; color: var(--text-primary); font-size: 0.875rem; line-height: 1.5; cursor: pointer; margin-bottom: 1rem; }
-.credential-confirmation .ui-checkbox { margin-top: 0.15rem; }
-@media (max-width: 960px) { .oauth-howto { grid-template-columns: 1fr; } }
+.oauth-howto-step strong {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.oauth-howto-step p {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.oauth-howto-step code {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+}
+.oauth-help-links {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 1.5rem;
+}
+.oauth-help-links .text-link {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.credential-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+.credential-confirmation .ui-checkbox {
+  margin-top: 0.15rem;
+}
+@media (max-width: 960px) {
+  .oauth-howto {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* Credentials */
 .credentials-list {
@@ -2478,19 +3256,93 @@ onMounted(() => {
 }
 
 /* Installation management */
-.installation-section-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.installation-toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.installation-open-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 37px; padding: 8px 12px; border-radius: var(--border-radius); background: var(--accent-gradient); color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; transition: filter 160ms ease; }
-.installation-open-link:hover { filter: brightness(1.1); }
-.installation-open-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
-.installation-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
-.installation-filters button { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-secondary); color: var(--text-secondary); padding: 9px 13px; cursor: pointer; font: inherit; font-size: 13px; transition: background-color 160ms ease, border-color 160ms ease; }
-.installation-filters button span { font-size: 12px; opacity: 0.8; }
-.installation-filters button:hover { border-color: var(--accent-primary); color: var(--text-primary); }
-.installation-filters button.is-selected { border-color: var(--accent-primary); background: var(--glass); color: var(--text-primary); font-weight: 600; }
-.installation-filters button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
-.installation-help { margin: 18px 0 0; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
-@media (prefers-reduced-motion: reduce) { .installation-open-link, .installation-filters button { transition: none; } }
+.installation-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.installation-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.installation-open-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 37px;
+  padding: 8px 12px;
+  border-radius: var(--border-radius);
+  background: var(--accent-gradient);
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: filter 160ms ease;
+}
+.installation-open-link:hover {
+  filter: brightness(1.1);
+}
+.installation-open-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+.installation-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+.installation-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 9px 13px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+.installation-filters button span {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.installation-filters button:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+.installation-filters button.is-selected {
+  border-color: var(--accent-primary);
+  background: var(--glass);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.installation-filters button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+.installation-help {
+  margin: 18px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .installation-open-link,
+  .installation-filters button {
+    transition: none;
+  }
+}
 
 /* Stats */
 .stats-card {
@@ -2812,8 +3664,13 @@ onMounted(() => {
   transition: border-color 160ms ease;
 }
 
-.command-name-input:hover { border-color: var(--accent-primary); }
-.command-name-input:focus-within { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.command-name-input:hover {
+  border-color: var(--accent-primary);
+}
+.command-name-input:focus-within {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
 
 .command-name-input span {
   color: var(--text-secondary);
@@ -2828,7 +3685,9 @@ onMounted(() => {
   padding: 10px 0;
   background: transparent;
 }
-.command-name-input input.ui-control:focus-visible { outline: none; }
+.command-name-input input.ui-control:focus-visible {
+  outline: none;
+}
 
 @media (max-width: 768px) {
   .form-grid {
@@ -3186,17 +4045,79 @@ onMounted(() => {
 
 <style scoped>
 /* OAuth Redirect URI manager: all colors are inherited from the active theme. */
-.redirect-uri-section { margin-top: 1.25rem; }
-.redirect-section-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
-.redirect-section-heading > div { flex: 1; min-width: 220px; }
-.redirect-count { font-size: 0.8125rem; color: var(--text-secondary); margin: 0 0 0.75rem; }
-.redirect-uri-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
-.redirect-uri-item { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.875rem; padding: 0.875rem 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--bg-secondary); }
-.redirect-uri-main { display: flex; flex-direction: column; gap: 0.375rem; flex: 1; min-width: 180px; }
-.redirect-uri-main code { color: var(--text-primary); overflow-wrap: anywhere; font-size: 0.875rem; }
-.redirect-uri-main small { color: var(--text-secondary); }
-.redirect-uri-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
-.redirect-delete-label { color: var(--text-secondary); font-size: 0.8125rem; }
-.redirect-empty { display: flex; gap: 0.75rem; align-items: flex-start; color: var(--text-secondary); padding: 1rem; border: 1px dashed var(--border-color); border-radius: var(--border-radius); font-size: 0.875rem; }
-.redirect-empty .app-icon { flex-shrink: 0; }
+.redirect-uri-section {
+  margin-top: 1.25rem;
+}
+.redirect-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.redirect-section-heading > div {
+  flex: 1;
+  min-width: 220px;
+}
+.redirect-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+}
+.redirect-uri-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.redirect-uri-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-secondary);
+}
+.redirect-uri-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 1;
+  min-width: 180px;
+}
+.redirect-uri-main code {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+}
+.redirect-uri-main small {
+  color: var(--text-secondary);
+}
+.redirect-uri-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.redirect-delete-label {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+.redirect-empty {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  color: var(--text-secondary);
+  padding: 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 0.875rem;
+}
+.redirect-empty .app-icon {
+  flex-shrink: 0;
+}
 </style>

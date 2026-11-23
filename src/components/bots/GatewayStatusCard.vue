@@ -1,222 +1,120 @@
 <template>
-  <div class="gateway-status-card">
-    <div class="gateway-status-header">
-      <div>
-        <h4>Состояние WebSocket Gateway</h4>
-        <p>Диагностика WebSocket Gateway для выбранной установки</p>
+  <section class="diagnostic-card" :aria-busy="loading">
+    <header class="diagnostic-header">
+      <div class="diagnostic-heading">
+        <span class="diagnostic-heading-icon"><AppIcon name="radio-tower" :size="22" /></span>
+        <div>
+          <h3>WebSocket Gateway</h3>
+          <p>Соединение и подтверждение доставки событий ботом</p>
+        </div>
       </div>
+      <Button variant="secondary" size="sm" :loading="loading" @click="load">Обновить</Button>
+    </header>
 
-      <Button variant="ghost" size="sm" :loading="loading" @click="load"> Обновить </Button>
+    <div v-if="loading && !status" class="diagnostic-empty" role="status">Загружаем состояние Gateway…</div>
+    <div v-if="error" class="diagnostic-error" role="alert">
+      <span>{{ error }}</span>
+      <Button variant="secondary" size="sm" :disabled="loading" @click="load">Повторить</Button>
     </div>
 
-    <div v-if="error" class="gateway-error">
-      {{ error }}
-    </div>
-
-    <div v-else-if="status" class="gateway-grid">
-      <div class="gateway-row">
-        <span>Статус подключения</span>
-        <Badge :variant="statusBadgeVariant" size="sm">
-          {{ humanStatus }}
-        </Badge>
+    <template v-if="status">
+      <div class="diagnostic-summary">
+        <Badge :variant="statusBadgeVariant">{{ gatewayConnectionLabel(status.status) }}</Badge>
+        <span v-if="!transportActive">Сейчас выбран другой способ доставки — отсутствие Gateway-подключения нормально.</span>
+        <span v-else-if="status.status === 'connected'">Бот подключён к Gateway. События требуют подтверждения от клиента.</span>
+        <span v-else>Для получения событий по WebSocket клиент бота должен установить соединение.</span>
       </div>
 
-      <div class="gateway-row">
-        <span>Событий в очереди</span>
-        <strong>{{ status.backlog_count ?? 0 }}</strong>
+      <div class="diagnostic-metrics">
+        <div class="diagnostic-metric">
+          <span class="diagnostic-metric-label">Событий в очереди</span>
+          <strong class="diagnostic-metric-value">{{ diagnosticNumber(status.backlog_count) }}</strong>
+          <small class="diagnostic-metric-hint">Ожидают обработки или подтверждения</small>
+        </div>
+        <div class="diagnostic-metric">
+          <span class="diagnostic-metric-label">Последнее подтверждение</span>
+          <strong class="diagnostic-metric-value">{{ diagnosticSequence(status.last_acked_seq) }}</strong>
+          <small class="diagnostic-metric-hint">Номер события, подтверждённого клиентом</small>
+        </div>
+        <div class="diagnostic-metric">
+          <span class="diagnostic-metric-label">Последнее отправленное событие</span>
+          <strong class="diagnostic-metric-value">{{ diagnosticSequence(status.last_issued_seq) }}</strong>
+          <small class="diagnostic-metric-hint">Номер события, переданного Gateway</small>
+        </div>
+        <div class="diagnostic-metric">
+          <span class="diagnostic-metric-label">Активность клиента</span>
+          <strong class="diagnostic-metric-value diagnostic-metric-date">{{ diagnosticDate(status.last_seen_at) }}</strong>
+          <small class="diagnostic-metric-hint">Последний сигнал от Gateway-сессии</small>
+        </div>
       </div>
 
-      <div class="gateway-row">
-        <span>Последнее отправленное событие</span>
-        <strong>#{{ status.last_issued_seq ?? 0 }}</strong>
-      </div>
+      <details class="diagnostic-details">
+        <summary>Подробности соединения</summary>
+        <dl class="diagnostic-rows">
+          <div class="diagnostic-row"><dt>Последний ACK</dt><dd>{{ diagnosticDate(status.last_acked_at) }}</dd></div>
+          <div class="diagnostic-row"><dt>Последнее подключение</dt><dd>{{ diagnosticDate(status.last_connected_at) }}</dd></div>
+          <div class="diagnostic-row"><dt>Последнее отключение</dt><dd>{{ diagnosticDate(status.last_disconnected_at) }}</dd></div>
+        </dl>
+        <p class="diagnostic-subheading">ID последнего соединения</p>
+        <code class="diagnostic-code">{{ status.last_connection_id || '—' }}</code>
+      </details>
+      <p class="diagnostic-note">Количество событий в очереди само по себе не означает ошибку: проверьте подключение и подтверждения ACK, если оно продолжает расти.</p>
+    </template>
 
-      <div class="gateway-row">
-        <span>Последнее подтверждённое событие</span>
-        <strong>#{{ status.last_acked_seq ?? 0 }}</strong>
-      </div>
-
-      <div class="gateway-row">
-        <span>Последняя активность</span>
-        <strong>{{ formatDate(status.last_seen_at) }}</strong>
-      </div>
-
-      <div class="gateway-row">
-        <span>Последнее подтверждение доставки</span>
-        <strong>{{ formatDate(status.last_acked_at) }}</strong>
-      </div>
-
-      <div class="gateway-row">
-        <span>Подключение установлено</span>
-        <strong>{{ formatDate(status.last_connected_at) }}</strong>
-      </div>
-
-      <div class="gateway-row">
-        <span>Последний раз отключался</span>
-        <strong>{{ formatDate(status.last_disconnected_at) }}</strong>
-      </div>
-
-      <div class="gateway-connection-id">
-        <span>ID подключения Gateway</span>
-        <code>{{ status.last_connection_id || '—' }}</code>
-      </div>
-    </div>
-
-    <div v-else class="empty-urls">Данные о подключениях Gateway пока отсутствуют</div>
-  </div>
+    <div v-else-if="!loading && !error" class="diagnostic-empty">Данных о Gateway пока нет.</div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import { botsApi, type InstallationGatewayStatus } from '@/api/bots'
+import { diagnosticDate, diagnosticNumber, diagnosticSequence, gatewayConnectionLabel } from '@/utils/botDiagnostics'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   installationId: number
-}>()
+  transportActive?: boolean
+}>(), { transportActive: true })
 
 const status = ref<InstallationGatewayStatus | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+let requestGeneration = 0
 
-const statusBadgeVariant = computed(() => {
-  switch (status.value?.status) {
-    case 'connected':
-      return 'success'
-    case 'disconnected':
-      return 'warning'
-    default:
-      return 'default'
-  }
+const statusBadgeVariant = computed<'success' | 'warning' | 'default'>(() => {
+  if (status.value?.status === 'connected') return 'success'
+  if (status.value?.status === 'disconnected') return 'warning'
+  return 'default'
 })
-
-const humanStatus = computed(() => {
-  switch (status.value?.status) {
-    case 'connected':
-      return 'Подключен'
-
-    case 'disconnected':
-      return 'Отключен'
-
-    default:
-      return 'Нет подключения'
-  }
-})
-
-const formatDate = (value?: string | null) => {
-  if (!value) return '—'
-  return new Date(value).toLocaleString()
-}
 
 const load = async () => {
+  const generation = ++requestGeneration
   const requestedInstallationId = props.installationId
+  status.value = null
+  error.value = null
   if (!requestedInstallationId) {
-    status.value = null
-    error.value = null
+    loading.value = false
     return
   }
 
-  status.value = null
   loading.value = true
-  error.value = null
-
   try {
     const response = await botsApi.getInstallationGatewayStatus(requestedInstallationId)
-    if (requestedInstallationId !== props.installationId) return
+    if (requestedInstallationId !== props.installationId || generation !== requestGeneration) return
     if (response.error || !response.data) {
-      throw new Error(response.error || 'Не удалось получить состояние Gateway')
+      error.value = response.error || 'Сервер не вернул состояние Gateway'
+      return
     }
     status.value = response.data
   } catch (err: unknown) {
-    if (requestedInstallationId !== props.installationId) return
+    if (requestedInstallationId !== props.installationId || generation !== requestGeneration) return
     error.value = err instanceof Error ? err.message : 'Не удалось загрузить состояние Gateway'
   } finally {
-    if (requestedInstallationId === props.installationId) loading.value = false
+    if (requestedInstallationId === props.installationId && generation === requestGeneration) loading.value = false
   }
 }
 
-watch(
-  () => props.installationId,
-  () => load(),
-)
-
-onMounted(load)
+watch(() => props.installationId, load, { immediate: true })
 </script>
-
-<style scoped>
-.gateway-status-card {
-  margin-top: 16px;
-  border: 1px solid var(--border-color);
-  background: var(--glass);
-  border-radius: 14px;
-  padding: 16px;
-}
-
-.gateway-status-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.gateway-status-header h4 {
-  margin: 0 0 4px;
-  color: var(--text-primary);
-}
-
-.gateway-status-header p {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.gateway-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.gateway-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-}
-
-.gateway-row span,
-.gateway-connection-id span {
-  color: var(--text-secondary);
-}
-
-.gateway-row strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.gateway-connection-id {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.gateway-connection-id code {
-  display: block;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
-  color: var(--text-primary);
-  font-size: 12px;
-  word-break: break-all;
-}
-
-.gateway-error {
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.08);
-  color: #ef4444;
-  border-radius: 10px;
-  padding: 10px;
-  font-size: 13px;
-}
-</style>

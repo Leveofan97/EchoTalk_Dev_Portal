@@ -1,299 +1,159 @@
 <template>
-  <div class="runtime-protection-card">
-    <div class="runtime-protection-header">
-      <div>
-        <h4>Защита от перегрузки</h4>
-        <p>Лимиты запросов, защита от частых действий и автоматическая блокировка</p>
+  <section class="diagnostic-card" :aria-busy="loading">
+    <header class="diagnostic-header">
+      <div class="diagnostic-heading">
+        <span class="diagnostic-heading-icon"><AppIcon name="shield-check" :size="22" /></span>
+        <div>
+          <h3>Защита от перегрузки</h3>
+          <p>Лимиты запросов и автоматическая блокировка установки</p>
+        </div>
       </div>
+      <Button variant="secondary" size="sm" :loading="loading" @click="load">Обновить</Button>
+    </header>
 
-      <Button variant="ghost" size="sm" :loading="loading" @click="load"> Обновить </Button>
+    <div v-if="loading && !limits && !stats" class="diagnostic-empty" role="status">Загружаем показатели защиты…</div>
+    <div v-if="error" class="diagnostic-error" role="alert">
+      <span>{{ error }}</span>
+      <Button variant="secondary" size="sm" :disabled="loading" @click="load">Повторить</Button>
     </div>
 
-    <div v-if="error" class="runtime-error">
-      {{ error }}
-    </div>
-
-    <div v-else-if="limits" class="runtime-grid">
-      <div class="runtime-row">
-        <span>Статус защиты</span>
-        <Badge :variant="statusBadgeVariant" size="sm">
-          {{ humanStatus }}
-        </Badge>
+    <template v-if="limits || stats">
+      <div class="diagnostic-summary">
+        <Badge :variant="statusBadgeVariant">{{ statusLabel }}</Badge>
+        <span v-if="health === 'blocked'">Новые запросы бота могут отклоняться до окончания блокировки.</span>
+        <span v-else-if="health === 'disabled'">Защита отключена для этой установки.</span>
+        <span v-else-if="health === 'active'">Защита включена; превышения лимитов учитываются сервером.</span>
+        <span v-else>Не все данные диагностики доступны. Статус защиты не подтверждён.</span>
       </div>
 
-      <div class="runtime-row">
-        <span>Нарушений в текущем окне</span>
-        <strong
-          >{{ stats?.violation_count ?? 0 }} /
-          {{ stats?.violation_limit ?? limits.violation_limit ?? 0 }}</strong
-        >
+      <div v-if="health === 'blocked'" class="diagnostic-block-info">
+        <div><strong>{{ runtimeBlockReason(stats?.block_reason || limits?.block_reason) }}</strong></div>
+        <div>До {{ diagnosticDate(stats?.blocked_until || limits?.blocked_until) }}</div>
+        <div v-if="stats?.retry_after_sec != null && stats.retry_after_sec > 0">Повторная попытка через {{ diagnosticDuration(stats.retry_after_sec) }}</div>
+        <code v-if="stats?.block_reason || limits?.block_reason" class="diagnostic-code">{{ stats?.block_reason || limits?.block_reason }}</code>
       </div>
 
-      <div class="runtime-row">
-        <span>Окно нарушений</span>
-        <strong>{{ stats?.violation_window_sec ?? limits.violation_window_sec ?? 0 }} сек.</strong>
+      <div class="diagnostic-metrics">
+        <div class="diagnostic-metric">
+          <span class="diagnostic-metric-label">Нарушения за период</span>
+          <strong class="diagnostic-metric-value">{{ diagnosticNumber(stats?.violation_count) }} / {{ diagnosticNumber(stats?.violation_limit ?? limits?.violation_limit) }}</strong>
+          <small class="diagnostic-metric-hint">Период: {{ diagnosticDuration(stats?.violation_window_sec ?? limits?.violation_window_sec) }}</small>
+        </div>
+        <div class="diagnostic-metric">
+          <span class="diagnostic-metric-label">Запросов в минуту</span>
+          <strong class="diagnostic-metric-value">{{ diagnosticNumber(limits?.requests_per_minute) }}</strong>
+          <small class="diagnostic-metric-hint">Максимум запросов к API бота</small>
+        </div>
+        <div class="diagnostic-metric">
+          <span class="diagnostic-metric-label">Сообщений в минуту</span>
+          <strong class="diagnostic-metric-value">{{ diagnosticNumber(limits?.messages_per_minute) }}</strong>
+          <small class="diagnostic-metric-hint">Лимит отправки сообщений</small>
+        </div>
+        <div class="diagnostic-metric">
+          <span class="diagnostic-metric-label">Взаимодействий в минуту</span>
+          <strong class="diagnostic-metric-value">{{ diagnosticNumber(limits?.interactions_per_minute) }}</strong>
+          <small class="diagnostic-metric-hint">Лимит обработки взаимодействий</small>
+        </div>
       </div>
 
-      <div class="runtime-row">
-        <span>Сброс окна нарушений</span>
-        <strong>{{ formatDate(stats?.violation_reset_at) }}</strong>
-      </div>
+      <details class="diagnostic-details">
+        <summary>Все ограничения и технические сведения</summary>
+        <div v-if="limits">
+          <p class="diagnostic-subheading">Gateway</p>
+          <dl class="diagnostic-rows">
+            <div class="diagnostic-row"><dt>Создание сессий в минуту</dt><dd>{{ diagnosticNumber(limits.gateway_sessions_per_minute) }}</dd></div>
+            <div class="diagnostic-row"><dt>WebSocket-подключений в минуту</dt><dd>{{ diagnosticNumber(limits.gateway_connections_per_minute) }}</dd></div>
+          </dl>
+          <p class="diagnostic-subheading">Суточные ограничения</p>
+          <dl class="diagnostic-rows">
+            <div class="diagnostic-row"><dt>Сообщений в сутки</dt><dd>{{ diagnosticNumber(limits.messages_per_day) }}</dd></div>
+            <div class="diagnostic-row"><dt>Взаимодействий в сутки</dt><dd>{{ diagnosticNumber(limits.interactions_per_day) }}</dd></div>
+            <div class="diagnostic-row"><dt>Событий Gateway в сутки</dt><dd>{{ diagnosticNumber(limits.gateway_events_per_day) }}</dd></div>
+          </dl>
+          <p class="diagnostic-subheading">Кратковременные всплески</p>
+          <dl class="diagnostic-rows">
+            <div class="diagnostic-row"><dt>Сообщения</dt><dd>{{ diagnosticNumber(limits.burst_messages_limit) }} за {{ diagnosticDuration(limits.burst_messages_window_sec) }}</dd></div>
+            <div class="diagnostic-row"><dt>Взаимодействия</dt><dd>{{ diagnosticNumber(limits.burst_interactions_limit) }} за {{ diagnosticDuration(limits.burst_interactions_window_sec) }}</dd></div>
+          </dl>
+          <p class="diagnostic-subheading">Блокировки</p>
+          <dl class="diagnostic-rows">
+            <div class="diagnostic-row"><dt>Время автоматической блокировки</dt><dd>{{ diagnosticDuration(limits.auto_block_duration_sec) }}</dd></div>
+            <div class="diagnostic-row"><dt>Период подсчёта нарушений</dt><dd>{{ diagnosticDuration(limits.violation_window_sec) }}</dd></div>
+            <div class="diagnostic-row"><dt>Сброс счётчика нарушений</dt><dd>{{ diagnosticDate(stats?.violation_reset_at) }}</dd></div>
+          </dl>
+        </div>
+        <p v-else class="diagnostic-note">Лимиты не загрузились. Попробуйте обновить данные.</p>
+      </details>
+      <p class="diagnostic-note">Показатели доступны только для просмотра. Разблокировка через эту панель не предусмотрена.</p>
+    </template>
 
-      <div class="runtime-row">
-        <span>Повторить запрос через</span>
-        <strong>{{ stats?.retry_after_sec ?? 0 }} сек.</strong>
-      </div>
-
-      <div class="runtime-row">
-        <span>Причина блокировки</span>
-        <strong>{{ stats?.block_reason || limits.block_reason || '—' }}</strong>
-      </div>
-
-      <div class="runtime-row">
-        <span>Блокировка действует до</span>
-        <strong>{{ formatDate(stats?.blocked_until || limits.blocked_until) }}</strong>
-      </div>
-
-      <div class="runtime-row">
-        <span>Запросов в минуту</span>
-        <strong>{{ limits.requests_per_minute ?? 0 }}</strong>
-      </div>
-
-      <div class="runtime-row">
-        <span>Сообщений в минуту</span>
-        <strong>{{ limits.messages_per_minute ?? 0 }}</strong>
-      </div>
-
-      <div class="runtime-row">
-        <span>Взаимодействий в минуту</span>
-        <strong>{{ limits.interactions_per_minute ?? 0 }}</strong>
-      </div>
-
-      <div class="runtime-row">
-        <span>Создание сессий Gateway в минуту</span>
-        <strong>{{ limits.gateway_sessions_per_minute ?? 0 }}</strong>
-      </div>
-
-      <div class="runtime-row">
-        <span>WebSocket-подключений в минуту</span>
-        <strong>{{ limits.gateway_connections_per_minute ?? 0 }}</strong>
-      </div>
-
-      <div class="runtime-row">
-        <span>Быстрая отправка сообщений</span>
-        <strong
-          >{{ limits.burst_messages_limit ?? 0 }} /
-          {{ limits.burst_messages_window_sec ?? 0 }} сек.</strong
-        >
-      </div>
-
-      <div class="runtime-row">
-        <span>Частые запросы взаимодействий</span>
-        <strong
-          >{{ limits.burst_interactions_limit ?? 0 }} /
-          {{ limits.burst_interactions_window_sec ?? 0 }} сек.</strong
-        >
-      </div>
-
-      <div class="runtime-row">
-        <span>Длительность автоматической блокировки</span>
-        <strong>{{ limits.auto_block_duration_sec ?? 0 }} сек.</strong>
-      </div>
-
-      <div class="runtime-note">
-        <span>Примечание</span>
-        <code
-          >Лимиты доступны только для диагностики. Ручная разблокировка владельцем бота
-          недоступна.</code
-        >
-      </div>
-    </div>
-
-    <div v-else class="empty-urls">Защита ещё не настроена</div>
-  </div>
+    <div v-else-if="!loading && !error" class="diagnostic-empty">Параметры защиты не получены.</div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import { botsApi, type BotRuntimeProtectionStats, type BotRuntimeLimits } from '@/api/bots'
+import { diagnosticDate, diagnosticDuration, diagnosticNumber, runtimeBlockReason, runtimeHealth } from '@/utils/botDiagnostics'
 
-const props = defineProps<{
-  installationId: number | string
-}>()
-
+const props = defineProps<{ installationId: number | string }>()
 const loading = ref(false)
 const error = ref('')
 const limits = ref<BotRuntimeLimits | null>(null)
 const stats = ref<BotRuntimeProtectionStats | null>(null)
+let requestGeneration = 0
 
-const humanStatus = computed(() => {
-  if (stats.value?.blocked) return 'Заблокирован'
-  if (limits.value && !limits.value.enabled) return 'Отключено'
-  return 'Активно'
-})
-
-const statusBadgeVariant = computed(() => {
-  if (stats.value?.blocked) return 'danger'
-  if (limits.value && !limits.value.enabled) return 'default'
-  return 'success'
+const health = computed(() => runtimeHealth(limits.value, stats.value))
+const statusLabel = computed(() => ({
+  blocked: 'Заблокирован', disabled: 'Отключена', active: 'Активна', unknown: 'Нет данных',
+})[health.value])
+const statusBadgeVariant = computed<'success' | 'danger' | 'default'>(() => {
+  if (health.value === 'blocked') return 'danger'
+  if (health.value === 'active') return 'success'
+  return 'default'
 })
 
 const load = async () => {
-  if (!props.installationId) return
-
-  loading.value = true
+  const generation = ++requestGeneration
+  const installationId = props.installationId
+  limits.value = null
+  stats.value = null
   error.value = ''
+  if (!installationId) {
+    loading.value = false
+    return
+  }
+  loading.value = true
 
   try {
-    const [limitsResponse, statsResponse] = await Promise.all([
-      botsApi.getInstallationRuntimeLimits(props.installationId),
-      botsApi.getInstallationRuntimeProtectionStats(props.installationId),
+    const [limitsResult, statsResult] = await Promise.allSettled([
+      botsApi.getInstallationRuntimeLimits(installationId),
+      botsApi.getInstallationRuntimeProtectionStats(installationId),
     ])
+    if (generation !== requestGeneration || installationId !== props.installationId) return
 
-    if (limitsResponse.error || !limitsResponse.data) {
-      throw new Error(limitsResponse.error || 'Не удалось загрузить лимиты')
+    const failures: string[] = []
+    if (limitsResult.status === 'fulfilled' && limitsResult.value.data && !limitsResult.value.error) {
+      limits.value = limitsResult.value.data
+    } else {
+      failures.push('Не удалось получить настройки лимитов')
     }
-    if (statsResponse.error || !statsResponse.data) {
-      throw new Error(statsResponse.error || 'Не удалось загрузить состояние защиты')
+    if (statsResult.status === 'fulfilled' && statsResult.value.data && !statsResult.value.error) {
+      stats.value = statsResult.value.data
+    } else {
+      failures.push('Не удалось получить текущие показатели защиты')
     }
-    limits.value = limitsResponse.data
-    stats.value = statsResponse.data
-  } catch (err: any) {
-    error.value =
-      err?.response?.data?.error || err?.message || 'Не удалось загрузить состояние защиты'
+    error.value = failures.join('. ')
+  } catch (err: unknown) {
+    if (generation !== requestGeneration || installationId !== props.installationId) return
+    error.value = err instanceof Error ? err.message : 'Не удалось загрузить состояние защиты'
   } finally {
-    loading.value = false
+    if (generation === requestGeneration && installationId === props.installationId) loading.value = false
   }
 }
 
-const formatDate = (value?: string | null) => {
-  if (!value) return '—'
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-
-  return date.toLocaleString()
-}
-
-watch(
-  () => props.installationId,
-  () => {
-    limits.value = null
-    stats.value = null
-    load()
-  },
-)
-
-onMounted(load)
+watch(() => props.installationId, load, { immediate: true })
 </script>
-
-<style scoped>
-.runtime-protection-card {
-  margin-top: 16px;
-  border: 1px solid var(--border-color);
-  background: var(--glass);
-  border-radius: 14px;
-  padding: 16px;
-}
-
-.gateway-status-card {
-  margin-top: 16px;
-  border: 1px solid var(--border-color);
-  background: var(--glass);
-  border-radius: 14px;
-  padding: 16px;
-}
-
-.runtime-protection-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.runtime-protection-header h4 {
-  margin: 0 0 4px;
-  color: var(--text-primary);
-}
-
-.runtime-protection-header p {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.runtime-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.runtime-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-}
-
-.runtime-row span,
-.runtime-note span {
-  color: var(--text-secondary);
-}
-
-.runtime-row strong {
-  color: var(--text-primary);
-  font-weight: 600;
-  text-align: right;
-}
-
-.runtime-note {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.runtime-note code {
-  display: block;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
-  color: var(--text-primary);
-  font-size: 12px;
-  word-break: break-word;
-  white-space: pre-wrap;
-}
-
-.runtime-error {
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.08);
-  color: #ef4444;
-  border-radius: 10px;
-  padding: 10px;
-  font-size: 13px;
-}
-
-.empty-urls {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-@media (max-width: 640px) {
-  .runtime-protection-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .runtime-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .runtime-row strong {
-    text-align: left;
-  }
-}
-</style>

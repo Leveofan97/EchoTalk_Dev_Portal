@@ -13,6 +13,7 @@ export interface BotApp {
   owner_id: number
   name: string
   description: string | null
+  readme_md?: string
   avatar_url: string | null
   is_public: boolean
   status: BotStatus
@@ -30,6 +31,7 @@ export interface BotApp {
 export interface CreateBotPayload {
   name: string
   description?: string
+  readme_md?: string
   avatar_url?: string
   is_public?: boolean
   scopes?: string[]

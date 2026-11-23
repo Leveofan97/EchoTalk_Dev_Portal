@@ -43,6 +43,7 @@ export interface PublicBotDetail {
   id: string
   name: string
   description: string
+  readme_md?: string
   avatar_url: string
   is_public: boolean
   owner: {

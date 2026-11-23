@@ -9,7 +9,7 @@
         :aria-selected="activeView === 'guides'"
         @click="setActiveView('guides')"
       >
-        Guides
+        Руководства
       </button>
 
       <button
@@ -20,7 +20,7 @@
         :aria-selected="activeView === 'api'"
         @click="setActiveView('api')"
       >
-        API Reference
+        Справочник API
       </button>
     </div>
 
@@ -51,14 +51,29 @@
       </aside>
 
       <main class="docs-content">
+        <nav class="docs-mobile-nav" aria-label="Быстрый переход к разделу">
+          <a v-for="item in navigation.flatMap((group) => group.items)" :key="item.id" :href="`#${item.id}`">
+            {{ item.label }}
+          </a>
+        </nav>
+
         <header class="docs-hero">
-          <div class="docs-badge">Bot API · OpenAPI 3.0.3</div>
-          <h1>Документация EchoTalk Bot API</h1>
+          <div class="docs-badge">EchoTalk · Bot Platform</div>
+          <h1>Документация для разработчиков ботов</h1>
           <p>
-            Руководство по bot-facing REST API EchoTalk. На этой странице зафиксированы базовая
-            аутентификация, Voice Resource API и Media Session API. Точный машинно-читаемый контракт
-            хранится в OpenAPI.
+            От регистрации приложения и OAuth-установки до первого сообщения, событий и команд.
+            Для точных схем Bot Resource API и Gateway откройте справочник API.
           </p>
+
+          <div class="docs-hero-actions">
+            <RouterLink :to="{ name: 'bots' }" class="docs-primary-action">
+              <AppIcon name="plus" :size="18" /> Мои боты
+            </RouterLink>
+            <a href="#quickstart" class="docs-secondary-action">Быстрый старт</a>
+            <button type="button" class="docs-secondary-action" @click="setActiveView('api')">
+              Справочник API
+            </button>
+          </div>
 
           <div class="docs-meta-grid">
             <div class="docs-meta-card">
@@ -77,6 +92,165 @@
             </div>
           </div>
         </header>
+
+        <section id="quickstart" class="doc-section">
+          <h2>Быстрый старт</h2>
+          <p>Минимальный путь от регистрации бота до первого запроса к EchoTalk API.</p>
+
+          <ol class="docs-steps">
+            <li>
+              <strong>Зарегистрируйте приложение.</strong>
+              Откройте <RouterLink :to="{ name: 'bots' }">«Мои боты»</RouterLink>, создайте бота и
+              выберите разрешения <code>bot</code>, <code>room.view</code> и
+              <code>room.sendMessage</code>. Для других функций нужны соответствующие scopes.
+            </li>
+            <li>
+              <strong>Настройте авторизацию.</strong>
+              На вкладке «Авторизация» получите Client ID и Client Secret, добавьте Redirect URI.
+              Сохраните секрет на стороне сервера: после закрытия окна он повторно не отображается.
+            </li>
+            <li>
+              <strong>Активируйте приложение.</strong>
+              Опубликуйте бота в Dev Portal. Для установки приложение должно иметь статус
+              <code>active</code> и действующие учётные данные. Чтобы страница бота была доступна
+              в каталоге, также включите параметр «Публичный» в настройках приложения.
+            </li>
+            <li>
+              <strong>Авторизуйте установку.</strong>
+              На публичной странице бота выберите сервер и разрешения, затем подтвердите установку.
+              Портал выдаст одноразовый код авторизации.
+            </li>
+            <li>
+              <strong>Получите токен и отправьте сообщение.</strong>
+              Обменяйте код на access/refresh token в backend бота и выполните запрос к
+              <code>/bot/rooms/{roomID}/messages</code>.
+            </li>
+          </ol>
+          <div class="callout callout--info">
+            <strong>Особенность текущего OAuth в EchoTalk.</strong>
+            <span>
+              Код авторизации сейчас выдаётся в интерфейсе и ответе API. Автоматического HTTP-перехода
+              на Redirect URI пока нет; зарегистрированный адрес используется для проверки при выдаче
+              кода и его обмене на токен.
+            </span>
+          </div>
+        </section>
+
+        <section id="oauth-install" class="doc-section">
+          <h2>OAuth и установка на сервер</h2>
+          <p>
+            Для установки пользователь должен иметь право добавлять ботов на выбранный сервер.
+            <code>POST /oauth/authorize</code> выполняется от имени авторизованного пользователя,
+            а не с Client Secret. В интерфейсе портала этот запрос выполняется при подтверждении установки.
+          </p>
+          <p>Параметр <code>state</code> должен быть уникальным, криптографически случайным
+            и связанным с текущей попыткой авторизации.
+          </p>
+          <CodeBlock title="POST /oauth/authorize · JSON" :code="authorizeExample" @copy="copyCode(authorizeExample)" />
+          <p>
+            Параметр <code>redirect_uri</code> можно передать явно: он должен в точности совпадать
+            с одним из адресов во вкладке «Авторизация». Если его не передать, backend выберет
+            первый зарегистрированный адрес. При отсутствии зарегистрированных адресов код не выдаётся.
+          </p>
+          <p>
+            Ответ содержит <code>code</code>, <code>state</code>, <code>client_id</code> и
+            <code>redirect_uri</code>. Сверяйте возвращённый <code>state</code> с сохранённым
+            значением текущей попытки авторизации. Код действует 10 минут и может быть использован только один раз.
+          </p>
+          <h3>Обмен кода на токены</h3>
+          <CodeBlock title="POST /oauth/token · JSON" :code="tokenRequestExample" @copy="copyCode(tokenRequestExample)" />
+          <p>
+            Отправляйте запрос из backend бота по HTTPS. Client Secret нельзя передавать
+            во frontend, публиковать в репозитории или записывать в логи.
+            <code>redirect_uri</code> при обмене обязан совпадать с адресом из выданного кода.
+          </p>
+          <div class="callout callout--warning">
+            <strong>Срок действия токенов.</strong>
+            <span>
+              Access token выдаётся на 15 минут, refresh token — на 30 дней. Для обновления вызывайте
+              <code>POST /oauth/token/refresh</code> с <code>grant_type: refresh_token</code>,
+              <code>refresh_token</code>, <code>client_id</code> и <code>client_secret</code>.
+              При обновлении refresh token ротируется: храните только новый токен.
+            </span>
+          </div>
+        </section>
+
+        <section id="first-request" class="doc-section">
+          <h2>Первый запрос к Bot API</h2>
+          <p>
+            Используйте access token конкретной установки. Сначала проверьте учётную запись бота,
+            затем получите комнаты сервера и отправьте тестовое сообщение в доступную комнату.
+          </p>
+          <p>В примерах ниже переменные <code>ECHOTALK_API_URL</code> и <code>BOT_ACCESS_TOKEN</code>
+            должны быть заданы в окружении процесса бота. Замените значения ID на реальные.
+          </p>
+          <CodeBlock title="GET /bot/me" :code="botMeExample" @copy="copyCode(botMeExample)" />
+          <CodeBlock title="GET /bot/servers/{serverID}/rooms" :code="botRoomsExample" @copy="copyCode(botRoomsExample)" />
+          <CodeBlock title="POST /bot/rooms/{roomID}/messages" :code="firstMessageExample" @copy="copyCode(firstMessageExample)" />
+          <div class="callout callout--info">
+            <strong>Необходимы разрешения.</strong>
+            <span>
+              Для отправки сообщения нужен <code>room.sendMessage</code>, а для доступа к данным
+              комнаты — соответствующие права. Проверки проходят на backend и учитывают права
+              конкретной установки бота на сервере.
+            </span>
+          </div>
+        </section>
+
+        <section id="delivery-setup" class="doc-section">
+          <h2>События: Webhook или Gateway</h2>
+          <p>
+            В «Управлении ботом» выберите установку (сервер), откройте вкладку «Подключение» и
+            выберите способ доставки: HTTP Webhook или WebSocket Gateway. На вкладке «Подписки»
+            укажите события, которые бот должен получать. Это настройки <strong>установки</strong>,
+            а не всех серверов сразу.
+          </p>
+          <div class="endpoint-list">
+            <EndpointRow method="GET" path="/dev/installations/{installationID}/webhook" description="Получить настройки доставки и подписки." />
+            <EndpointRow method="PUT" path="/dev/installations/{installationID}/webhook" description="Сохранить выбранный транспорт, адреса и события." />
+            <EndpointRow method="POST" path="/bot/gateway/session" description="Получить временный gateway session token от имени бота." />
+            <EndpointRow method="GET" path="/bot/gateway/ws" description="Открыть WebSocket-соединение с gateway session token." />
+          </div>
+          <p>
+            Для Webhook проверяйте подпись <code>X-EchoTalk-Signature</code> на стороне бота.
+            Для Gateway используйте heartbeat, ACK и resume по протоколу AsyncAPI.
+            Подробности находятся в <button type="button" class="docs-text-button" @click="setActiveApiReference('gateway')">справочнике Gateway</button>.
+          </p>
+          <div class="callout callout--warning">
+            <strong>Не смешивайте токены.</strong>
+            <span>
+              Обычный bot access token предназначен для REST API, а временный gateway session token —
+              для WebSocket. Секрет подписи Webhook храните только в backend бота.
+            </span>
+          </div>
+        </section>
+
+        <section id="commands-setup" class="doc-section">
+          <h2>Slash-команды</h2>
+          <p>
+            Команды создаются во вкладке «Команды» выбранного приложения. Адрес обработчика
+            <code>command_base_url</code> задаётся во вкладке «Подключение» для установки.
+            Для production обработчик должен принимать HTTPS POST-запросы и обрабатывать
+            команды на своём сервере.
+          </p>
+          <CodeBlock title="POST /dev/bots/{botID}/commands · JSON" :code="commandCreateExample" @copy="copyCode(commandCreateExample)" />
+          <p>
+            Для изменения и удаления команд доступны <code>PUT</code> и <code>DELETE</code> на
+            <code>/dev/bots/{botID}/commands/{commandID}</code>. Входящие вызовы обработчика
+            проверяйте на подлинность; не доверяйте полям запроса без валидации.
+          </p>
+        </section>
+
+        <section id="troubleshooting" class="doc-section">
+          <h2>Если что-то не работает</h2>
+          <div class="docs-troubleshooting">
+            <div><strong>Ошибка Redirect URI</strong><p>Добавьте адрес во вкладке «Авторизация». При обмене кода используйте точно тот адрес, который вернул <code>/oauth/authorize</code>.</p></div>
+            <div><strong>Код истёк или уже использован</strong><p>Повторите авторизацию: одноразовый код действует 10 минут. Не отправляйте запрос обмена параллельно несколько раз.</p></div>
+            <div><strong>403 Forbidden</strong><p>Проверьте scopes приложения, разрешения конкретной установки, доступ к серверу и права на комнату.</p></div>
+            <div><strong>429 Too Many Requests</strong><p>Проверьте вкладку «Диагностика» и соблюдайте <code>retry_after_sec</code> или заголовок <code>Retry-After</code>, если он возвращён API.</p></div>
+            <div><strong>Нет событий</strong><p>Проверьте транспорт доставки, подписки выбранной установки, права бота и состояние соединения Gateway или последние попытки Webhook.</p></div>
+          </div>
+        </section>
 
         <section id="overview" class="doc-section">
           <h2>Обзор</h2>
@@ -310,7 +484,7 @@
         <section id="errors" class="doc-section">
           <h2>Ошибки</h2>
 
-          <p>Все Bot API ошибки используют единый envelope:</p>
+          <p>Voice/Media Resource API использует следующий формат ошибок. Ответы OAuth и Dev Portal могут иметь другой формат:</p>
 
           <CodeBlock
             title="Error envelope"
@@ -364,9 +538,10 @@
           </div>
 
           <p>
-            OpenAPI содержит точные request/response schemas, status codes, error codes, scopes и
-            примеры. В дальнейшем этот раздел можно дополнить встроенным Redoc/Scalar viewer без
-            изменения human-readable руководств выше.
+            Справочник REST покрывает Bot Resource API, а справочник Gateway — его WebSocket-протокол.
+            OAuth, настройки Dev Portal и установка ботов описаны в руководствах выше по текущим
+            маршрутам backend. Не следует считать, что OpenAPI Resource API документирует
+            все административные endpoints.
           </p>
         </section>
       </main>
@@ -434,20 +609,26 @@
       </header>
 
       <div class="api-reference-frame">
-        <StoplightReference v-if="activeApiReference === 'rest'" :spec-url="openApiUrl" />
-
-        <AsyncApiReference v-else :spec-url="asyncApiUrl" />
+        <Suspense>
+          <StoplightReference v-if="activeApiReference === 'rest'" :spec-url="openApiUrl" />
+          <AsyncApiReference v-else :spec-url="asyncApiUrl" />
+          <template #fallback>
+            <div class="docs-reference-loading" role="status">Загрузка справочника API…</div>
+          </template>
+        </Suspense>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { defineAsyncComponent, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
-import '@stoplight/elements/web-components.min.js'
-import '@stoplight/elements/styles.min.css'
-import AsyncApiReference from '@/views/AsyncApiReference.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
+
+// Загружаем тяжёлые просмотрщики спецификаций только по запросу пользователя.
+const StoplightReference = defineAsyncComponent(() => import('@/components/docs/StoplightReference'))
+const AsyncApiReference = defineAsyncComponent(() => import('@/views/AsyncApiReference.vue'))
 
 type NavItem = {
   id: string
@@ -489,7 +670,17 @@ const configuredAsyncApiUrl = String(import.meta.env.VITE_BOT_ASYNCAPI_URL ?? ''
 
 const asyncApiUrl = configuredAsyncApiUrl || '/asyncapi/bot-gateway-asyncapi.yaml'
 
+// Поддерживаем браузерные Назад/Вперёд и прямые ссылки с ?view=api&api=gateway.
+watch(
+  () => [route.query.view, route.query.api],
+  () => {
+    activeView.value = route.query.view === 'api' ? 'api' : 'guides'
+    activeApiReference.value = route.query.api === 'gateway' ? 'gateway' : 'rest'
+  },
+)
+
 async function setActiveApiReference(view: ApiReferenceView): Promise<void> {
+  activeView.value = 'api'
   activeApiReference.value = view
 
   const query: LocationQueryRaw = {
@@ -529,8 +720,14 @@ const navigation: NavGroup[] = [
   {
     title: 'Начало работы',
     items: [
-      { id: 'overview', label: 'Обзор' },
-      { id: 'authentication', label: 'Аутентификация' },
+      { id: 'quickstart', label: 'Быстрый старт' },
+      { id: 'oauth-install', label: 'OAuth и установка' },
+      { id: 'first-request', label: 'Первое сообщение' },
+      { id: 'delivery-setup', label: 'Webhook и Gateway' },
+      { id: 'commands-setup', label: 'Slash-команды' },
+      { id: 'troubleshooting', label: 'Решение проблем' },
+      { id: 'overview', label: 'Обзор API' },
+      { id: 'authentication', label: 'Bot access token' },
       { id: 'scopes', label: 'Voice scopes' },
     ],
   },
@@ -656,6 +853,43 @@ const commonErrors: ErrorRow[] = [
 
 const authHeaderExample = `Authorization: Bearer YOUR_BOT_ACCESS_TOKEN`
 
+// Демонстрационные значения не являются рабочими секретами.
+const authorizeExample = `{
+  "bot_id": 12,
+  "server_id": 42,
+  "scopes": ["bot", "room.view", "room.sendMessage"],
+  "state": "<RANDOM_CSRF_STATE>",
+  "redirect_uri": "https://bot.example.com/oauth/callback"
+}`
+
+const tokenRequestExample = `{
+  "grant_type": "authorization_code",
+  "code": "<AUTHORIZATION_CODE>",
+  "client_id": "<CLIENT_ID>",
+  "client_secret": "<CLIENT_SECRET>",
+  "redirect_uri": "https://bot.example.com/oauth/callback"
+}`
+
+const botMeExample = `curl --fail-with-body -sS \\
+  -H "Authorization: Bearer $BOT_ACCESS_TOKEN" \\
+  "$ECHOTALK_API_URL/bot/me"`
+
+const botRoomsExample = `curl --fail-with-body -sS \\
+  -H "Authorization: Bearer $BOT_ACCESS_TOKEN" \\
+  "$ECHOTALK_API_URL/bot/servers/<SERVER_ID>/rooms"`
+
+const firstMessageExample = `curl --fail-with-body -sS -X POST \\
+  "$ECHOTALK_API_URL/bot/rooms/<ROOM_ID>/messages" \\
+  -H "Authorization: Bearer $BOT_ACCESS_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"content":"Привет из EchoTalk Bot API!"}'`
+
+const commandCreateExample = `{
+  "name": "help",
+  "description": "Список доступных команд",
+  "is_enabled": true
+}`
+
 const voiceStateExample = `{
   "data": {
     "is_active": true,
@@ -739,7 +973,7 @@ const runtimeLimitExample = `{
   }
 }`
 
-const activeSection = ref('overview')
+const activeSection = ref('quickstart')
 
 let observer: IntersectionObserver | null = null
 
@@ -806,31 +1040,6 @@ async function copyCode(code: string): Promise<void> {
 
   await navigator.clipboard.writeText(code)
 }
-
-const StoplightReference = defineComponent({
-  name: 'StoplightReference',
-  props: {
-    specUrl: {
-      type: String,
-      required: true,
-    },
-  },
-  setup(props) {
-    return () =>
-      h('elements-api', {
-        class: 'stoplight-reference',
-        apiDescriptionUrl: props.specUrl,
-        router: 'memory',
-        layout: 'responsive',
-        hideSchemas: true,
-        hideExport: true,
-        hideTryIt: false,
-        hideTryItPanel: false,
-        hideInternal: true,
-        tryItCredentialsPolicy: 'omit',
-      })
-  },
-})
 
 const CodeBlock = defineComponent({
   name: 'DocsCodeBlock',
@@ -1379,6 +1588,87 @@ const EndpointRow = defineComponent({
   overflow-wrap: anywhere;
 }
 
+/* Onboarding: CTA, ordered steps, troubleshooting and accessible mobile navigation. */
+.docs-hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+
+.docs-primary-action,
+.docs-secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.docs-primary-action {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--bg-primary);
+}
+
+.docs-primary-action:hover { filter: brightness(1.08); }
+.docs-secondary-action { background: var(--bg-tertiary); color: var(--text-primary); }
+.docs-secondary-action:hover { background: var(--bg-elevated); }
+
+.docs-primary-action:focus-visible,
+.docs-secondary-action:focus-visible,
+.docs-text-button:focus-visible,
+.docs-mobile-nav a:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+.docs-steps {
+  display: grid;
+  gap: 12px;
+  padding-left: 28px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.docs-steps li { padding: 6px 0 6px 8px; }
+.docs-steps li::marker { color: var(--accent-primary); font-weight: 700; }
+.docs-steps strong, .docs-troubleshooting strong { color: var(--text-primary); }
+.docs-steps a { color: var(--accent-primary); }
+.docs-troubleshooting { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.docs-troubleshooting > div {
+  padding: 18px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-tertiary);
+}
+.docs-troubleshooting p { margin: 8px 0 0; }
+.docs-text-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-primary);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.docs-reference-loading {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  color: var(--text-secondary);
+}
+.docs-mobile-nav { display: none; }
+
 @media (max-width: 1080px) {
   .docs-shell {
     grid-template-columns: 220px minmax(0, 1fr);
@@ -1424,6 +1714,25 @@ const EndpointRow = defineComponent({
   .docs-sidebar {
     display: none;
   }
+  .docs-mobile-nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    margin-bottom: 24px;
+    padding-bottom: 10px;
+    scrollbar-width: thin;
+  }
+  .docs-mobile-nav a {
+    flex: none;
+    padding: 8px 11px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.84rem;
+    text-decoration: none;
+  }
+  .docs-troubleshooting { grid-template-columns: 1fr; }
 
   .docs-hero {
     margin-bottom: 40px;

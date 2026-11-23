@@ -26,6 +26,7 @@
                   placeholder="Кратко опишите назначение бота"
                   :disabled="isLoading"
                 ></textarea>
+                <p class="form-hint">Короткое описание для каталога. Полная инструкция оформляется на вкладке README в управлении ботом.</p>
               </div>
 
               <div class="form-group">

@@ -19,12 +19,12 @@
         <div class="bot-hero">
           <div class="bot-avatar-large">
             <img v-if="bot.avatar_url" :src="bot.avatar_url" :alt="bot.name" />
-            <span v-else>{{ bot.name[0] }}</span>
+            <span v-else>{{ bot.name?.[0]?.toUpperCase() || 'B' }}</span>
           </div>
 
           <div class="bot-info">
             <h1>{{ bot.name }}</h1>
-            <p class="description">{{ bot.description }}</p>
+            <p class="description">{{ bot.description || 'Описание пока не добавлено' }}</p>
 
             <div class="bot-stats">
               <div class="stat">
@@ -40,8 +40,8 @@
             <div class="owner-info">
               <span>Создатель:</span>
               <div class="owner">
-                <img v-if="bot.owner?.avatar_url" :src="bot.owner.avatar_url" />
-                <span v-else>{{ bot.owner?.username?.[0] }}</span>
+                <img v-if="bot.owner?.avatar_url" :src="bot.owner.avatar_url" alt="" />
+                <span v-else>{{ bot.owner?.username?.[0]?.toUpperCase() || 'Р' }}</span>
                 {{ bot.owner?.username }}
               </div>
             </div>
@@ -49,12 +49,15 @@
 
           <!-- Actions -->
           <div class="bot-actions">
+            <Button v-if="!authReady" variant="primary" size="lg" disabled>
+              Проверяем авторизацию...
+            </Button>
             <Button
-              v-if="isAuthenticated"
+              v-else-if="isAuthenticated"
               variant="primary"
               size="lg"
               @click="startInstall"
-              :loading="botsStore.isLoading"
+              :disabled="serversLoading || botsStore.isInstalling"
             >
               Добавить на сервер
             </Button>
@@ -72,19 +75,26 @@
           </div>
         </div>
 
+        <!-- Extended description, rendered from sanitized Markdown, never raw HTML. -->
+        <Card v-if="bot.readme_md?.trim()" class="readme-section">
+          <h2 class="readme-title icon-heading"><AppIcon name="book-open" :size="24" /> О боте</h2>
+          <BotMarkdown :source="bot.readme_md || ''" />
+        </Card>
+
         <!-- Scopes -->
         <Card class="scopes-section">
           <h3 class="icon-heading"><AppIcon name="key-round" :size="24" /> Разрешения</h3>
           <p class="hint">Этот бот запрашивает следующие разрешения:</p>
 
           <div class="scopes-list">
-            <div v-for="scope in bot.scopes" :key="scope" class="scope-item">
-              <span class="scope-icon">✓</span>
+            <div v-for="scope in bot.scopes || []" :key="scope" class="scope-item">
+              <AppIcon name="check" class="scope-icon" :size="22" />
               <div class="scope-info">
+                <strong>{{ scopeTitle({ name: scope, label: scope }) }}</strong>
                 <code>{{ scope }}</code>
-                <p>{{ getScopeDescription(scope) }}</p>
               </div>
             </div>
+            <p v-if="!bot.scopes?.length" class="hint">Разрешения не указаны.</p>
           </div>
         </Card>
 
@@ -112,7 +122,9 @@
           <div class="modal-content install-modal">
             <div class="modal-header">
               <h2>Выберите сервер</h2>
-              <button class="modal-close" @click="cancelInstall">×</button>
+              <button class="modal-close" type="button" aria-label="Закрыть выбор сервера" @click="cancelInstall">
+                <AppIcon name="x" :size="22" />
+              </button>
             </div>
 
             <div class="modal-body">
@@ -120,9 +132,15 @@
                 Установка <strong>{{ bot?.name }}</strong>
               </p>
 
-              <div v-if="botsStore.isLoading" class="loading-state">
+              <div v-if="serversLoading" class="loading-state" role="status">
                 <div class="spinner"></div>
                 <p>Загрузка серверов...</p>
+              </div>
+
+              <div v-else-if="serversError" class="empty-servers" role="alert">
+                <AppIcon name="alert-triangle" class="empty-icon" :size="40" />
+                <p>{{ serversError }}</p>
+                <Button variant="secondary" @click="loadInstallServers">Повторить загрузку</Button>
               </div>
 
               <div v-else-if="botsStore.serversForInstall.length === 0" class="empty-servers">
@@ -132,22 +150,25 @@
               </div>
 
               <div v-else class="servers-list">
-                <div
+                <button
                   v-for="server in botsStore.serversForInstall"
                   :key="server.id"
+                  type="button"
                   class="server-card"
-                  :class="{ 'has-bot': server.has_bot, disabled: server.has_bot }"
-                  @click="!server.has_bot && selectServer(server)"
+                  :class="{ 'has-bot': server.has_bot }"
+                  :disabled="server.has_bot"
+                  @click="selectServer(server)"
                 >
                   <div class="server-avatar">
-                    <img v-if="server.avatar_url" :src="server.avatar_url" />
-                    <span v-else>{{ server.name[0] }}</span>
+                    <img v-if="server.avatar_url" :src="server.avatar_url" alt="" />
+                    <span v-else>{{ server.name?.[0]?.toUpperCase() || 'С' }}</span>
                   </div>
                   <div class="server-info">
                     <h4>{{ server.name }}</h4>
-                    <p v-if="server.has_bot" class="has-bot-badge">✓ Бот уже установлен</p>
+                    <p v-if="server.has_bot" class="has-bot-badge"><AppIcon name="check" :size="16" /> Уже установлен</p>
+                    <p v-else class="server-select-hint">Выбрать сервер</p>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
           </div>
@@ -166,7 +187,9 @@
           <div class="modal-content install-modal">
             <div class="modal-header">
               <h2>Настройте разрешения</h2>
-              <button class="modal-close" @click="backToServers">×</button>
+              <button class="modal-close" type="button" aria-label="Вернуться к выбору сервера" @click="backToServers">
+                <AppIcon name="x" :size="22" />
+              </button>
             </div>
 
             <div class="modal-body">
@@ -185,13 +208,14 @@
                   <label class="scope-label">
                     <input
                       type="checkbox"
-                      v-model="selectedScopes"
-                      :value="scope"
+                      class="ui-checkbox"
+                      :checked="selectedScopes.includes(scope)"
                       :disabled="scope === 'bot'"
+                      @change="onScopeChange(scope, $event)"
                     />
                     <div class="scope-content">
+                      <strong>{{ scopeTitle({ name: scope, label: scope }) }}</strong>
                       <code>{{ scope }}</code>
-                      <span class="scope-desc">{{ getScopeDescription(scope) }}</span>
                       <span v-if="scope === 'bot'" class="scope-required">(обязательно)</span>
                     </div>
                   </label>
@@ -199,7 +223,7 @@
               </div>
 
               <div class="scopes-warning" v-if="selectedScopes.length < (bot?.scopes?.length || 0)">
-                <span>⚠️</span>
+                <AppIcon name="alert-triangle" :size="22" />
                 <p>Вы ограничиваете функциональность бота. Некоторые функции могут не работать.</p>
               </div>
 
@@ -242,19 +266,19 @@
                 </h4>
                 <ul class="scopes-list-confirm">
                   <li v-for="scope in selectedScopes" :key="scope">
+                    <span>{{ scopeTitle({ name: scope, label: scope }) }}</span>
                     <code>{{ scope }}</code>
-                    <span>{{ getScopeDescription(scope) }}</span>
                   </li>
                 </ul>
                 <p v-if="selectedScopes.length < (bot?.scopes?.length || 0)" class="scopes-note">
                   Исключены:
-                  {{ bot?.scopes?.filter((s) => !selectedScopes.includes(s)).join(', ') }}
+                  {{ bot?.scopes?.filter((s) => !selectedScopes.includes(s)).map((s) => scopeTitle({ name: s, label: s })).join(', ') }}
                 </p>
               </div>
 
               <p v-if="installAuthorizeError" class="install-oauth-error" role="alert">{{ installAuthorizeError }}</p>
               <div class="modal-actions">
-                <Button variant="ghost" @click="backToScopes">Назад</Button>
+                <Button variant="ghost" :disabled="botsStore.isInstalling" @click="backToScopes">Назад</Button>
                 <Button variant="primary" :loading="botsStore.isInstalling" @click="confirmInstall">
                   Авторизовать
                 </Button>
@@ -278,7 +302,7 @@
               <div class="code-block">
                 <code>{{ botsStore.authCode }}</code>
                 <Button variant="ghost" size="sm" @click="copyCode">
-                  {{ copied ? '✓ Скопировано!' : 'Копировать' }}
+                  <AppIcon v-if="copied" name="check" :size="18" /> {{ copied ? 'Скопировано' : 'Копировать' }}
                 </Button>
               </div>
               <p class="code-hint">Действителен 10 минут</p>
@@ -394,15 +418,18 @@ POST /oauth/token
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useBotsStore } from '@/stores/bots'
 import { botsApi, type PublicBotDetail } from '@/api/bots'
 import { useClipboard } from '@/composables/useClipboard'
+import { scopeTitle, updateBotScopes } from '@/utils/botScopeCatalog'
+import type { BotAvailableScope } from '@/api/bots'
 import Button from '@/components/ui/Button.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import Card from '@/components/ui/Card.vue'
+import BotMarkdown from '@/components/bots/BotMarkdown.vue'
 import type { ServerForInstall } from '@/types'
 
 const route = useRoute()
@@ -411,6 +438,11 @@ const botsStore = useBotsStore()
 const { copy, copied } = useClipboard()
 
 const bot = ref<PublicBotDetail | null>(null)
+const authReady = ref(false)
+void authStore.initAuth().then(
+  () => { authReady.value = true },
+  () => { authReady.value = true },
+)
 const loading = ref(true)
 const error = ref('')
 
@@ -422,10 +454,23 @@ const selectedServer = ref<ServerForInstall | null>(null)
 const selectedScopes = ref<string[]>([])
 const authResponse = ref<{ client_id: string; redirect_uri: string } | null>(null)
 const installAuthorizeError = ref('')
+const serversLoading = ref(false)
+const serversError = ref('')
+// Стабильный набор разрешений из публичной карточки для зависимых scopes.
+const installScopeCatalog = computed<BotAvailableScope[]>(() =>
+  (bot.value?.scopes || []).map((name) => ({
+    name,
+    label: name,
+    description: '',
+    required: name === 'bot',
+    assignable: true,
+    group: 'installation',
+  })),
+)
 
 // ================ Debug
 const showBotDebugPanel = computed(() => {
-  return import.meta.env.DEV || import.meta.env.VITE_ENABLE_BOT_DEBUG === 'true'
+  return import.meta.env.DEV
 })
 
 const debugClientSecret = ref('')
@@ -448,20 +493,44 @@ const isOwner = computed(() => {
 })
 
 const loadBot = async () => {
+  const requestedBotId = botId.value
   loading.value = true
   error.value = ''
-  const response = await botsApi.getPublicBotInfo(botId.value)
-  if (response.error) {
-    error.value = response.status === 404 ? 'Бот не найден или не публичный' : response.error
-  } else {
-    bot.value = response.data || null
+  bot.value = null
+  try {
+    const response = await botsApi.getPublicBotInfo(requestedBotId)
+    if (requestedBotId !== botId.value) return
+    if (response.error) {
+      error.value = response.status === 404 ? 'Бот не найден или не публичный' : response.error
+    } else {
+      bot.value = response.data || null
+      if (!bot.value) error.value = 'Сервер не вернул данные бота'
+    }
+  } catch {
+    if (requestedBotId === botId.value) error.value = 'Не удалось загрузить информацию о боте'
+  } finally {
+    if (requestedBotId === botId.value) loading.value = false
   }
-  loading.value = false
 }
 
 const redirectToLogin = () => {
   localStorage.setItem('redirect_after_login', window.location.href)
   window.location.href = `https://echotalk.ru/login?redirect=${encodeURIComponent(window.location.href)}`
+}
+
+const loadInstallServers = async () => {
+  serversLoading.value = true
+  serversError.value = ''
+  botsStore.error = null
+  botsStore.serversForInstall = []
+  try {
+    await botsStore.fetchServersForInstall(botId.value)
+    serversError.value = botsStore.error || ''
+  } catch {
+    serversError.value = 'Не удалось загрузить список серверов'
+  } finally {
+    serversLoading.value = false
+  }
 }
 
 const startInstall = async () => {
@@ -470,15 +539,26 @@ const startInstall = async () => {
     return
   }
   installStep.value = 'select-server'
-  await botsStore.fetchServersForInstall(botId.value)
+  await loadInstallServers()
 }
 
 const selectServer = (server: ServerForInstall) => {
   if (server.has_bot) return
   selectedServer.value = server
   // Инициализируем scopes - все включены по умолчанию
-  selectedScopes.value = [...(bot.value?.scopes || [])]
+  selectedScopes.value = [...new Set(bot.value?.scopes || [])]
   installStep.value = 'select-scopes'
+}
+
+const onScopeChange = (name: string, event: Event) => {
+  const checked = (event.target as HTMLInputElement).checked
+  const allowed = new Set(bot.value?.scopes || [])
+  selectedScopes.value = updateBotScopes(
+    selectedScopes.value,
+    name,
+    checked,
+    installScopeCatalog.value,
+  ).filter((scope) => allowed.has(scope))
 }
 
 const backToServers = () => {
@@ -498,7 +578,7 @@ const backToScopes = () => {
 }
 
 const confirmInstall = async () => {
-  if (!selectedServer.value || !bot.value || selectedScopes.value.length === 0) return
+  if (botsStore.isInstalling || !selectedServer.value || !bot.value || selectedScopes.value.length === 0) return
 
   installAuthorizeError.value = ''
   const state = generateRandomState()
@@ -538,6 +618,7 @@ const finishInstall = () => {
   selectedServer.value = null
   selectedScopes.value = []
   authResponse.value = null
+  installAuthorizeError.value = ''
   botsStore.clearAuthCode()
 
   resetDebugPanel()
@@ -547,21 +628,12 @@ const cancelInstall = () => {
   installStep.value = 'ready'
   selectedServer.value = null
   selectedScopes.value = []
+  installAuthorizeError.value = ''
+  authResponse.value = null
+  serversError.value = ''
   botsStore.serversForInstall = []
-
+  botsStore.clearAuthCode()
   resetDebugPanel()
-}
-
-const getScopeDescription = (scope: string) => {
-  const descriptions: Record<string, string> = {
-    bot: 'Базовые функции бота',
-    'server.view': 'Просмотр информации о сервере',
-    'server.members.view': 'Просмотр участников сервера',
-    'message.content.read': 'Просмотр сообщений (контента) в комнатах',
-    'room.view': 'Просмотр доступных комнат',
-    'room.sendMessage': 'Отправка сообщений в комнаты',
-  }
-  return descriptions[scope] || scope
 }
 
 //==================================================
@@ -688,9 +760,10 @@ const resetDebugPanel = () => {
   debugMessage.value = 'Hello from bot debug panel'
 }
 
-onMounted(() => {
+watch(botId, () => {
+  cancelInstall()
   loadBot()
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -751,6 +824,7 @@ onMounted(() => {
 }
 
 /* ===== Bot Profile ===== */
+.readme-title { color: var(--text-primary); font-size: 1.25rem; margin: 0 0 1.25rem; }
 .bot-profile {
   display: flex;
   flex-direction: column;
@@ -854,7 +928,7 @@ onMounted(() => {
   font-weight: 500;
   color: var(--text-primary);
   padding: 0.25rem 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-tertiary);
   border-radius: 20px;
 }
 
@@ -900,7 +974,7 @@ onMounted(() => {
   align-items: flex-start;
   gap: 1rem;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-secondary);
   border-radius: 12px;
   border: 1px solid var(--border-color);
   transition: all 0.2s ease;
@@ -930,17 +1004,13 @@ onMounted(() => {
 
 .scope-info code {
   display: block;
-  font-size: 0.875rem;
-  color: var(--accent-primary);
-  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.3rem;
   font-family: 'JetBrains Mono', monospace;
 }
 
-.scope-info p {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
+.scope-info strong { display: block; font-size: 0.925rem; color: var(--text-primary); }
 
 /* ===== Help Section ===== */
 .help-section {
@@ -982,7 +1052,7 @@ onMounted(() => {
   border-radius: 16px;
   width: 100%;
   max-width: 500px;
-  max-height: 100vh;
+  max-height: min(90dvh, 900px);
   overflow: hidden;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
 }
@@ -1023,7 +1093,7 @@ onMounted(() => {
 .modal-body {
   padding: 1.5rem;
   overflow-y: auto;
-  max-height: calc(90vh - 80px);
+  max-height: calc(90dvh - 80px);
 }
 
 .modal-actions {
@@ -1058,32 +1128,29 @@ onMounted(() => {
 }
 
 .server-card {
+  width: 100%;
+  text-align: left;
+  color: var(--text-primary);
+  font: inherit;
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 2px solid transparent;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.server-card:hover:not(.disabled) {
-  background: rgba(139, 92, 246, 0.1);
+.server-card:hover:not(:disabled) {
+  background: var(--bg-tertiary);
   border-color: var(--accent-primary);
-  transform: translateX(4px);
 }
 
-.server-card.has-bot {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background: rgba(34, 197, 94, 0.05);
-}
-
-.server-card.disabled {
-  cursor: not-allowed;
-}
+.server-card.has-bot { opacity: 0.65; cursor: not-allowed; }
+.server-card:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+.server-select-hint { color: var(--text-secondary); font-size: 0.75rem; margin: 0; }
 
 .server-avatar {
   width: 48px;
@@ -1154,7 +1221,7 @@ onMounted(() => {
 }
 
 .scope-toggle {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-secondary);
   border-radius: 12px;
   padding: 1rem;
   border: 1px solid transparent;
@@ -1165,10 +1232,7 @@ onMounted(() => {
   border-color: var(--border-color);
 }
 
-.scope-toggle.disabled {
-  opacity: 0.7;
-  background: rgba(0, 0, 0, 0.1);
-}
+.scope-toggle.disabled { opacity: 0.85; }
 
 .scope-label {
   display: flex;
@@ -1197,9 +1261,10 @@ onMounted(() => {
   flex: 1;
 }
 
+.scope-content strong { color: var(--text-primary); font-size: 0.95rem; }
 .scope-content code {
-  font-size: 0.875rem;
-  color: var(--accent-primary);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
   font-family: 'JetBrains Mono', monospace;
 }
 
@@ -1233,7 +1298,7 @@ onMounted(() => {
 .scopes-warning p {
   margin: 0;
   font-size: 0.875rem;
-  color: #eab308;
+  color: var(--text-primary);
   line-height: 1.5;
 }
 
@@ -1488,6 +1553,11 @@ onMounted(() => {
     max-width: 100%;
     margin: 0.5rem;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-card, .scope-toggle, .modal-enter-active, .modal-leave-active { transition: none; }
+  .spinner { animation: none; }
 }
 
 .debug-panel {
