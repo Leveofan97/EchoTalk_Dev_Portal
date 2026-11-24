@@ -3,15 +3,16 @@
   <Teleport to="body">
     <Transition name="modal">
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
-        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="add-redirect-title">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="oauth-url-modal-title">
           <div class="modal-header">
-            <h2 id="add-redirect-title">Добавить Redirect URI</h2>
+            <h2 id="oauth-url-modal-title">{{ mode === 'oauth-start' ? (initialValue ? 'Изменить OAuth Start URL' : 'Добавить OAuth Start URL') : 'Добавить Redirect URI' }}</h2>
             <button class="modal-close" type="button" aria-label="Закрыть" :disabled="isLoading" @click="close"><AppIcon name="x" :size="21" /></button>
           </div>
 
           <form @submit.prevent="handleSubmit" class="modal-body">
             <div class="form-group">
               <Input
+                v-if="mode === 'redirect'"
                 v-model="url"
                 id="redirect-uri"
                 label="URL *"
@@ -20,13 +21,27 @@
                 required
                 maxlength="500"
               />
+              <Input
+                v-else
+                v-model="url"
+                id="oauth-start-url"
+                label="OAuth Start URL *"
+                placeholder="https://your-bot.example.com/oauth/start"
+                type="url"
+                required
+                maxlength="500"
+                :error="validationError"
+              />
               <p class="form-hint">
                 Допускается HTTPS или HTTP для localhost и loopback IP. Максимум 500 символов.
+                <template v-if="mode === 'oauth-start'">
+                  Адрес должен вести на backend бота, где создаётся OAuth state.
+                </template>
               </p>
             </div>
 
             <div class="modal-actions">
-              <Button variant="ghost" type="button" @click="close">
+              <Button variant="ghost" type="button" :disabled="isLoading" @click="close">
                 Отмена
               </Button>
               <Button
@@ -34,7 +49,7 @@
                 type="submit"
                 :loading="isLoading"
               >
-                Добавить
+                {{ mode === 'oauth-start' ? 'Сохранить' : 'Добавить' }}
               </Button>
             </div>
           </form>
@@ -45,15 +60,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import { isSafeBotOAuthURL } from '@/utils/botOAuthFlow'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   isOpen: boolean
   isLoading?: boolean
-}>()
+  mode?: 'redirect' | 'oauth-start'
+  initialValue?: string
+}>(), {
+  mode: 'redirect',
+  initialValue: '',
+})
 
 const emit = defineEmits<{
   close: []
@@ -61,17 +82,33 @@ const emit = defineEmits<{
 }>()
 
 const url = ref('')
+const validationError = ref('')
+
+// Opening the dialog must always show the current value, not an unsaved previous draft.
+watch(() => props.isOpen, (open) => {
+  if (open) {
+    url.value = props.mode === 'oauth-start' ? props.initialValue : ''
+    validationError.value = ''
+  }
+})
+watch(url, () => { validationError.value = '' })
 
 const close = () => {
   if (props.isLoading) return
   url.value = ''
+  validationError.value = ''
   emit('close')
 }
 
 const handleSubmit = () => {
-  if (url.value.trim()) {
-    emit('submit', url.value.trim())
+  if (props.isLoading) return
+  const value = url.value.trim()
+  if (!value) return
+  if (props.mode === 'oauth-start' && !isSafeBotOAuthURL(value)) {
+    validationError.value = 'Укажите HTTPS URL или HTTP для localhost/loopback без логина, пароля и фрагмента.'
+    return
   }
+  emit('submit', value)
 }
 </script>
 

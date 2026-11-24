@@ -7,6 +7,14 @@
       @close="showAddRedirectModal = false"
       @submit="addRedirectURI"
     />
+    <AddRedirectModal
+      mode="oauth-start"
+      :is-open="showOAuthStartModal"
+      :is-loading="isSavingOAuthStart"
+      :initial-value="bot?.oauth_start_url ?? ''"
+      @close="showOAuthStartModal = false"
+      @submit="saveOAuthStart"
+    />
 
     <div class="container">
       <!-- Header -->
@@ -263,43 +271,75 @@
               </div>
             </Card>
             <Card id="bot-redirect-uris" class="section-card redirect-uri-section">
-              <div class="section-header redirect-section-heading">
-                <div>
-                  <h2 class="section-title"><AppIcon name="link-2" :size="24" /> Адреса перенаправления OAuth</h2>
-                  <p class="section-desc">Добавьте разрешённые callback-адреса. После подтверждения установки браузер переходит на callback бота с code и state. Адрес проверяется при выдаче и обмене кода.</p>
-                </div>
-                <Button variant="secondary" :disabled="isSavingRedirectURIs || redirectURIs.length >= 10" @click="showAddRedirectModal = true">
-                  <AppIcon name="plus" :size="19" /> Добавить адрес
-                </Button>
+              <div class="section-header">
+                <h2 class="section-title"><AppIcon name="link-2" :size="24" /> Адреса OAuth</h2>
+                <p class="section-desc">Настройте адрес начала авторизации и разрешённые адреса возврата к боту.</p>
               </div>
-              <p class="redirect-count">Зарегистрировано: {{ redirectURIs.length }} из 10</p>
-              <div v-if="!redirectURIs.length" class="redirect-empty" role="note">
-                <AppIcon name="alert-triangle" :size="21" />
-                <span>Адреса не зарегистрированы. Получение OAuth-кода недоступно, пока не добавлен хотя бы один Redirect URI.</span>
-              </div>
-              <ul v-else class="redirect-uri-list">
-                <li v-for="(uri, index) in redirectURIs" :key="uri" class="redirect-uri-item">
-                  <div class="redirect-uri-main">
-                    <code>{{ uri }}</code>
-                    <small v-if="index === 0">По умолчанию при установке через Dev Portal</small>
+
+              <div class="oauth-url-group">
+                <div class="redirect-section-heading">
+                  <div>
+                    <h3 class="oauth-url-heading">OAuth Start URL</h3>
+                    <p class="section-desc">Адрес backend бота, где создаётся OAuth state перед установкой из каталога. Только HTTPS (кроме localhost и loopback для разработки).</p>
                   </div>
-                  <div v-if="pendingRedirectURIToRemove === uri" class="redirect-uri-actions">
-                    <span class="redirect-delete-label">Удалить адрес?</span>
-                    <Button variant="ghost" size="sm" :disabled="isSavingRedirectURIs" @click="pendingRedirectURIToRemove = null">Отмена</Button>
-                    <Button variant="danger" size="sm" :loading="isSavingRedirectURIs" @click="removeRedirectURI(uri)">Удалить</Button>
-                  </div>
-                  <Button v-else variant="ghost" size="sm" :disabled="isSavingRedirectURIs" @click="pendingRedirectURIToRemove = uri">
-                    <AppIcon name="trash-2" :size="18" /> Удалить
+                  <Button variant="secondary" :disabled="isSavingOAuthStart" @click="showOAuthStartModal = true">
+                    <AppIcon :name="bot?.oauth_start_url ? 'settings' : 'plus'" :size="19" />
+                    {{ bot?.oauth_start_url ? 'Изменить адрес' : 'Добавить адрес' }}
                   </Button>
-                </li>
-              </ul>
-              <div class="form-group" style="margin-top: 1.5rem">
-                <label for="bot-oauth-start-url">OAuth Start URL</label>
-                <p class="section-desc">Адрес на backend бота, где создаётся OAuth state. При установке из каталога пользователь сначала перейдёт туда, а backend бота вернёт его на страницу EchoTalk с state и redirect_uri. Только HTTPS (кроме localhost для разработки).</p>
-                <input id="bot-oauth-start-url" v-model.trim="oauthStartDraft" type="url" maxlength="500" class="form-input ui-control" placeholder="https://your-bot.example.com/oauth/start" :disabled="isSavingOAuthStart" />
-                <div class="modal-actions" style="justify-content: flex-start; margin-top: .75rem">
-                  <Button variant="primary" :loading="isSavingOAuthStart" :disabled="oauthStartDraft === (bot?.oauth_start_url ?? '')" @click="saveOAuthStart">Сохранить Start URL</Button>
                 </div>
+                <ul v-if="bot?.oauth_start_url" class="redirect-uri-list">
+                  <li class="redirect-uri-item">
+                    <div class="redirect-uri-main">
+                      <code>{{ bot.oauth_start_url }}</code>
+                      <small>Точка входа на backend разработчика бота</small>
+                    </div>
+                    <div v-if="pendingOAuthStartRemoval" class="redirect-uri-actions">
+                      <span class="redirect-delete-label">Удалить адрес?</span>
+                      <Button variant="ghost" size="sm" :disabled="isSavingOAuthStart" @click="pendingOAuthStartRemoval = false">Отмена</Button>
+                      <Button variant="danger" size="sm" :loading="isSavingOAuthStart" @click="removeOAuthStart">Удалить</Button>
+                    </div>
+                    <Button v-else variant="ghost" size="sm" :disabled="isSavingOAuthStart" @click="pendingOAuthStartRemoval = true">
+                      <AppIcon name="trash-2" :size="18" /> Удалить
+                    </Button>
+                  </li>
+                </ul>
+                <div v-else class="redirect-empty" role="note">
+                  <AppIcon name="alert-triangle" :size="21" />
+                  <span>OAuth Start URL не задан. Установка бота из каталога не будет доступна до настройки адреса.</span>
+                </div>
+              </div>
+
+              <div class="oauth-url-group">
+                <div class="redirect-section-heading">
+                  <div>
+                    <h3 class="oauth-url-heading">Redirect URI</h3>
+                    <p class="section-desc">Разрешённые callback-адреса. После подтверждения браузер возвращается на callback с code и state. Адрес проверяется при выдаче и обмене кода.</p>
+                  </div>
+                  <Button variant="secondary" :disabled="isSavingRedirectURIs || redirectURIs.length >= 10" @click="showAddRedirectModal = true">
+                    <AppIcon name="plus" :size="19" /> Добавить адрес
+                  </Button>
+                </div>
+                <p class="redirect-count">Зарегистрировано: {{ redirectURIs.length }} из 10</p>
+                <div v-if="!redirectURIs.length" class="redirect-empty" role="note">
+                  <AppIcon name="alert-triangle" :size="21" />
+                  <span>Адреса не зарегистрированы. Получение OAuth-кода недоступно, пока не добавлен хотя бы один Redirect URI.</span>
+                </div>
+                <ul v-else class="redirect-uri-list">
+                  <li v-for="(uri, index) in redirectURIs" :key="uri" class="redirect-uri-item">
+                    <div class="redirect-uri-main">
+                      <code>{{ uri }}</code>
+                      <small v-if="index === 0">По умолчанию при установке через Dev Portal</small>
+                    </div>
+                    <div v-if="pendingRedirectURIToRemove === uri" class="redirect-uri-actions">
+                      <span class="redirect-delete-label">Удалить адрес?</span>
+                      <Button variant="ghost" size="sm" :disabled="isSavingRedirectURIs" @click="pendingRedirectURIToRemove = null">Отмена</Button>
+                      <Button variant="danger" size="sm" :loading="isSavingRedirectURIs" @click="removeRedirectURI(uri)">Удалить</Button>
+                    </div>
+                    <Button v-else variant="ghost" size="sm" :disabled="isSavingRedirectURIs" @click="pendingRedirectURIToRemove = uri">
+                      <AppIcon name="trash-2" :size="18" /> Удалить
+                    </Button>
+                  </li>
+                </ul>
               </div>
             </Card>
 </section>
@@ -1318,24 +1358,37 @@ const showAddRedirectModal = ref(false)
 const isSavingRedirectURIs = ref(false)
 const pendingRedirectURIToRemove = ref<string | null>(null)
 const redirectURIs = computed(() => bot.value?.redirect_uris ?? [])
-const oauthStartDraft = ref('')
+const showOAuthStartModal = ref(false)
+const pendingOAuthStartRemoval = ref(false)
 const isSavingOAuthStart = ref(false)
-watch(() => bot.value?.oauth_start_url, (url) => { oauthStartDraft.value = url ?? '' }, { immediate: true })
 
-const saveOAuthStart = async () => {
-  if (isSavingOAuthStart.value) return
+const saveOAuthStart = async (url: string): Promise<boolean> => {
+  if (isSavingOAuthStart.value) return false
+  if (url === (bot.value?.oauth_start_url ?? '')) {
+    showOAuthStartModal.value = false
+    return true
+  }
   isSavingOAuthStart.value = true
   try {
-    await botsStore.updateBot(botId.value, { oauth_start_url: oauthStartDraft.value })
+    await botsStore.updateBot(botId.value, { oauth_start_url: url })
     const details = await botsStore.fetchBotDetails(botId.value)
-    if (!details) throw new Error('Не удалось проверить сохранённый URL')
+    if (!details || (details.oauth_start_url ?? '') !== url) {
+      throw new Error('Не удалось проверить сохранённый URL')
+    }
     bot.value = details
-    toastStore.success('OAuth Start URL сохранён')
-  } catch (err: any) {
-    toastStore.error(err.message || 'Не удалось сохранить OAuth Start URL')
+    showOAuthStartModal.value = false
+    toastStore.success(url ? 'OAuth Start URL сохранён' : 'OAuth Start URL удалён')
+    return true
+  } catch (err: unknown) {
+    toastStore.error(err instanceof Error ? err.message : 'Не удалось сохранить OAuth Start URL')
+    return false
   } finally {
     isSavingOAuthStart.value = false
   }
+}
+
+const removeOAuthStart = async () => {
+  if (await saveOAuthStart('')) pendingOAuthStartRemoval.value = false
 }
 
 const saveRedirectURIs = async (uris: string[]): Promise<boolean> => {
@@ -3268,9 +3321,13 @@ onMounted(() => {
 <style scoped>
 /* OAuth Redirect URI manager: all colors are inherited from the active theme. */
 .redirect-uri-section { margin-top: 1.25rem; }
+.oauth-url-group { display: grid; gap: 0.75rem; }
+.oauth-url-group + .oauth-url-group { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
 .redirect-section-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
 .redirect-section-heading > div { flex: 1; min-width: 220px; }
-.redirect-count { font-size: 0.8125rem; color: var(--text-secondary); margin: 0 0 0.75rem; }
+.oauth-url-heading { color: var(--text-primary); font-weight: 600; font-size: 1rem; margin: 0 0 0.35rem; }
+.redirect-section-heading .section-desc { margin: 0; }
+.redirect-count { font-size: 0.8125rem; color: var(--text-secondary); margin: 0; }
 .redirect-uri-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
 .redirect-uri-item { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.875rem; padding: 0.875rem 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--bg-secondary); }
 .redirect-uri-main { display: flex; flex-direction: column; gap: 0.375rem; flex: 1; min-width: 180px; }

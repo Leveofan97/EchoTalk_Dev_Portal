@@ -52,7 +52,11 @@
 
       <main class="docs-content">
         <nav class="docs-mobile-nav" aria-label="Быстрый переход к разделу">
-          <a v-for="item in navigation.flatMap((group) => group.items)" :key="item.id" :href="`#${item.id}`">
+          <a
+            v-for="item in navigation.flatMap((group) => group.items)"
+            :key="item.id"
+            :href="`#${item.id}`"
+          >
             {{ item.label }}
           </a>
         </nav>
@@ -61,8 +65,8 @@
           <div class="docs-badge">EchoTalk · Bot Platform</div>
           <h1>Документация для разработчиков ботов</h1>
           <p>
-            От регистрации приложения и OAuth-установки до первого сообщения, событий и команд.
-            Для точных схем Bot Resource API и Gateway откройте справочник API.
+            От регистрации приложения и OAuth-установки до первого сообщения, событий и команд. Для
+            точных схем Bot Resource API и Gateway откройте справочник API.
           </p>
 
           <div class="docs-hero-actions">
@@ -94,154 +98,66 @@
         </header>
 
         <section id="quickstart" class="doc-section">
-          <h2>Быстрый старт</h2>
-          <p>Минимальный путь от регистрации бота до первого запроса к EchoTalk API.</p>
-
+          <h2>Быстрый старт: от регистрации до первого сообщения</h2>
+          <p>
+            Ниже — порядок действий для разработчика бота. Для HTTP-примеров используется тестовая
+            установка: <code>bot_app_id=4</code>, <code>server_id=1</code>, <code>room_id=3</code>.
+            Это иллюстративные значения, у вашего бота ID будут другими.
+          </p>
           <ol class="docs-steps">
             <li>
-              <strong>Зарегистрируйте приложение.</strong>
-              Откройте <RouterLink :to="{ name: 'bots' }">«Мои боты»</RouterLink>, создайте бота и
-              выберите разрешения <code>bot</code>, <code>room.view</code> и
-              <code>room.sendMessage</code>. Для других функций нужны соответствующие scopes.
+              <strong>Создайте бота.</strong>
+              В <RouterLink :to="{ name: 'bots' }">«Мои боты»</RouterLink> укажите имя (3–100
+              символов), описание (до 500 символов) и минимальные разрешения: <code>bot</code>,
+              <code>room.view</code>, <code>room.sendMessage</code>.
             </li>
             <li>
-              <strong>Настройте авторизацию.</strong>
-              На вкладке «Авторизация» получите Client ID и Client Secret, добавьте Redirect URI и OAuth Start URL.
-              Сохраните секрет на стороне сервера: после закрытия окна он повторно не отображается.
+              <strong>Настройте свою серверную программу.</strong>
+              Реализуйте два HTTP-адреса: <code>/oauth/start</code> и <code>/oauth/callback</code>.
+              Укажите их как OAuth Start URL и Redirect URI в разделе «Авторизация» бота, создайте
+              Client ID и Client Secret.
             </li>
             <li>
-              <strong>Активируйте приложение.</strong>
-              Опубликуйте бота в Dev Portal. Для установки приложение должно иметь статус
-              <code>active</code> и действующие учётные данные. Чтобы страница бота была доступна
-              в каталоге, также включите параметр «Публичный» в настройках приложения.
+              <strong>Подготовьте установку.</strong>
+              Опубликуйте бота (статус <code>active</code>) и включите публичность, чтобы его
+              карточка появилась в каталоге. Для разработки используйте отдельного тестового бота и
+              тестовый сервер. После локального теста снимите публичность и уберите loopback-адреса
+              из OAuth-настроек.
             </li>
             <li>
-              <strong>Авторизуйте установку.</strong>
-              На публичной странице бота выберите сервер и разрешения, затем подтвердите установку.
-              После подтверждения браузер перейдёт на backend бота с одноразовым кодом и state.
+              <strong>Попросите пользователя добавить бота.</strong>
+              На публичной карточке он нажимает «Добавить на сервер», выбирает сервер и подтверждает
+              разрешения. Сайт проводит его через OAuth Start URL и Callback.
             </li>
             <li>
-              <strong>Получите токен и отправьте сообщение.</strong>
-              Обменяйте полученный callback-код на access/refresh token в backend бота и выполните запрос к
-              <code>/bot/rooms/{roomID}/messages</code>.
+              <strong>Получите токены на сервере бота.</strong>
+              Обработчик Callback проверяет <code>state</code> и отправляет
+              <code>POST /oauth/token</code> в API EchoTalk. В ответ получает
+              <code>access_token</code> и <code>refresh_token</code>.
+            </li>
+            <li>
+              <strong>Узнайте ID сервера и комнаты.</strong>
+              С access token вызовите <code>GET /bot/me</code> и возьмите оттуда
+              <code>server_id</code> и <code>installation_id</code>. Затем вызовите
+              <code>GET /bot/servers/{serverID}/rooms</code> и выберите <code>id</code>
+              доступной текстовой комнаты.
+            </li>
+            <li>
+              <strong>Отправьте первое сообщение.</strong>
+              Выполните <code>POST /bot/rooms/{roomID}/messages</code> с выбранным
+              <code>room_id</code> в пути и <code>content</code> в JSON-теле. Пошаговые ответы API
+              показаны в разделе «Первое сообщение».
             </li>
           </ol>
           <div class="callout callout--info">
-            <strong>Установка из каталога.</strong>
-            <span>EchoTalk сначала переводит пользователя на OAuth Start URL бота. Backend бота создаёт случайный state, сохраняет его в HttpOnly/SameSite=Lax cookie и возвращает пользователя на страницу /explore/&lt;BOT_ID&gt;?state=...&amp;redirect_uri=.... После подтверждения браузер переходит на зарегистрированный callback бота с code и state.</span>
-          </div>
-        </section>
-
-        <section id="oauth-install" class="doc-section">
-          <h2>OAuth и установка на сервер</h2>
-          <p>
-            Для установки пользователь должен иметь право добавлять ботов на выбранный сервер. Настройте OAuth Start URL и зарегистрированный Redirect URI на backend бота.
-            <code>POST /oauth/authorize</code> выполняется от имени авторизованного пользователя,
-            а не с Client Secret. В интерфейсе портала этот запрос выполняется при подтверждении установки.
-          </p>
-          <p>Параметр <code>state</code> формирует backend бота в OAuth Start URL. Он должен быть криптографически случайным и проверяться backend бота на callback до обмена кода.
-          </p>
-          <CodeBlock title="POST /oauth/authorize · JSON" :code="authorizeExample" @copy="copyCode(authorizeExample)" />
-          <p>
-            Параметр <code>redirect_uri</code> можно передать явно: он должен в точности совпадать
-            с одним из адресов во вкладке «Авторизация». Если его не передать, backend выберет
-            первый зарегистрированный адрес (только для старых API-клиентов). При отсутствии зарегистрированных адресов код не выдаётся.
-          </p>
-          <p>
-            Ответ API содержит <code>code</code>, <code>state</code>, <code>client_id</code>, <code>redirect_uri</code> и <code>redirect_to</code>. После успешного ответа frontend проверяет callback и выполняет top-level навигацию на <code>redirect_to</code>. Backend бота получает <code>GET /oauth/callback?code=...&amp;state=...</code>, проверяет state и обменивает код. Код действует 10 минут и может использоваться один раз.
-          </p>
-          <h3>Обмен кода на токены</h3>
-          <CodeBlock title="POST /oauth/token · JSON" :code="tokenRequestExample" @copy="copyCode(tokenRequestExample)" />
-          <p>
-            Отправляйте запрос из backend бота по HTTPS. Client Secret нельзя передавать
-            во frontend, публиковать в репозитории или записывать в логи.
-            <code>redirect_uri</code> при обмене обязан совпадать с адресом из выданного кода.
-          </p>
-          <div class="callout callout--warning">
-            <strong>Срок действия токенов.</strong>
+            <strong>Кто получает токены?</strong>
             <span>
-              Access token выдаётся на 15 минут, refresh token — на 30 дней. Для обновления вызывайте
-              <code>POST /oauth/token/refresh</code> с <code>grant_type: refresh_token</code>,
-              <code>refresh_token</code>, <code>client_id</code> и <code>client_secret</code>.
-              При обновлении refresh token ротируется: храните только новый токен.
+              Только серверная программа бота. Dev Portal получает согласие пользователя, но Client
+              Secret и новые access/refresh token в браузер и Dev Portal не передаются. Для
+              локальной проверки не нужны исходники EchoTalk: реализуйте два обработчика HTTP на
+              своём сервере по <a href="#oauth-install">контрактам выше</a> и выполните
+              <a href="#oauth-local-test">проверку шаг за шагом</a>.
             </span>
-          </div>
-        </section>
-
-        <section id="first-request" class="doc-section">
-          <h2>Первый запрос к Bot API</h2>
-          <p>
-            Используйте access token конкретной установки. Сначала проверьте учётную запись бота,
-            затем получите комнаты сервера и отправьте тестовое сообщение в доступную комнату.
-          </p>
-          <p>В примерах ниже переменные <code>ECHOTALK_API_URL</code> и <code>BOT_ACCESS_TOKEN</code>
-            должны быть заданы в окружении процесса бота. Замените значения ID на реальные.
-          </p>
-          <CodeBlock title="GET /bot/me" :code="botMeExample" @copy="copyCode(botMeExample)" />
-          <CodeBlock title="GET /bot/servers/{serverID}/rooms" :code="botRoomsExample" @copy="copyCode(botRoomsExample)" />
-          <CodeBlock title="POST /bot/rooms/{roomID}/messages" :code="firstMessageExample" @copy="copyCode(firstMessageExample)" />
-          <div class="callout callout--info">
-            <strong>Необходимы разрешения.</strong>
-            <span>
-              Для отправки сообщения нужен <code>room.sendMessage</code>, а для доступа к данным
-              комнаты — соответствующие права. Проверки проходят на backend и учитывают права
-              конкретной установки бота на сервере.
-            </span>
-          </div>
-        </section>
-
-        <section id="delivery-setup" class="doc-section">
-          <h2>События: Webhook или Gateway</h2>
-          <p>
-            В «Управлении ботом» выберите установку (сервер), откройте вкладку «Подключение» и
-            выберите способ доставки: HTTP Webhook или WebSocket Gateway. На вкладке «Подписки»
-            укажите события, которые бот должен получать. Это настройки <strong>установки</strong>,
-            а не всех серверов сразу.
-          </p>
-          <div class="endpoint-list">
-            <EndpointRow method="GET" path="/dev/installations/{installationID}/webhook" description="Получить настройки доставки и подписки." />
-            <EndpointRow method="PUT" path="/dev/installations/{installationID}/webhook" description="Сохранить выбранный транспорт, адреса и события." />
-            <EndpointRow method="POST" path="/bot/gateway/session" description="Получить временный gateway session token от имени бота." />
-            <EndpointRow method="GET" path="/bot/gateway/ws" description="Открыть WebSocket-соединение с gateway session token." />
-          </div>
-          <p>
-            Для Webhook проверяйте подпись <code>X-EchoTalk-Signature</code> на стороне бота.
-            Для Gateway используйте heartbeat, ACK и resume по протоколу AsyncAPI.
-            Подробности находятся в <button type="button" class="docs-text-button" @click="setActiveApiReference('gateway')">справочнике Gateway</button>.
-          </p>
-          <div class="callout callout--warning">
-            <strong>Не смешивайте токены.</strong>
-            <span>
-              Обычный bot access token предназначен для REST API, а временный gateway session token —
-              для WebSocket. Секрет подписи Webhook храните только в backend бота.
-            </span>
-          </div>
-        </section>
-
-        <section id="commands-setup" class="doc-section">
-          <h2>Slash-команды</h2>
-          <p>
-            Команды создаются во вкладке «Команды» выбранного приложения. Адрес обработчика
-            <code>command_base_url</code> задаётся во вкладке «Подключение» для установки.
-            Для production обработчик должен принимать HTTPS POST-запросы и обрабатывать
-            команды на своём сервере.
-          </p>
-          <CodeBlock title="POST /dev/bots/{botID}/commands · JSON" :code="commandCreateExample" @copy="copyCode(commandCreateExample)" />
-          <p>
-            Для изменения и удаления команд доступны <code>PUT</code> и <code>DELETE</code> на
-            <code>/dev/bots/{botID}/commands/{commandID}</code>. Входящие вызовы обработчика
-            проверяйте на подлинность; не доверяйте полям запроса без валидации.
-          </p>
-        </section>
-
-        <section id="troubleshooting" class="doc-section">
-          <h2>Если что-то не работает</h2>
-          <div class="docs-troubleshooting">
-            <div><strong>Ошибка Redirect URI</strong><p>Добавьте адрес во вкладке «Авторизация». При обмене кода используйте точно тот адрес, который вернул <code>/oauth/authorize</code>.</p></div>
-            <div><strong>Код истёк или уже использован</strong><p>Повторите авторизацию: одноразовый код действует 10 минут. Не отправляйте запрос обмена параллельно несколько раз.</p></div>
-            <div><strong>403 Forbidden</strong><p>Проверьте scopes приложения, разрешения конкретной установки, доступ к серверу и права на комнату.</p></div>
-            <div><strong>429 Too Many Requests</strong><p>Проверьте вкладку «Диагностика» и соблюдайте <code>retry_after_sec</code> или заголовок <code>Retry-After</code>, если он возвращён API.</p></div>
-            <div><strong>Нет событий</strong><p>Проверьте транспорт доставки, подписки выбранной установки, права бота и состояние соединения Gateway или последние попытки Webhook.</p></div>
           </div>
         </section>
 
@@ -263,6 +179,98 @@
           </div>
         </section>
 
+        <section id="installation-model" class="doc-section">
+          <h2>Установка, сервер и токены: что с чем связано</h2>
+          <p>
+            <strong>Установка (installation)</strong> — запись о том, что определённый бот получил
+            доступ к определённому серверу EchoTalk. Один бот может иметь установки на разных
+            серверах. У каждой установки собственные <code>installation_id</code>, разрешения,
+            настройки событий и токены.
+          </p>
+          <div class="docs-oauth-contract">
+            <div>
+              <strong><code>bot_app_id</code></strong
+              ><span
+                >ID приложения, которое создал разработчик в Dev Portal. Для нескольких установок
+                одного бота он одинаковый.</span
+              >
+            </div>
+            <div>
+              <strong><code>server_id</code></strong
+              ><span>ID сервера EchoTalk, на который бот был добавлен пользователем.</span>
+            </div>
+            <div>
+              <strong><code>installation_id</code></strong
+              ><span
+                >ID конкретной установки «бот + сервер». Нужен в Dev Portal для настроек транспорта,
+                подписок и диагностики.</span
+              >
+            </div>
+            <div>
+              <strong><code>room_id</code></strong
+              ><span
+                >ID комнаты внутри сервера. Получается из
+                <code>GET /bot/servers/{serverID}/rooms</code>.</span
+              >
+            </div>
+          </div>
+          <p>
+            <code>POST /oauth/token</code> возвращает токены, но
+            <strong>не возвращает ID установки или сервера</strong>. После обмена кода сервер бота
+            вызывает <code>GET /bot/me</code> с полученным access token. Ответ содержит
+            <code>bot_app_id</code>, <code>installation_id</code> и <code>server_id</code>.
+            Сохраняйте эту связь вместе с токенами в серверном хранилище.
+          </p>
+          <div class="callout callout--info">
+            <strong>Нужно ли запрашивать список серверов?</strong>
+            <span>
+              Нет. Bot Access Token относится к одной установке на одном сервере.
+              <code>/bot/me</code> уже сообщает её <code>server_id</code>. Для доступа к другому
+              серверу требуется отдельная установка и её токен.
+            </span>
+          </div>
+          <h3>Разные API и разные способы входа</h3>
+          <div class="table-wrap">
+            <table class="docs-table">
+              <thead>
+                <tr>
+                  <th>Маршруты</th>
+                  <th>Кто выполняет запросы</th>
+                  <th>Авторизация</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>/dev/*</code></td>
+                  <td>Сайт Dev Portal от имени владельца бота (настройки, установки, команды)</td>
+                  <td>Пользовательская сессия EchoTalk; не Bot Token</td>
+                </tr>
+                <tr>
+                  <td><code>/oauth/authorize</code></td>
+                  <td>Сайт Dev Portal после подтверждения пользователем</td>
+                  <td>Пользовательская сессия; сервер бота её не запрашивает</td>
+                </tr>
+                <tr>
+                  <td><code>/oauth/token</code>, <code>/oauth/token/refresh</code></td>
+                  <td>Только сервер бота</td>
+                  <td>Authorization Code или Refresh Token вместе с Client ID и Client Secret</td>
+                </tr>
+                <tr>
+                  <td><code>/bot/*</code></td>
+                  <td>Сервер бота, выполняющий рабочие операции</td>
+                  <td><code>Authorization: Bearer &lt;BOT_ACCESS_TOKEN&gt;</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Права доступа проверяются на backend EchoTalk для каждой установки. Знание
+            <code>server_id</code> или <code>room_id</code> не даёт доступа без соответствующих
+            разрешений. Разделение API не означает, что можно использовать пользовательский JWT
+            вместо токена бота.
+          </p>
+        </section>
+
         <section id="authentication" class="doc-section">
           <h2>Аутентификация</h2>
 
@@ -279,6 +287,780 @@
               Не храните bot access token или LiveKit token в исходниках, localStorage, логах и
               публичных примерах. Используйте секреты окружения или secret manager.
             </span>
+          </div>
+        </section>
+
+        <section id="oauth-install" class="doc-section">
+          <h2>Установка бота через OAuth: адреса и запросы</h2>
+          <p>
+            Чтобы пользователь мог установить вашего бота из каталога EchoTalk, нужно создать
+            <strong>два HTTP-обработчика на сервере бота</strong> и указать их адреса в Dev Portal.
+            Во <strong>всех примерах этого раздела</strong> используется один сценарий: ID бота —
+            <code>4</code>, сервер бота — <code>https://mybot.ru</code>, а сайт Dev Portal для
+            наглядности обозначен как <code>https://portal.example</code>. Это условные адреса:
+            вместо них используйте домен своего бота и
+            <strong>фактический адрес Dev Portal</strong>, открытый в браузере. Локальная проверка
+            вынесена в <a href="#oauth-local-test">отдельный раздел</a>.
+          </p>
+
+          <h3>Схема установки</h3>
+          <ol class="docs-oauth-journey" aria-label="Последовательность OAuth-установки">
+            <li>
+              <strong>Dev Portal в браузере пользователя</strong>
+              <span>После нажатия «Добавить на сервер» открывает OAuth Start URL.</span>
+            </li>
+            <li>
+              <strong>Сервер вашего бота</strong>
+              <span
+                >Принимает <code>GET /oauth/start</code>, создаёт <code>state</code> и
+                перенаправляет браузер обратно в Dev Portal.</span
+              >
+            </li>
+            <li>
+              <strong>Dev Portal и API EchoTalk</strong>
+              <span
+                >Пользователь подтверждает разрешения; запрос
+                <code>POST /oauth/authorize</code> выдаёт одноразовый код.</span
+              >
+            </li>
+            <li>
+              <strong>Сервер вашего бота</strong>
+              <span
+                >Браузер открывает <code>GET /oauth/callback</code> с кодом; сервер проверяет
+                <code>state</code>.</span
+              >
+            </li>
+            <li>
+              <strong>API EchoTalk</strong>
+              <span
+                >Получает серверный <code>POST /oauth/token</code> и выдаёт токены установки.</span
+              >
+            </li>
+          </ol>
+
+          <h3>1. Какие адреса указать в Dev Portal</h3>
+          <p>
+            Откройте «Мои боты» → ваш бот → «Авторизация». Адреса ниже должны соответствовать
+            маршрутам, которые обрабатывает <strong>ваша программа бота</strong>, а не маршрутам Go
+            API EchoTalk.
+          </p>
+          <div class="docs-oauth-addresses">
+            <div>
+              <h3>OAuth Start URL</h3>
+              <code>https://mybot.ru/oauth/start</code>
+              <p>
+                Начало установки. Dev Portal открывает этот адрес
+                <strong>в браузере пользователя</strong>. Ваш сервер принимает
+                <code>GET /oauth/start</code>, создаёт <code>state</code>
+                и возвращает HTTP-ответ с перенаправлением в Dev Portal.
+              </p>
+            </div>
+            <div>
+              <h3>Redirect URI (Callback)</h3>
+              <code>https://mybot.ru/oauth/callback</code>
+              <p>
+                Завершение установки. После подтверждения разрешений браузер выполнит
+                <strong>GET-запрос</strong> на этот адрес с параметрами <code>code</code> и
+                <code>state</code>. Ваш сервер проверит <code>state</code> и обменяет код на токены.
+              </p>
+            </div>
+          </div>
+          <p>
+            В этом сценарии укажите именно эти два HTTPS-адреса в настройках бота.
+            <strong>Redirect URI должен точно совпадать</strong> со значением
+            <code>redirect_uri</code> в запросах <code>/oauth/authorize</code> и
+            <code>/oauth/token</code>. Для своего компьютера используйте отдельные
+            <a href="#oauth-local-test">настройки локального теста</a> — не смешивайте локальные
+            адреса с рабочими в одной цепочке запросов.
+          </p>
+
+          <h3>2. Какой запрос принимает OAuth Start URL</h3>
+          <p>
+            После нажатия «Добавить на сервер» сайт Dev Portal меняет адрес текущей вкладки на
+            <code>https://mybot.ru/oauth/start</code>. Браузер выполняет
+            <strong>HTTP GET-запрос без тела и без обязательных URL-параметров</strong>. В текущем
+            OAuth Flow EchoTalk не передаёт в этот запрос ни Client ID, ни ID сервера, ни
+            <code>state</code>. Сервер бота знает ID приложения, адрес Dev Portal и свой Redirect
+            URI из конфигурации.
+          </p>
+          <CodeBlock
+            title="Браузер → сервер бота · GET /oauth/start"
+            :code="oauthStartRequestExample"
+            @copy="copyCode(oauthStartRequestExample)"
+          />
+          <p>
+            Обработчик должен создать новый <code>state</code>, сохранить его для этого браузера
+            (например, в HttpOnly cookie), а затем ответить перенаправлением
+            <code>303 See Other</code>. В заголовке <code>Location</code> укажите страницу
+            <code>https://portal.example/explore/4</code> (замените домен на реальный адрес Dev
+            Portal) с двумя параметрами: <code>state</code> и <code>redirect_uri</code>.
+          </p>
+          <CodeBlock
+            title="Ответ сервера бота · HTTP 303 и заголовки"
+            :code="oauthStartResponseExample"
+            @copy="copyCode(oauthStartResponseExample)"
+          />
+          <p>
+            Получив этот ответ, браузер сам открывает новый адрес из <code>Location</code>. Параметр
+            <code>redirect_uri</code> должен содержать зарегистрированный Callback URL,
+            закодированный для передачи в строке запроса. Ответ <code>303</code> — это не запрос
+            сервера бота к EchoTalk: перенаправление выполняет браузер пользователя.
+          </p>
+
+          <h3>Что такое state и как его создать</h3>
+          <p>
+            <code>state</code> — случайная строка для проверки одной попытки установки. Её создаёт
+            <strong>ваш сервер бота</strong> при каждом вызове <code>/oauth/start</code>. Она
+            защищает от подмены процесса авторизации: при возвращении пользователя на Callback
+            сервер должен получить тот же <code>state</code>, который сохранил в начале.
+          </p>
+          <div class="docs-oauth-contract">
+            <div>
+              <strong>Формат, принимаемый EchoTalk API</strong
+              ><span
+                >Длина от 16 до 256 символов; только латинские буквы, цифры и символы
+                <code>.</code>, <code>_</code>, <code>~</code>, <code>-</code>.</span
+              >
+            </div>
+            <div>
+              <strong>Рекомендуемая генерация</strong
+              ><span
+                >32 случайных байта из криптографически стойкого генератора, кодированные в
+                Base64URL без <code>=</code> (43 символа).</span
+              >
+            </div>
+            <div>
+              <strong>Хранение и срок действия</strong
+              ><span
+                >Привяжите значение к браузерной сессии; например, HttpOnly cookie на 10 минут с
+                <code>SameSite=Lax</code>. Для публичного HTTPS обязательно
+                <code>Secure</code>.</span
+              >
+            </div>
+            <div>
+              <strong>Проверка</strong
+              ><span
+                >Сравните <code>state</code> из URL Callback с сохранённым значением, отклоните
+                отсутствующий, истёкший или несовпадающий маркер и удалите его после проверки.</span
+              >
+            </div>
+          </div>
+          <CodeBlock
+            title="Go · создание state (пример)"
+            :code="oauthStateGoExample"
+            @copy="copyCode(oauthStateGoExample)"
+          />
+          <p>
+            Вы можете реализовать <code>/oauth/start</code> и <code>/oauth/callback</code> на любом
+            серверном языке. Форматы запросов и ответов приведены выше; доступ к исходникам EchoTalk
+            не требуется. Для production храните состояние авторизации в серверной сессии или
+            используйте защищённую привязку к браузеру; не используйте один статический
+            <code>state</code> для всех установок.
+          </p>
+
+          <h3>Контракт обмена: что реализовывать вам, а что делает Dev Portal</h3>
+          <p>
+            Ваш код реализует только <code>/oauth/start</code>, <code>/oauth/callback</code> и
+            серверный обмен по <code>/oauth/token</code>. Запрос
+            <code>/oauth/authorize</code> выполняет сам Dev Portal после нажатия «Авторизовать»:
+            отдельный пользовательский токен разработчику бота не нужен.
+          </p>
+          <div class="table-wrap">
+            <table class="docs-table">
+              <thead>
+                <tr>
+                  <th>Метод и адрес</th>
+                  <th>Обязательные поля</th>
+                  <th>Ответ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>POST /oauth/authorize</code></td>
+                  <td>
+                    <code>bot_id</code>, <code>server_id</code>, <code>scopes</code>,
+                    <code>state</code>; <code>redirect_uri</code> — для выбора зарегистрированного
+                    callback
+                  </td>
+                  <td>
+                    <code>200</code>: JSON с <code>code</code>, <code>state</code>,
+                    <code>client_id</code>, <code>redirect_uri</code>, <code>redirect_to</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>POST /oauth/token</code></td>
+                  <td>
+                    <code>grant_type=authorization_code</code>, <code>code</code>,
+                    <code>client_id</code>, <code>client_secret</code>, <code>redirect_uri</code>
+                  </td>
+                  <td>
+                    <code>200</code>: <code>access_token</code>, <code>refresh_token</code>,
+                    <code>token_type</code>, <code>expires_in</code>, <code>scope</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>POST /oauth/token/refresh</code></td>
+                  <td>
+                    <code>grant_type=refresh_token</code>, <code>refresh_token</code>,
+                    <code>client_id</code>, <code>client_secret</code>
+                  </td>
+                  <td><code>200</code>: новая пара токенов в таком же формате</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>3. Как Dev Portal получает код авторизации</h3>
+          <p>
+            После перехода из <code>/oauth/start</code> на страницу
+            <code>/explore/4</code> пользователь выбирает сервер и разрешения. При нажатии
+            «Авторизовать» Dev Portal отправляет <strong>POST-запрос с JSON</strong> на API EchoTalk
+            <code>/oauth/authorize</code> от имени вошедшего пользователя. В запросе есть ID бота и
+            сервера, выбранные разрешения, а также <code>state</code> и <code>redirect_uri</code> из
+            адреса страницы. Client Secret здесь <strong>не передаётся</strong>. В примере ниже
+            опущены заголовки пользовательской сессии, которыми управляет сайт Dev Portal, а не
+            сервер бота.
+          </p>
+          <CodeBlock
+            title="Dev Portal → EchoTalk API · POST /oauth/authorize (JSON)"
+            :code="authorizeExample"
+            @copy="copyCode(authorizeExample)"
+          />
+          <p>
+            EchoTalk проверяет права пользователя, разрешения и регистрацию Callback URL. При успехе
+            API возвращает <strong>HTTP 200 с JSON</strong>, а не перенаправляет браузер. Поле
+            <code>redirect_to</code> содержит готовый Callback URL с кодом и исходным
+            <code>state</code>.
+          </p>
+          <CodeBlock
+            title="EchoTalk API → Dev Portal · пример ответа"
+            :code="authorizeResponseExample"
+            @copy="copyCode(authorizeResponseExample)"
+          />
+
+          <h3>4. Какой запрос принимает Redirect URI (Callback)</h3>
+          <p>
+            Получив ответ с <code>redirect_to</code>, сайт Dev Portal открывает этот адрес в
+            браузере пользователя. Браузер выполняет <strong>GET-запрос</strong> на
+            <code>/oauth/callback</code> вашего сервера. В строке запроса обязательно присутствуют
+            два параметра:
+          </p>
+          <div class="docs-oauth-contract">
+            <div>
+              <strong><code>code</code></strong
+              ><span
+                >Одноразовый код авторизации от API EchoTalk. Действителен 10 минут. Сам по себе ещё
+                не является токеном бота.</span
+              >
+            </div>
+            <div>
+              <strong><code>state</code></strong
+              ><span
+                >Точно то же значение, которое сервер бота создал на шаге 2 и сохранил для этой
+                попытки установки.</span
+              >
+            </div>
+          </div>
+          <CodeBlock
+            title="Браузер → сервер бота · GET /oauth/callback"
+            :code="oauthCallbackRequestExample"
+            @copy="copyCode(oauthCallbackRequestExample)"
+          />
+          <p>
+            Обработчик Callback читает <code>code</code> и <code>state</code> из параметров URL,
+            сравнивает <code>state</code> с сохранённым значением и очищает его после успешной
+            проверки. При ошибке проверку нужно прервать:
+            <strong>не обменивайте код на токены</strong>. Для безопасности этот URL не следует
+            записывать целиком в access-логи: он содержит временный код авторизации. На callback
+            отдавайте <code>Cache-Control: no-store</code> и
+            <code>Referrer-Policy: no-referrer</code>, не загружайте сторонние скрипты до удаления
+            кода из адресной строки.
+          </p>
+
+          <h3>5. Как сервер бота получает токены</h3>
+          <p>
+            После успешной проверки <code>state</code> <strong>сам сервер бота</strong> отправляет
+            POST-запрос с JSON на <code>https://jiechotalk.ru:8443/oauth/token</code>. Этот запрос
+            не выполняется из браузера. В нём указываются <code>code</code>, Client ID, Client
+            Secret и зарегистрированный Redirect URI. После успешного обмена кода EchoTalk создаёт
+            или активирует установку бота.
+          </p>
+          <CodeBlock
+            title="Сервер бота → EchoTalk API: POST /oauth/token"
+            :code="tokenRequestExample"
+            @copy="copyCode(tokenRequestExample)"
+          />
+          <p>
+            API возвращает <strong>HTTP 200</strong> с новой парой <code>access_token</code> и
+            <code>refresh_token</code>, типом токена, сроком действия и выданными разрешениями.
+          </p>
+          <CodeBlock
+            title="EchoTalk API → сервер бота · пример ответа"
+            :code="tokenResponseExample"
+            @copy="copyCode(tokenResponseExample)"
+          />
+          <p>
+            Сохраняйте токены только на сервере бота в защищённом хранилище. С помощью access token
+            можно проверить установку запросом
+            <code>GET /bot/me</code> и показать пользователю страницу успеха.
+          </p>
+          <div class="callout callout--warning">
+            <strong>Где хранятся секреты?</strong>
+            <span>
+              Не передавайте Client Secret, access token и refresh token в Dev Portal, JavaScript
+              браузера, URL или логи. При OAuth-установке в браузере передаются только временный
+              <code>code</code> и <code>state</code>. Redirect URI при обмене кода должен точно
+              совпадать с зарегистрированным адресом.
+            </span>
+          </div>
+
+          <h3>Как обновлять токены</h3>
+          <p>
+            Access token действует 15 минут. Для продления доступа сервер бота использует refresh
+            token (срок действия — 30 дней) и отправляет запрос
+            <code>POST /oauth/token/refresh</code>. В ответ приходит новая пара токенов. Сохраните
+            новый refresh token вместо старого: предыдущий после ротации использовать нельзя. При
+            отзыве установки оба токена теряют доступ.
+          </p>
+          <CodeBlock
+            title="Сервер бота → EchoTalk API: POST /oauth/token/refresh"
+            :code="refreshTokenExample"
+            @copy="copyCode(refreshTokenExample)"
+          />
+          <h3>Ошибки авторизации и повторная установка</h3>
+          <p>
+            OAuth сейчас возвращает ошибки в JSON с полем <code>error</code>, например
+            <code>{"error":"redirect_uri mismatch"}</code>. Это <strong>не</strong> формат
+            <code>code/message/details</code> из Voice/Media API.
+          </p>
+          <div class="table-wrap">
+            <table class="docs-table">
+              <thead>
+                <tr>
+                  <th>HTTP</th>
+                  <th>Когда возвращается</th>
+                  <th>Что сделать</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>400</code></td>
+                  <td>
+                    Неверные поля, <code>state</code>, несовпадение <code>redirect_uri</code>,
+                    истёкший или уже использованный код
+                  </td>
+                  <td>Проверить параметры и при необходимости начать новую попытку авторизации</td>
+                </tr>
+                <tr>
+                  <td><code>401</code></td>
+                  <td>Неверный Client ID/Secret или недействительный Refresh Token</td>
+                  <td>Проверить серверные credentials; не публиковать их для диагностики</td>
+                </tr>
+                <tr>
+                  <td><code>403</code></td>
+                  <td>
+                    Приложение не активно или у пользователя недостаточно прав для выдачи разрешений
+                  </td>
+                  <td>Проверить статус и права без попыток обойти ограничения</td>
+                </tr>
+                <tr>
+                  <td><code>404</code></td>
+                  <td>Приложение не найдено</td>
+                  <td>Проверить ID бота</td>
+                </tr>
+                <tr>
+                  <td><code>409</code></td>
+                  <td>Бот уже активно установлен на выбранном сервере</td>
+                  <td>Не пытаться повторить установку поверх действующей</td>
+                </tr>
+                <tr>
+                  <td><code>500</code></td>
+                  <td>Внутренняя ошибка или недоступность зависимостей</td>
+                  <td>Повторить позже; не выводить секреты в логи</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Для текущего API повторная OAuth-авторизация
+            <strong>активной установки</strong> возвращает <code>409</code>, даже если refresh token
+            у бота уже истёк. Если обновление токена невозможно, требуется контролируемое
+            восстановление доступа через администратора сервера и повторная установка после отзыва
+            прежней. Автоматический сценарий обновления разрешений/переустановки без отзыва пока не
+            предусмотрен.
+          </p>
+        </section>
+
+        <section id="oauth-local-test" class="doc-section">
+          <h2>Проверка OAuth локально: готовый Go-пример</h2>
+          <p>
+            Чтобы проверить весь процесс без написания собственного OAuth-сервера с нуля, скачайте
+            <strong>отдельный демонстрационный Go-файл</strong>. Он доступен всем разработчикам
+            прямо на сайте Dev Portal и не требует доступа к приватным исходникам EchoTalk. Для
+            запуска нужны установленный Go, PowerShell и тестовый бот со своими Client ID и Client
+            Secret.
+          </p>
+          <p>
+            <a
+              class="docs-secondary-action"
+              href="/example/oauth/main.go"
+              download="echotalk-oauth-demo.go"
+            >
+              <AppIcon name="download" :size="17" /> Скачать Go-пример
+            </a>
+          </p>
+          <ol class="docs-steps">
+            <li>
+              <strong>Настройте тестового бота в Dev Portal.</strong>
+              Статус <code>active</code>, публичность включена. В разделе «Авторизация» задайте
+              <strong>OAuth Start URL</strong> <code>http://127.0.0.1:3001/oauth/start</code>, а в
+              списке <strong>Redirect URI</strong> зарегистрируйте
+              <code>http://127.0.0.1:3001/oauth/callback</code>. Создайте Client ID и Client Secret.
+              Устанавливайте бота только на сервер, которым управляете.
+            </li>
+            <li>
+              <strong>Откройте PowerShell на своём компьютере.</strong>
+              Скопируйте команды ниже целиком. Укажите публичный HTTPS-адрес Dev Portal из браузера
+              (без пути, например <code>https://portal.example</code>), ID своего тестового бота и
+              его OAuth-credentials. Команды скачивают пример с этого сайта в текущую папку и
+              запускают его на <code>127.0.0.1:3001</code>.
+              <strong>Перед запуском можно открыть Go-файл и проверить его код.</strong>
+            </li>
+          </ol>
+          <CodeBlock
+            title="PowerShell · скачать и запустить Go OAuth-пример"
+            :code="oauthDemoPowerShellExample"
+            @copy="copyCode(oauthDemoPowerShellExample)"
+          />
+          <ol class="docs-steps" start="3">
+            <li>
+              <strong>Откройте публичную карточку своего бота.</strong>
+              В Dev Portal нажмите «Добавить на сервер», выберите сервер и подтвердите разрешения.
+              Браузер сначала откроет локальный <code>/oauth/start</code>, затем страницу установки,
+              затем вернётся на локальный <code>/oauth/callback</code>. Dev Portal работает на своём
+              публичном адресе — запускать сайт EchoTalk на localhost не нужно.
+            </li>
+            <li>
+              <strong>Проверьте результат.</strong>
+              Если обмен кода и запрос <code>GET /bot/me</code> успешны, в браузере откроется
+              <code>http://127.0.0.1:3001/oauth/success</code> с текстом
+              <code>OAuth callback and /bot/me succeeded</code>. В Dev Portal во вкладке «Установки»
+              появится активная установка. При повторном открытии старого callback обработчик должен
+              отклонить запрос: <code>state</code> уже использован.
+            </li>
+          </ol>
+          <div class="callout callout--warning">
+            <strong>Только для локальной проверки.</strong>
+            <span>
+              Пример не сохраняет и не печатает токены, не запускает Gateway и не отправляет
+              сообщения. Client Secret вводится в PowerShell через скрытый ввод и доступен только в
+              переменных среды локального процесса и запущенного Go-примера, но не в браузере или
+              публичном Go-файле. Программа работает только на <code>127.0.0.1:3001</code>,
+              использует проверку <code>state</code> и защищённый HTTPS-запрос к EchoTalk API. Не
+              используйте этот тестовый сервер как production-реализацию.
+            </span>
+          </div>
+          <p>
+            Если порт <code>3001</code> занят, остановите конфликтующий процесс либо согласованно
+            измените адрес прослушивания в Go-файле, OAuth Start URL, Redirect URI и
+            <code>ECHOTALK_REDIRECT_URI</code>. Для установки бота другими пользователями нужен
+            <strong>публичный HTTPS</strong> на стороне бота. Для боевого бота используйте
+            собственный HTTPS-сервер, безопасное хранение и обновление токенов, серверные сессии и
+            отдельную обработку ошибок. Сейчас отдельного режима установки приватного бота через
+            публичную карточку нет. После теста удалите локальные OAuth-адреса и отключите
+            публичность QA-бота. Остановите Go-сервер через <code>Ctrl+C</code>, затем удалите
+            секреты из PowerShell:
+            <code>Remove-Item Env:ECHOTALK_CLIENT_SECRET -ErrorAction SilentlyContinue</code>.
+          </p>
+        </section>
+
+        <section id="first-request" class="doc-section">
+          <h2>Первое сообщение: от токена до комнаты</h2>
+          <p>
+            После <code>POST /oauth/token</code> у бота есть access token, но ещё неизвестны ID
+            установки и доступных комнат. Ниже — три последовательных запроса
+            <strong>от сервера бота</strong>. Примеры <code>curl</code> используют синтаксис Bash;
+            для PowerShell подойдут <code>Invoke-RestMethod</code> с теми же методами, адресами и
+            заголовками.
+          </p>
+          <p>
+            В окружении серверного процесса задайте <code>ECHOTALK_API_URL</code> и
+            <code>BOT_ACCESS_TOKEN</code>. Не вставляйте секреты в URL, client-side JavaScript или
+            документацию. Здесь в ответах показаны условные ID.
+          </p>
+          <h3>1. Определите установку и сервер: GET /bot/me</h3>
+          <CodeBlock title="curl · /bot/me" :code="botMeExample" @copy="copyCode(botMeExample)" />
+          <CodeBlock
+            title="HTTP 200 · пример JSON"
+            :code="botMeResponseExample"
+            @copy="copyCode(botMeResponseExample)"
+          />
+          <p>
+            Используйте <code>server_id</code> из ответа (в примере — <code>1</code>).
+            <code>installation_id</code> нужен для сопоставления токенов с установкой, а не в URL
+            сообщения. Это ID только этой установки: токен не даёт доступа сразу ко всем серверам,
+            где существует бот.
+          </p>
+          <h3>2. Получите доступные комнаты: GET /bot/servers/{serverID}/rooms</h3>
+          <CodeBlock
+            title="curl · список комнат сервера"
+            :code="botRoomsExample"
+            @copy="copyCode(botRoomsExample)"
+          />
+          <CodeBlock
+            title="HTTP 200 · пример JSON"
+            :code="botRoomsResponseExample"
+            @copy="copyCode(botRoomsResponseExample)"
+          />
+          <p>
+            Возьмите <code>id</code> нужной текстовой комнаты из массива <code>data</code> (в
+            примере — <code>3</code>). Это <code>room_id</code>. Не заменяйте его
+            <code>category_id</code> или ID сервера.
+          </p>
+          <h3>3. Отправьте сообщение: POST /bot/rooms/{roomID}/messages</h3>
+          <CodeBlock
+            title="curl · отправка сообщения"
+            :code="firstMessageExample"
+            @copy="copyCode(firstMessageExample)"
+          />
+          <CodeBlock
+            title="Успешный ответ · пример JSON"
+            :code="firstMessageResponseExample"
+            @copy="copyCode(firstMessageResponseExample)"
+          />
+          <div class="callout callout--info">
+            <strong>Разрешения и ошибки.</strong>
+            <span>
+              Для чтения списка комнат нужен <code>room.view</code>, для отправки —
+              <code>room.sendMessage</code>. При недостаточных разрешениях или запрете на уровне
+              комнаты backend отклонит запрос: менять ID комнаты в попытке обойти проверку нельзя.
+              При <code>401</code> обновите access token по действующему refresh token, при
+              <code>429</code> соблюдайте <code>Retry-After</code> или <code>retry_after_sec</code>,
+              если они предоставлены.
+            </span>
+          </div>
+        </section>
+
+        <section id="delivery-setup" class="doc-section">
+          <h2>Получение событий: Gateway или Webhook</h2>
+          <p>
+            Отправка сообщения через REST не запускает обработку событий сама по себе. В Dev Portal
+            откройте бота → «Установки», выберите нужный сервер, затем во вкладках «Подключение» и
+            «Подписки» настройте транспорт и события (например, <code>message.created</code>).
+            Подписки и транспорт настраиваются <strong>отдельно для каждой установки</strong>.
+          </p>
+          <div class="table-wrap">
+            <table class="docs-table">
+              <thead>
+                <tr>
+                  <th>Транспорт</th>
+                  <th>Как работает</th>
+                  <th>Где настроить</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>WebSocket Gateway</td>
+                  <td>
+                    Ваша программа устанавливает постоянное WebSocket-соединение с EchoTalk и
+                    подтверждает обработанные события через ACK
+                  </td>
+                  <td>Выберите Gateway в «Подключении» установки</td>
+                </tr>
+                <tr>
+                  <td>Webhook</td>
+                  <td>API EchoTalk отправляет HTTPS POST-запрос на ваш публичный обработчик</td>
+                  <td>Укажите Webhook URL и секрет подписи в «Подключении» установки</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Настройки транспорта запрашивает Dev Portal под пользовательской сессией:
+            <code>GET/PUT /dev/installations/{installationID}/webhook</code>. Бот не должен вызывать
+            эти адреса со своим access token.
+          </p>
+          <h3>Минимальный цикл Gateway</h3>
+          <ol class="docs-steps">
+            <li>
+              <strong>Получите временный токен соединения.</strong> Сервер бота отправляет
+              <code>POST /bot/gateway/session</code> с
+              <code>Authorization: Bearer &lt;BOT_ACCESS_TOKEN&gt;</code>. В ответ приходит
+              <code>session_token</code>; не подменяйте им REST access token.
+            </li>
+            <li>
+              <strong>Подключитесь к WebSocket.</strong> Серверный WebSocket-клиент открывает
+              <code>wss://jiechotalk.ru:8443/bot/gateway/ws</code>, передавая
+              <code>Authorization: Bearer &lt;GATEWAY_SESSION_TOKEN&gt;</code>
+              в HTTP-заголовке соединения. Обычный браузерный WebSocket API такой заголовок вручную
+              не устанавливает: используйте серверный клиент.
+            </li>
+            <li>
+              <strong>Получите <code>hello</code>.</strong> EchoTalk сообщает интервал
+              <code>heartbeat_sec</code> и состояние соединения. Отправьте <code>resume</code> с
+              последним надёжно сохранённым <code>last_ack_seq</code> (для первого запуска —
+              <code>0</code>).
+            </li>
+            <li>
+              <strong>Обработайте событие и подтвердите его.</strong> Для пакета
+              <code>type=event</code> возьмите <code>data.seq</code>, обработайте полезную нагрузку,
+              сохраните результат и только затем отправьте <code>ack</code> с тем же
+              <code>seq</code>. Используйте <code>event_id</code> для защиты от повторной обработки.
+            </li>
+            <li>
+              <strong>Поддерживайте соединение.</strong> Отправляйте <code>heartbeat</code> с
+              интервалом из <code>hello</code>. После обрыва подключайтесь заново с backoff, новым
+              session token и сохранённым номером ACK.
+            </li>
+          </ol>
+          <CodeBlock
+            title="Gateway · формы служебных сообщений (пример)"
+            :code="gatewayFramesExample"
+            @copy="copyCode(gatewayFramesExample)"
+          />
+          <p>
+            Это краткая схема протокола, не готовый production-клиент. Точную структуру событий и
+            обработку ошибок <code>invalid_resume</code> смотрите в
+            <button
+              type="button"
+              class="docs-text-button"
+              @click="setActiveApiReference('gateway')"
+            >
+              AsyncAPI Gateway</button
+            >. Для восстановления из журнала существует <code>GET /bot/events</code>
+            с пагинацией; не рассчитывайте только на состояние в оперативной памяти.
+          </p>
+          <h3>Webhook: какой запрос приходит на ваш сервер</h3>
+          <p>
+            Когда выбран Webhook, EchoTalk отправляет JSON в теле HTTPS POST-запроса на указанный
+            URL. Подлинность проверяется по заголовкам
+            <code>X-EchoTalk-Timestamp</code> и <code>X-EchoTalk-Signature</code>. Подпись — это
+            шестнадцатеричный HMAC-SHA256 от строки <code>timestamp + "." + raw_body</code> с
+            секретом Webhook конкретной установки.
+          </p>
+          <CodeBlock
+            title="Webhook · вычисление подписи на Node.js"
+            :code="webhookSignatureExample"
+            @copy="copyCode(webhookSignatureExample)"
+          />
+          <p>
+            Сравнивайте подпись в постоянное время, проверяйте свежесть timestamp, считайте
+            <code>event_id</code> идемпотентным ключом и считайте подпись
+            <strong>от исходных байтов тела</strong>, до JSON-декодирования. Не публикуйте Webhook
+            Secret и не записывайте тела с персональными данными в открытые логи. Историю попыток и
+            ошибок смотрите в «Журнале доставки».
+          </p>
+          <div class="callout callout--warning">
+            <strong>Разные токены и ограничения.</strong>
+            <span>
+              Bot Access Token служит для <code>/bot/*</code>, временный Gateway Session Token —
+              только для WebSocket, Webhook Secret — только для проверки входящих POST. По каждой
+              установке действуют отдельные лимиты запросов, сообщений, interactions и Gateway; при
+              <code>429</code> учитывайте время до повтора.
+            </span>
+          </div>
+        </section>
+
+        <section id="commands-setup" class="doc-section">
+          <h2>Slash-команды</h2>
+          <p>
+            Команды создаются во вкладке «Команды» выбранного приложения. Адрес обработчика
+            <code>command_base_url</code> задаётся во вкладке «Подключение» для установки. Для
+            production обработчик должен принимать HTTPS POST-запросы и обрабатывать команды на
+            своём сервере.
+          </p>
+          <CodeBlock
+            title="POST /dev/bots/{botID}/commands · JSON"
+            :code="commandCreateExample"
+            @copy="copyCode(commandCreateExample)"
+          />
+          <p>
+            При создании указываются имя, описание и флаг <code>is_enabled</code>. Допустимость
+            имени команды проверяет backend: при ошибке используйте полученный ответ API, не
+            обходите валидацию на клиенте. Для изменения и удаления команд доступны
+            <code>PUT</code> и <code>DELETE</code> на
+            <code>/dev/bots/{botID}/commands/{commandID}</code>. Входящие вызовы обработчика
+            проверяйте на подлинность; не доверяйте полям запроса без валидации.
+          </p>
+        </section>
+
+        <section id="troubleshooting" class="doc-section">
+          <h2>Если что-то не работает</h2>
+          <div class="docs-troubleshooting">
+            <div>
+              <strong>OAuth Start URL не настроен</strong>
+              <p>
+                Добавьте адрес начала OAuth во вкладке «Авторизация». При установке из каталога
+                сначала должен открыться backend бота, который создаёт state.
+              </p>
+            </div>
+            <div>
+              <strong>Ошибка Redirect URI</strong>
+              <p>
+                Убедитесь, что callback зарегистрирован и в <code>/oauth/authorize</code> и
+                <code>/oauth/token</code> передаётся один и тот же точный адрес. Проверьте порт,
+                путь и протокол.
+              </p>
+            </div>
+            <div>
+              <strong>Неверный или отсутствующий state</strong>
+              <p>
+                Начните установку с OAuth Start URL. Проверьте, что cookie с state сохранён
+                браузером и доступен backend бота на callback; повтор или истечение state должны
+                отклоняться.
+              </p>
+            </div>
+            <div>
+              <strong>Код истёк или уже использован</strong>
+              <p>
+                Повторите авторизацию: одноразовый код действует 10 минут. Не отправляйте запрос
+                обмена параллельно несколько раз.
+              </p>
+            </div>
+            <div>
+              <strong>409: бот уже установлен</strong>
+              <p>
+                Повторное подтверждение не заменяет действующую установку. Изменения разрешений и
+                восстановление доступа после истечения refresh token требуют отдельного управляемого
+                процесса.
+              </p>
+            </div>
+            <div>
+              <strong>Неясно, где взять server_id / room_id</strong>
+              <p>
+                Вызовите <code>GET /bot/me</code>, затем
+                <code>GET /bot/servers/{serverID}/rooms</code>. ID установки и сервера не
+                возвращаются из <code>/oauth/token</code>.
+              </p>
+            </div>
+            <div>
+              <strong>401 при refresh</strong>
+              <p>
+                Старый, отозванный или истёкший refresh token использовать нельзя; не выполняйте
+                бесконечные повторы и не запрашивайте Client Secret в браузере.
+              </p>
+            </div>
+            <div>
+              <strong>403 Forbidden</strong>
+              <p>
+                Проверьте scopes приложения, разрешения конкретной установки, доступ к серверу и
+                права на комнату.
+              </p>
+            </div>
+            <div>
+              <strong>429 Too Many Requests</strong>
+              <p>
+                Проверьте вкладку «Диагностика» и соблюдайте <code>retry_after_sec</code> или
+                заголовок <code>Retry-After</code>, если он возвращён API.
+              </p>
+            </div>
+            <div>
+              <strong>Нет событий</strong>
+              <p>
+                Проверьте транспорт доставки, подписки выбранной установки, права бота и состояние
+                соединения Gateway или последние попытки Webhook.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -477,7 +1259,10 @@
         <section id="errors" class="doc-section">
           <h2>Ошибки</h2>
 
-          <p>Voice/Media Resource API использует следующий формат ошибок. Ответы OAuth и Dev Portal могут иметь другой формат:</p>
+          <p>
+            Voice/Media Resource API использует следующий формат ошибок. Ответы OAuth и Dev Portal
+            могут иметь другой формат:
+          </p>
 
           <CodeBlock
             title="Error envelope"
@@ -524,17 +1309,24 @@
         <section id="openapi" class="doc-section">
           <h2>OpenAPI Reference</h2>
 
-          <p>Каноническая спецификация API находится в backend-репозитории:</p>
-
-          <div class="file-reference">
-            <code>docs/openapi/bot-resource-api.yaml</code>
-          </div>
-
           <p>
-            Справочник REST покрывает Bot Resource API, а справочник Gateway — его WebSocket-протокол.
-            OAuth, настройки Dev Portal и установка ботов описаны в руководствах выше по текущим
-            маршрутам backend. Не следует считать, что OpenAPI Resource API документирует
-            все административные endpoints.
+            Спецификации доступны прямо в Dev Portal: откройте
+            <button type="button" class="docs-text-button" @click="setActiveApiReference('rest')">
+              REST API
+            </button>
+            или
+            <button
+              type="button"
+              class="docs-text-button"
+              @click="setActiveApiReference('gateway')"
+            >
+              Gateway API</button
+            >. Исходный код EchoTalk для просмотра спецификаций не нужен.
+          </p>
+          <p>
+            REST-справочник покрывает Bot Resource API, а Gateway-справочник — WebSocket-протокол.
+            OAuth, настройки Dev Portal и установка ботов описаны в руководстве выше. OpenAPI
+            Resource API не является спецификацией всех административных endpoints.
           </p>
         </section>
       </main>
@@ -615,12 +1407,23 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  defineAsyncComponent,
+  defineComponent,
+  h,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
 // Загружаем тяжёлые просмотрщики спецификаций только по запросу пользователя.
-const StoplightReference = defineAsyncComponent(() => import('@/components/docs/StoplightReference'))
+const StoplightReference = defineAsyncComponent(
+  () => import('@/components/docs/StoplightReference'),
+)
 const AsyncApiReference = defineAsyncComponent(() => import('@/views/AsyncApiReference.vue'))
 
 type NavItem = {
@@ -714,13 +1517,15 @@ const navigation: NavGroup[] = [
     title: 'Начало работы',
     items: [
       { id: 'quickstart', label: 'Быстрый старт' },
+      { id: 'overview', label: 'Обзор API' },
+      { id: 'installation-model', label: 'Токены и установки' },
+      { id: 'authentication', label: 'Bot access token' },
       { id: 'oauth-install', label: 'OAuth и установка' },
+      { id: 'oauth-local-test', label: 'Проверка OAuth локально' },
       { id: 'first-request', label: 'Первое сообщение' },
       { id: 'delivery-setup', label: 'Webhook и Gateway' },
       { id: 'commands-setup', label: 'Slash-команды' },
       { id: 'troubleshooting', label: 'Решение проблем' },
-      { id: 'overview', label: 'Обзор API' },
-      { id: 'authentication', label: 'Bot access token' },
       { id: 'scopes', label: 'Voice scopes' },
     ],
   },
@@ -847,21 +1652,155 @@ const commonErrors: ErrorRow[] = [
 const authHeaderExample = `Authorization: Bearer YOUR_BOT_ACCESS_TOKEN`
 
 // Демонстрационные значения не являются рабочими секретами.
-const authorizeExample = `{
-  "bot_id": 12,
-  "server_id": 42,
-  "scopes": ["bot", "room.view", "room.sendMessage"],
-  "state": "<RANDOM_CSRF_STATE>",
-  "redirect_uri": "https://bot.example.com/oauth/callback"
+const oauthDemoPowerShellExample = `# Откройте PowerShell в пустой папке. Нужен установленный Go.
+$env:ECHOTALK_API_URL = "https://jiechotalk.ru:8443"
+$env:ECHOTALK_PORTAL_URL = (Read-Host "HTTPS-адрес Dev Portal").TrimEnd('/')
+$env:ECHOTALK_BOT_ID = Read-Host "ID вашего тестового бота"
+$env:ECHOTALK_REDIRECT_URI = "http://127.0.0.1:3001/oauth/callback"
+$env:ECHOTALK_CLIENT_ID = Read-Host "Client ID"
+$clientSecret = Read-Host "Client Secret" -AsSecureString
+$env:ECHOTALK_CLIENT_SECRET = [System.Net.NetworkCredential]::new("", $clientSecret).Password
+Remove-Variable clientSecret
+
+# Скачайте публичный исходный файл, затем изучите его перед запуском.
+Invoke-WebRequest -Uri "$($env:ECHOTALK_PORTAL_URL)/examples/oauth-demo/main.go" -OutFile "./echotalk-oauth-demo.go"
+# Запустите свой локальный HTTP-сервер (порт 3001 должен быть свободен).
+go run ./echotalk-oauth-demo.go`
+
+const oauthStartRequestExample = `GET /oauth/start HTTP/1.1
+Host: mybot.ru
+
+# Тело запроса отсутствует. Параметры URL не требуются.`
+
+const oauthStartResponseExample = `HTTP/1.1 303 See Other
+Cache-Control: no-store
+Set-Cookie: et_oauth_state=<STATE>; Path=/oauth; Max-Age=600; HttpOnly; Secure; SameSite=Lax
+Location: https://portal.example/explore/4?state=<STATE>&redirect_uri=https%3A%2F%2Fmybot.ru%2Foauth%2Fcallback
+
+# Для HTTPS cookie обязательно имеет флаг Secure.`
+
+const oauthStateGoExample = `// В обработчике GET /oauth/start. Импорты: crypto/rand, encoding/base64, net/http.
+b := make([]byte, 32)
+if _, err := rand.Read(b); err != nil {
+    http.Error(w, "internal error", http.StatusInternalServerError)
+    return
+}
+state := base64.RawURLEncoding.EncodeToString(b)
+// Сохраните state в сессии или HttpOnly cookie для последующей проверки.`
+
+const authorizeExample = `POST /oauth/authorize
+Content-Type: application/json
+
+{
+  "bot_id": 4,
+  "server_id": 1,
+  "scopes": ["bot", "room.view"],
+  "state": "<STATE_FROM_OAUTH_START>",
+  "redirect_uri": "https://mybot.ru/oauth/callback"
 }`
 
-const tokenRequestExample = `{
+const authorizeResponseExample = `HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "code": "<ONE_TIME_CODE>",
+  "state": "<STATE_FROM_OAUTH_START>",
+  "client_id": "<CLIENT_ID>",
+  "redirect_uri": "https://mybot.ru/oauth/callback",
+  "redirect_to": "https://mybot.ru/oauth/callback?code=<ONE_TIME_CODE>&state=<STATE_FROM_OAUTH_START>"
+}`
+
+const oauthCallbackRequestExample = `GET /oauth/callback?code=<ONE_TIME_CODE>&state=<STATE_FROM_OAUTH_START> HTTP/1.1
+Host: mybot.ru
+Cookie: et_oauth_state=<STATE_FROM_OAUTH_START>
+
+# Обработчик должен проверить совпадение state из URL и cookie.`
+
+const tokenRequestExample = `POST https://jiechotalk.ru:8443/oauth/token
+Content-Type: application/json
+
+{
   "grant_type": "authorization_code",
-  "code": "<AUTHORIZATION_CODE>",
+  "code": "<ONE_TIME_CODE>",
   "client_id": "<CLIENT_ID>",
   "client_secret": "<CLIENT_SECRET>",
-  "redirect_uri": "https://bot.example.com/oauth/callback"
+  "redirect_uri": "https://mybot.ru/oauth/callback"
 }`
+
+const tokenResponseExample = `HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "access_token": "<BOT_ACCESS_TOKEN>",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "refresh_token": "<BOT_REFRESH_TOKEN>",
+  "scope": "bot room.view"
+}`
+
+const refreshTokenExample = `{
+  "grant_type": "refresh_token",
+  "client_id": "<CLIENT_ID>",
+  "client_secret": "<CLIENT_SECRET>",
+  "refresh_token": "<CURRENT_REFRESH_TOKEN>"
+}`
+
+const botMeResponseExample = `{
+  "bot_app_id": 4,
+  "bot_user_id": 204,
+  "installation_id": 5,
+  "server_id": 1,
+  "granted_scopes": ["bot", "room.view", "room.sendMessage"]
+}`
+
+const botRoomsResponseExample = `{
+  "data": [
+    { "id": 3, "server_id": 1, "name": "Тестовая комната", "type": "text", "category_id": null, "is_dialog": false, "position": 0 }
+  ]
+}`
+
+const firstMessageResponseExample = `{
+  "data": {
+    "id": 501,
+    "room_id": 3,
+    "user_id": 204,
+    "content": "Привет из EchoTalk Bot API!",
+    "type": "text",
+    "created_at": "2026-11-23T10:11:57Z"
+  }
+}`
+
+const gatewayFramesExample = `// EchoTalk → ваш сервер (после подключения)
+{"type":"hello","data":{"heartbeat_sec":30}}
+
+// Ваш сервер → EchoTalk (последний сохранённый ACK; первый запуск = 0)
+{"type":"resume","data":{"last_ack_seq":0}}
+
+// EchoTalk → ваш сервер (форма события; поля payload зависят от типа)
+{"type":"event","data":{"seq":1,"event_id":"<EVENT_ID>","type":"message.created","payload":{}}}
+
+// Ваш сервер → EchoTalk (только после успешной обработки)
+{"type":"ack","data":{"seq":1}}
+
+// Ваш сервер → EchoTalk (периодически по heartbeat_sec)
+{"type":"heartbeat","data":{"ts":<UNIX_TIME_MS>}}`
+
+const webhookSignatureExample = `import { createHmac, timingSafeEqual } from 'node:crypto'
+
+// rawBody — исходный Buffer из POST, secret — из серверного хранилища.
+function verifyWebhook({ secret, rawBody, timestamp, signature }) {
+  const seconds = Number(timestamp)
+  if (!Number.isSafeInteger(seconds) ||
+      Math.abs(Math.floor(Date.now() / 1000) - seconds) > 300) return false
+  if (!/^[a-f0-9]{64}$/.test(signature ?? '')) return false
+
+  const expected = createHmac('sha256', secret)
+    .update(String(timestamp) + '.')
+    .update(rawBody)
+    .digest('hex')
+  return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))
+}
+// Применяйте до JSON-разбора. event_id проверяйте на дубликаты отдельно.`
 
 const botMeExample = `curl --fail-with-body -sS \\
   -H "Authorization: Bearer $BOT_ACCESS_TOKEN" \\
@@ -1385,6 +2324,102 @@ const EndpointRow = defineComponent({
   color: var(--text-primary);
 }
 
+/* OAuth installation flow: compact timeline, not a glossary of participants. */
+.docs-oauth-journey {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 26px;
+  padding: 0;
+}
+.docs-oauth-journey li {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+.docs-oauth-journey strong {
+  color: var(--text-primary);
+}
+.docs-oauth-journey code {
+  overflow-wrap: anywhere;
+}
+.docs-oauth-contract {
+  display: grid;
+  gap: 0;
+  margin: 16px 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+.docs-oauth-contract > div {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.36fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--bg-tertiary);
+  line-height: 1.6;
+}
+.docs-oauth-contract > div + div {
+  border-top: 1px solid var(--border-color);
+}
+.docs-oauth-contract strong {
+  color: var(--text-primary);
+}
+.docs-oauth-contract span {
+  color: var(--text-secondary);
+}
+@media (max-width: 1150px) {
+  .docs-oauth-journey {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .docs-oauth-journey {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .docs-oauth-contract > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+}
+
+.docs-oauth-addresses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+.docs-oauth-addresses > div {
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-tertiary);
+  padding: 16px 18px;
+}
+.docs-oauth-addresses h3 {
+  margin-top: 0;
+}
+.docs-oauth-addresses code {
+  overflow-wrap: anywhere;
+}
+.docs-oauth-addresses p {
+  margin: 12px 0 0;
+}
+@media (max-width: 760px) {
+  .docs-oauth-addresses {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .callout--warning {
   border-color: rgba(245, 158, 11, 0.35);
 }
@@ -1613,9 +2648,16 @@ const EndpointRow = defineComponent({
   color: var(--bg-primary);
 }
 
-.docs-primary-action:hover { filter: brightness(1.08); }
-.docs-secondary-action { background: var(--bg-tertiary); color: var(--text-primary); }
-.docs-secondary-action:hover { background: var(--bg-elevated); }
+.docs-primary-action:hover {
+  filter: brightness(1.08);
+}
+.docs-secondary-action {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.docs-secondary-action:hover {
+  background: var(--bg-elevated);
+}
 
 .docs-primary-action:focus-visible,
 .docs-secondary-action:focus-visible,
@@ -1632,18 +2674,34 @@ const EndpointRow = defineComponent({
   color: var(--text-secondary);
   line-height: 1.7;
 }
-.docs-steps li { padding: 6px 0 6px 8px; }
-.docs-steps li::marker { color: var(--accent-primary); font-weight: 700; }
-.docs-steps strong, .docs-troubleshooting strong { color: var(--text-primary); }
-.docs-steps a { color: var(--accent-primary); }
-.docs-troubleshooting { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.docs-steps li {
+  padding: 6px 0 6px 8px;
+}
+.docs-steps li::marker {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+.docs-steps strong,
+.docs-troubleshooting strong {
+  color: var(--text-primary);
+}
+.docs-steps a {
+  color: var(--accent-primary);
+}
+.docs-troubleshooting {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
 .docs-troubleshooting > div {
   padding: 18px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   background: var(--bg-tertiary);
 }
-.docs-troubleshooting p { margin: 8px 0 0; }
+.docs-troubleshooting p {
+  margin: 8px 0 0;
+}
 .docs-text-button {
   padding: 0;
   border: none;
@@ -1660,7 +2718,9 @@ const EndpointRow = defineComponent({
   min-height: 220px;
   color: var(--text-secondary);
 }
-.docs-mobile-nav { display: none; }
+.docs-mobile-nav {
+  display: none;
+}
 
 @media (max-width: 1080px) {
   .docs-shell {
@@ -1725,7 +2785,9 @@ const EndpointRow = defineComponent({
     font-size: 0.84rem;
     text-decoration: none;
   }
-  .docs-troubleshooting { grid-template-columns: 1fr; }
+  .docs-troubleshooting {
+    grid-template-columns: 1fr;
+  }
 
   .docs-hero {
     margin-bottom: 40px;
