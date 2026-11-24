@@ -388,7 +388,7 @@ const loadInstallServers = async () => {
   }
 }
 
-const oauthStartRequest = computed(() => parseOAuthStartRequest(route.query.state, route.query.redirect_uri))
+const oauthStartRequest = computed(() => parseOAuthStartRequest(route.query.state, route.query.redirect_uri, route.query.code_challenge, route.query.code_challenge_method))
 
 const startInstall = async () => {
   installLaunchError.value = ''
@@ -399,7 +399,8 @@ const startInstall = async () => {
   if (!oauthStartRequest.value) {
     // Marketplace installation must first visit the bot's backend so the client
     // can create an HttpOnly-cookie-bound state before returning to EchoTalk.
-    if (route.query.state !== undefined || route.query.redirect_uri !== undefined) {
+    if (route.query.state !== undefined || route.query.redirect_uri !== undefined ||
+        route.query.code_challenge !== undefined || route.query.code_challenge_method !== undefined) {
       installLaunchError.value = 'Неверные параметры начала OAuth. Повторите установку с сайта бота.'
       return
     }
@@ -464,6 +465,8 @@ const confirmInstall = async () => {
     scopes: selectedScopes.value,
     state: request.state,
     redirect_uri: request.redirectUri,
+    code_challenge: request.codeChallenge,
+    code_challenge_method: request.codeChallengeMethod,
   })
   if (!result) {
     installAuthorizeError.value = botsStore.error || 'Не удалось выполнить OAuth-авторизацию'

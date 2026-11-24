@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
@@ -93,6 +94,15 @@ func main() {
 			http.Error(w, "internal error", 500)
 			return
 		}
+		verifier, err := randomState()
+		if err != nil {
+			http.Error(w, "internal error", 500)
+			return
+		}
+		sum := sha256.Sum256([]byte(verifier))
+		challenge := base64.RawURLEncoding.EncodeToString(sum[:])
+		// The verifier never goes to the portal or into a URL.
+		http.SetCookie(w, &http.Cookie{Name: "et_oauth_verifier", Value: verifier, Path: "/oauth", MaxAge: 600, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: redirect.Scheme == "https"})
 		// The browser carries this first-party cookie back on the top-level callback.
 		http.SetCookie(w, &http.Cookie{
 			Name: "et_oauth_state", Value: state, Path: "/oauth", MaxAge: 600,
@@ -103,6 +113,8 @@ func main() {
 		query := target.Query()
 		query.Set("state", state)
 		query.Set("redirect_uri", cfg.RedirectURI)
+		query.Set("code_challenge", challenge)
+		query.Set("code_challenge_method", "S256")
 		target.RawQuery = query.Encode()
 		http.Redirect(w, r, target.String(), http.StatusSeeOther)
 	})
@@ -122,6 +134,12 @@ func main() {
 			http.Error(w, "invalid OAuth state", http.StatusBadRequest)
 			return
 		}
+		verifierCookie, err := r.Cookie("et_oauth_verifier")
+		if err != nil || len(verifierCookie.Value) != 43 {
+			http.Error(w, "missing PKCE verifier", http.StatusBadRequest)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: "et_oauth_verifier", Path: "/oauth", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: redirect.Scheme == "https"})
 		http.SetCookie(w, &http.Cookie{
 			Name: "et_oauth_state", Path: "/oauth", MaxAge: -1,
 			HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: redirect.Scheme == "https",
@@ -136,7 +154,7 @@ func main() {
 		body, err := json.Marshal(map[string]string{
 			"grant_type": "authorization_code", "code": code,
 			"client_id": cfg.ClientID, "client_secret": cfg.ClientSecret,
-			"redirect_uri": cfg.RedirectURI,
+			"redirect_uri": cfg.RedirectURI, "code_verifier": verifierCookie.Value,
 		})
 		if err != nil {
 			http.Error(w, "internal error", 500)

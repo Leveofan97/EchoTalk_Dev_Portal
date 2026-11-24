@@ -2,6 +2,8 @@
 export interface OAuthStartRequest {
   state: string
   redirectUri: string
+  codeChallenge: string
+  codeChallengeMethod: 'S256'
 }
 
 export interface OAuthAuthorizationResult {
@@ -13,6 +15,7 @@ export interface OAuthAuthorizationResult {
 
 export function isSafeBotOAuthURL(raw: string): boolean {
   try {
+    if (!raw || /[\s\\#]/.test(raw)) return false
     const url = new URL(raw)
     if (url.username || url.password || url.hash || !url.hostname) return false
     if (url.protocol === 'https:') return true
@@ -25,11 +28,16 @@ export function isSafeBotOAuthURL(raw: string): boolean {
 export function parseOAuthStartRequest(
   stateValue: unknown,
   redirectValue: unknown,
+  challengeValue: unknown,
+  methodValue: unknown,
 ): OAuthStartRequest | null {
   if (typeof stateValue !== 'string' || typeof redirectValue !== 'string') return null
   if (!/^[A-Za-z0-9._~-]{16,256}$/.test(stateValue)) return null
-  if (!isSafeBotOAuthURL(redirectValue)) return null
-  return { state: stateValue, redirectUri: redirectValue }
+  if (redirectValue.length > 500 || !isSafeBotOAuthURL(redirectValue)) return null
+  // SHA-256 yields 43 canonical unpadded base64url characters. Last two bits are zero.
+  if (methodValue !== 'S256' || typeof challengeValue !== 'string' ||
+      !/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/.test(challengeValue)) return null
+  return { state: stateValue, redirectUri: redirectValue, codeChallenge: challengeValue, codeChallengeMethod: 'S256' }
 }
 
 /** Accept only the server-generated callback for the original, bot-initiated request. */

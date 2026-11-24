@@ -73,6 +73,7 @@ export interface ExchangeTokenPayload {
   client_id: string
   client_secret: string
   redirect_uri: string
+  code_verifier: string
 }
 
 export interface TokenExchangeResponse {
@@ -262,8 +263,11 @@ export const botsApi = {
   createCredentials: (id: string | number, type: 'secret' | 'public_key') =>
     api.post<CreatedCredentialsResponse>(`/dev/bots/${id}/credentials`, { type }),
 
-  rotateCredentials: (id: string | number) =>
-    api.post<CreateCredentialsResponse>(`/dev/bots/${id}/credentials/rotate`),
+  rotateCredentials: (id: string | number, expectedClientId?: string) =>
+    api.post<CreatedCredentialsResponse>(`/dev/bots/${id}/credentials/rotate`, {
+      type: 'secret',
+      expected_client_id: expectedClientId,
+    }),
 
   // Commands
   getCommands: (id: string | number) => api.get<BotCommand[]>(`/dev/bots/${id}/commands`),
@@ -309,6 +313,8 @@ export const botsApi = {
     scopes: string[]
     state: string
     redirect_uri: string
+    code_challenge: string
+    code_challenge_method: 'S256'
   }) =>
     api.post<{
       code: string

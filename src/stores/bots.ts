@@ -327,17 +327,22 @@ export const useBotsStore = defineStore('bots', () => {
     }
   }
 
-  const rotateCredentials = async (botId: string | number) => {
+  const rotateCredentials = async (botId: string | number, expectedClientId?: string) => {
     try {
-      const response = await botsApi.rotateCredentials(botId)
+      const response = await botsApi.rotateCredentials(botId, expectedClientId)
 
       if (response.error) {
         throw new Error(response.error)
       }
 
-      // После ротации обновляем список
+      const credential = response.data
+      if (!credential?.client_id || !credential.client_secret || !credential.created_at) {
+        throw new Error('Некорректный ответ сервера при ротации ключа')
+      }
+
+      // Секрет не помещается в Pinia store. Возвращаем его вызывающему компоненту.
       await fetchBotCredentials(botId)
-      return response.data || response
+      return credential
     } catch (err: any) {
       error.value = err.message
       throw err
@@ -436,6 +441,8 @@ export const useBotsStore = defineStore('bots', () => {
     scopes: string[]
     state: string
     redirect_uri: string
+    code_challenge: string
+    code_challenge_method: 'S256'
   }) => {
     isInstalling.value = true
     error.value = null

@@ -280,7 +280,7 @@
                 <div class="redirect-section-heading">
                   <div>
                     <h3 class="oauth-url-heading">OAuth Start URL</h3>
-                    <p class="section-desc">Адрес backend бота, где создаётся OAuth state перед установкой из каталога. Только HTTPS (кроме localhost и loopback для разработки).</p>
+                    <p class="section-desc">Адрес backend бота, где создаются OAuth state и PKCE S256 перед установкой из каталога. Только HTTPS; loopback разрешён лишь тестовым ботам из списка администратора.</p>
                   </div>
                   <Button variant="secondary" :disabled="isSavingOAuthStart" @click="showOAuthStartModal = true">
                     <AppIcon :name="bot?.oauth_start_url ? 'settings' : 'plus'" :size="19" />
@@ -313,7 +313,7 @@
                 <div class="redirect-section-heading">
                   <div>
                     <h3 class="oauth-url-heading">Redirect URI</h3>
-                    <p class="section-desc">Разрешённые callback-адреса. После подтверждения браузер возвращается на callback с code и state. Адрес проверяется при выдаче и обмене кода.</p>
+                    <p class="section-desc">Разрешённые callback-адреса. После подтверждения браузер возвращается на callback с code и state. Адрес проверяется при выдаче и обмене кода. PKCE S256 обязателен; loopback разрешён только тестовым ботам из списка администратора.</p>
                   </div>
                   <Button variant="secondary" :disabled="isSavingRedirectURIs || redirectURIs.length >= 10" @click="showAddRedirectModal = true">
                     <AppIcon name="plus" :size="19" /> Добавить адрес
@@ -1048,8 +1048,8 @@
             </div>
             <div class="modal-body">
               <p v-if="activeCredential">
-                Новый секрет заменит действующий. Интеграции со старым секретом могут потерять доступ,
-                пока вы не обновите их конфигурацию.
+                Будут заменены Client ID и Client Secret. Старые credentials перестанут работать.
+                Обновите оба значения в конфигурации интеграций.
               </p>
               <p v-else>
                 Новый секрет будет показан только один раз после создания. Сохраните его в защищённом хранилище.
@@ -1724,8 +1724,10 @@ const handleCreateCredential = async () => {
 
   isCreatingCredential.value = true
   try {
-    // createCredential добавит в список новую запись (без секрета)
-    const newCred = await botsStore.createCredential(botId.value, 'secret')
+    const current = activeCredential.value
+    const newCred = current
+      ? await botsStore.rotateCredentials(botId.value, current.client_id)
+      : await botsStore.createCredential(botId.value, 'secret')
 
     // Сохраняем секрет отдельно, чтобы показать один раз
     freshlyCreatedSecret.value = {
@@ -1743,7 +1745,11 @@ const handleCreateCredential = async () => {
 
     toastStore.success('Client Secret создан. Сохраните его сейчас!')
   } catch (err: any) {
-    toastStore.error('Ошибка создания секрета: ' + err.message)
+    toastStore.error('Ошибка сохранения credentials: ' + err.message)
+    // После конфликта не повторяем ротацию автоматически.
+    showCreateCredential.value = false
+    credentialRotationAcknowledged.value = false
+    await loadBot()
   } finally {
     isCreatingCredential.value = false
   }
