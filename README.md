@@ -1,9 +1,14 @@
 # EchoTalk Bot Developer Portal — Статус реализации
 
-**Дата обновления:** 2026-11-19  
+**Дата обновления:** 2026-11-25
+
 **Версия ТЗ:** Bot Developer Portal.pdf (февраль 2026)  
-**Исторический базовый релиз:** release 0.22.0; актуальный backend содержит последующие hardening/runtime changes и работает на VPS. Присвоение backend релизных Docker/Git-тегов не входит в процесс публикации Dev Portal.  
-**Текущий рабочий статус:** backend Bot Platform реализован, развёрнут и прошёл основные функциональные и media/recovery проверки 2026-11-18—19. P4.0.1–P4.0.6 закрыты; **P4.0.8 принят по проверенному объёму duration enforcement/recovery, Gateway и bounded soak**, но infrastructure chaos и часть глубоких метрик/проверок остаются отложенными. **P4.0.10 выполнен частично:** backup/restore, healthchecks, регрессионные и production smoke-пробы пройдены; риски с секретами, миграциями, offsite backup и реальным rollback осознанно отложены. **Следующий этап — аудит понятности и полноты интерфейса Dev Portal, затем сборка, публикация на хостинге, подключение домена и публичный запуск.** Формальный RC1/Git-теги/Docker-тегирование не используются как обязательные шаги процесса выпуска.
+**Исторический базовый релиз:** release 0.22.0; backend Bot Platform работает на VPS. Последующие изменения DP 3.10.1 прошли локальный staging, но развёртывание всего актуального security-набора на VPS и post-deploy regression ещё не подтверждены. Формальные Docker/Git release-теги по-прежнему не обязательны.  
+**Текущий рабочий статус:** backend Bot Platform реализован, исторические backend smoke/E2E, media duration/recovery и ограниченные эксплуатационные проверки 2026-11-18—19 пройдены. P4.0.1–P4.0.6 закрыты в историческом объёме, P4.0.8 принят по проверенным сценариям, P4.0.10 закрыт частично. DP 3.9.1–3.9.5: локальный OAuth E2E и Developer Onboarding завершены (84/84 тестов предыдущей серии). **DP 3.10.1 — OAuth & Tokens Security Audit завершён в запланированном объёме (STAGING VERIFIED, 2026-11-25): финальная регрессия 110 PASS / 0 FAIL / 4 SKIP; все четыре пропущенных блока проверены отдельно, 12/12 контрольных блоков завершены.** Полный security audit, публичная публикация Dev Portal и production-проверка накопленных исправлений ещё не завершены.
+
+**Следующий этап: DP 3.10.2 — RBAC & IDOR Security Audit.** Перед обновлением VPS — backup, проверка миграций и совместимости, план rollback и post-deploy smoke. Затем DP 3.10.3–3.10.4, DP 3.11 — финальный общеплатформенный E2E/regression, DP 3.12 — публикация/production readiness и решение GO / NO-GO. Формальные RC1/Git/Docker-теги не обязательны; release-blocking security риски остаются обязательными к рассмотрению.
+
+**Обозначение:** исторические `P3.9.x` ниже — этапы **backend Voice/Media API**; новые `DP 3.9.x–3.12` — этапы **Dev Portal**. Это разные дорожные карты.
 
 ---
 
@@ -87,23 +92,37 @@
 - **P4.0.8 Gateway + Media Enforcement / Recovery — ✅ принят по проведённым bounded/E2E и integration-тестам; infra fault windows и глубокие Go/backlog метрики отложены.**
 - **P4.0.10 Operational Readiness / Backup / Smoke — ⚠️ частично завершён; пройдены backup/restore, healthchecks, API/Gateway/Slash/Voice smoke, metrics; известные security/infra риски отложены.**
 
-➡️ **Текущий этап: Dev Portal UX / Developer Onboarding Review → frontend build → hosting/domain → публичный запуск.** Backend пересобирать, тегировать и релизить заново ради формальной процедуры не требуется. Отложенные security/infra вопросы остаются открытыми и не считаются проверенными.
+**Dev Portal — отдельная линейка DP (новое по состоянию на 2026-11-25):**
+
+- **DP 3.1–3.8 — ✅** основные UX/onboarding-страницы, создание и настройки бота, credentials, OAuth-настройки, установки, webhook/gateway diagnostics, каталог и API-документация реализованы в предыдущих итерациях.
+- **DP 3.8.1 — ✅** README бота (`readme_md`, ограничение 64 КБ), Markdown-редактор и безопасное отображение в публичной карточке.
+- **DP 3.9 — ✅ по локальному QA:** frontend tests, read-only API smoke, Bot REST/Gateway и OAuth refresh/revoke пройдены в описанных сценариях; полный публичный E2E не выполнялся.
+- **DP 3.9.1 — ✅ OAuth redirect flow:** `OAuth Start URL`, браузерный redirect на Go backend бота, `state`, callback, обмен кода и `/bot/me` подтверждены реальным локальным тестом; ручная выдача кода в модальном окне заменена автоматическим переходом.
+- **DP 3.9.x UI/docs (этапы 3.9.1–3.9.5) — ✅ по реализованным изменениям:** единый вид OAuth Start URL/Redirect URI, HTTP-контракты, end-to-end Quick Start, устранение ссылок на приватный исходный код и путаницы localhost/HTTPS, публичный Go OAuth demo в `public/examples/oauth-demo/main.go`.
+- **DP 3.10 — 🚧** Security Audit в работе: DP 3.10.1 закрыт в проверенном объёме; DP 3.10.2–3.10.4 остаются открытыми.
+- **DP 3.10.1.1–3.10.1.6 — ✅** JWT/User Auth, Bot Token Lifecycle, Credentials Rotation, OAuth Code/State, PKCE/Redirect URI и OAuth Rate Limiting реализованы и проверены в рамках DP 3.10.1.
+- **DP 3.10.1.7 — ✅ STAGING VERIFIED:** Security Regression & OAuth E2E, Gateway lifecycle/backlog isolation, User Recovery & Session Security, Redis Outage Fail-Closed и Linux Go Race Detector. Финальный отчёт: `security-report-20261125T105918.114319400Z.json` — 110 PASS / 0 FAIL / 4 SKIP (четыре блока проверены отдельно).
+- **DP 3.10.2 — ⏳ следующий этап:** RBAC & IDOR Security Audit; DP 3.10.3 Browser & HTTP и DP 3.10.4 Runtime & Infrastructure/Dependencies ещё впереди.
+- **DP 3.11 — ⏳** сквозные E2E/regression и негативные сценарии после исправлений.
+- **DP 3.12 — ⏳** публичная сборка/хостинг/домен/HTTPS, продакшн-проверки и release decision.
+
+➡️ **Текущий этап: DP 3.10.2 — RBAC & IDOR Security Audit.** DP 3.10.1 завершён по локальному staging; production rollout накопленных security fixes и контрольная проверка на VPS не подтверждены. Полный security gate и публичная сборка ещё впереди (см. §9.6).
 
 ### 0.1 Оценка готовности к первому публичному запуску
 
-Статус на 2026-11-19 (инженерная/продуктовая оценка, не KPI). Числовые проценты из снимка 2026-11-13 больше не используются: они не отражают фактическую проверку UX Dev Portal.
+Статус на 2026-11-25 (инженерная/продуктовая оценка, не KPI). Исторические backend-проверки 2026-11-18—19 дополнены локальным OAuth/UX QA и Security Regression DP 3.10.1 от 2026-11-25. Числовые проценты общей готовности не используются; 12/12 относится только к контрольным блокам DP 3.10.1.7.
 
 | Область | Статус | Комментарий |
 |---|---|---|
 | Bot Platform functional core | ✅ Проверено | OAuth/runtime, Gateway, commands, resource API, LiveKit/media функциональность ранее реализованы; в ноябре выполнены контрольные smoke-тесты |
-| REST / Gateway contracts | ✅ Реализовано | OpenAPI/AsyncAPI, typed events и примеры присутствуют; доступность и удобство документации в UI ещё нужно оценить |
+| REST / Gateway contracts | ✅ Реализовано | OpenAPI/AsyncAPI и typed events; Developer Onboarding/Quick Start переработаны, но их UX на публичном домене ещё не проверен |
 | Media duration/recovery | ✅ Проверено в ограниченных сценариях | E2E duration/daily revoke, stuck `revoking`, restart, LiveKit failure mock, concurrent CAS, usage stability |
-| Operations / recovery | ⚠️ Есть отложенные проверки | backup/restore и readiness пройдены; rollback не запускался, Redis/PostgreSQL outage и глубокий soak не проверялись |
-| Security | ⚠️ Открытые риски | исторические P4.0.1–P4.0.6 закрыты, однако `.env` отслеживается Git, права `644`, backend process `root` |
-| Developer Portal UX / onboarding | 🚧 Следующий этап | необходимо оценить путь разработчика от регистрации бота до установки, команд, событий, документации и диагностики |
-| Публичная публикация Dev Portal | ❌ Ещё не выполнена | frontend build, хостинг, домен, HTTPS, final UX smoke |
+| Operations / recovery | ⚠️ Есть отложенные проверки | backup/restore и readiness пройдены; Redis OAuth fail-closed и восстановление проверены на staging; PostgreSQL/LiveKit outage, runtime-wide Redis failure, реальный rollback и длительный soak ещё не проверены |
+| Security | ⚠️ DP 3.10.1 STAGING VERIFIED | 110 PASS / 0 FAIL / 4 SKIP (проверены отдельно); JWT, OAuth/PKCE, token lifecycle, Gateway, user sessions и OAuth rate limiter проверены в описанных сценариях. RBAC/IDOR, browser/HTTP, runtime/dependencies и production deployment ещё впереди; известные infra/secret риски открыты |
+| Developer Portal UX / onboarding | ✅ Основная итерация завершена, финальный UX smoke впереди | OAuth settings UI, публичный каталог/README, Quick Start, примеры HTTP/Gateway/Webhook и скачиваемый Go OAuth demo; локальная проверка 84/84 тестов, без подтверждения широкого пользовательского тестирования |
+| Публичная публикация Dev Portal | ❌ Не подтверждена | production build/typecheck на актуальной интеграции, размещение и проверка HTTPS/домен/CORS/SPA, final UX/E2E и security sign-off ещё впереди |
 
-**Принятое решение по выпуску:** backend остаётся одной тщательно протестированной рабочей сборкой на VPS; публичный выпуск — это готовый и опубликованный клиент Dev Portal. Формальный RC1, Git-tag и выпуск новых backend-образов не являются обязательными действиями. Отложенные проблемы безопасности и восстановления не исчезают от такого решения и задокументированы отдельно.
+**Принятое решение по выпуску:** сохраняем принцип одной рабочей backend-сборки на VPS без обязательных формальных RC1/Git/Docker-тегов. Публичный выпуск — готовый Dev Portal; при этом проверенные security fixes должны быть развёрнуты контролируемо, с backup, совместимыми миграциями, rollback plan и post-deploy проверками. Staging PASS не равен production deployment.
 
 Пройденные end-to-end проверки:
 
@@ -403,7 +422,7 @@
 - отслеживание отзыва invite-ссылок
 - поддержка invite tracker / audit / moderation bot сценариев
 
-➡️ **Текущий этап: UX-аудит и подготовка Dev Portal к публикации; результаты P4.0.8/P4.0.10 и отложенные проверки приведены в разделе 9.**
+➡️ **Текущий этап: DP 3.10.2 RBAC & IDOR; DP 3.10.1 и его E2E завершены на staging.** Evidence и план дальнейшего запуска — §9.6; исторические P4.0.8/P4.0.10 сохраняются.
 
 
 ---
@@ -419,7 +438,7 @@
 | Interaction lifecycle | Все interaction проходят через state machine | ✅ |
 | Ephemeral != Message | Ephemeral не сохраняется как обычное сообщение чата | ✅ |
 | Modal instance persistence | Каждая открытая modal хранится отдельной записью | ✅ |
-| Gateway backlog | Gateway events сохраняются для resume/replay | ✅ базово |
+| Gateway backlog | Gateway events сохраняются для resume/replay; текущая generation (`GatewayEpoch`) ограничивает replay/read | ✅ staging (DP 3.10.1.7) |
 
 ---
 
@@ -432,11 +451,12 @@
 | Создание Bot App | ✅ | `POST /dev/bots` |
 | Редактирование | ✅ | `PUT /dev/bots/:id` |
 | Удаление | ✅ | `DELETE /dev/bots/:id` |
-| Redirect URLs | ✅ | `bot_app_redirect_uris` |
+| Redirect URLs | ✅ | `bot_app_redirect_uris`; добавление и удаление в модальном диалоге |
+| OAuth Start URL | ✅ | `bot_apps.oauth_start_url`, переход к backend бота перед OAuth; UI управления через модалку |
 | Credentials / secrets / rotation | ✅ | `bot_credentials` + rotate |
 | Публичный каталог | ✅ | `GET /api/public-bots`, `GET /api/public-bots/:id` |
 | Допустимые scopes | ✅ | `GET /dev/bots/available-scopes` |
-| UI install flow | ✅ | server → scopes → confirm → code |
+| UI install flow | ✅ | browser → bot `/oauth/start` → Dev Portal server/scopes/confirm → bot `/oauth/callback` → token exchange; E2E подтверждён |
 | Slash commands UI | ✅ | создание / редактирование / включение |
 | Webhook URL | ✅ | настройка на installation |
 | Command Base URL | ✅ | настройка на installation |
@@ -445,6 +465,9 @@
 | Gateway status UI | ✅ | реализовано |
 | Runtime Protection UI | ✅ | лимиты, burst, violations, auto-block |
 | Event Replay UI | ✅ | просмотр сохранённых Gateway events по installation |
+| README бота и публичная карточка | ✅ | Markdown до 64 КБ, sanitization, редактор, описание в каталоге |
+| Developer Quick Start | ✅ | объяснение OAuth с едиными HTTPS-примерами, HTTP-контрактами, installation/server/room, REST и событиями |
+| Публичный OAuth Go demo | ✅ в исходниках | `public/examples/oauth-demo/main.go`, запуск внешним разработчиком без доступа к приватному репозиторию; доступность через публичный домен ещё проверить |
 | Event subscriptions search UI | ✅ | поиск событий подписки в Dev Portal |
 | Interaction inspector | ❌ | planned |
 | Версии / релизы | ❌ | нет |
@@ -453,18 +476,22 @@
 
 | Функция | Endpoint | Статус | Примечание |
 |---------|----------|--------|------------|
-| Authorization Code flow | `POST /oauth/authorize` | ✅ | работает |
-| Обмен code на токены | `POST /oauth/token` | ✅ | проверено |
+| Authorization Code flow | `POST /oauth/authorize` | ✅ | browser E2E; обязательны зарегистрированный точный Redirect URI, `state`, PKCE S256 (DP 3.10.1) |
+| Обмен code на токены | `POST /oauth/token` | ✅ | client credentials, точный `redirect_uri`, `code_verifier`, одноразовый code; конкурентный redemption PASS на staging |
 | Refresh token flow | `POST /oauth/token/refresh` | ✅ | atomic rotation, replay/reuse protection и concurrent refresh regression закрыты в P4.0.1 |
-| Ротация credentials | `POST /dev/bots/:id/credentials/rotate` | ✅ | работает |
+| Ротация credentials | `POST /dev/bots/:id/credentials/rotate` | ✅ | CAS rotation: один победитель; pending codes старого credential инвалидируются, действующие access tokens сохраняются (staging) |
+| OAuth code / state storage | PostgreSQL | ✅ | digest, TTL, одноразовость, rollback/atomic consume (staging/integration) |
+| Redirect URI / PKCE | authorize + token | ✅ | S256 обязателен, plain/missing отклоняются; HTTP loopback только для явно разрешённых тестовых BotApp ID |
+| OAuth rate limiting | authorize/token/refresh/credentials | ✅ | Redis atomic quota, bounded payload, 429/503, fail-closed при отказе Redis (staging) |
 | Привязка code к credential | `bot_oauth_codes.credential_id` | ✅ | исправлено |
+| OAuth Start URL | `bot_apps.oauth_start_url` / `PUT /dev/bots/:id` | ✅ по E2E | GORM должен явно использовать `column:oauth_start_url`, чтобы не создавать `o_auth_start_url` |
 | Отзыв установки | `DELETE /servers/:serverID/bots/:installation_id` | ✅ | revoke installation/tokens |
 
 ### 2.3 Bot API Gateway / Runtime ✅
 
 | Компонент | Статус | Примечание                              |
 |-----------|--------|-----------------------------------------|
-| `BotAuthMiddleware` | ✅ | access/session token validation         |
+| `BotAuthMiddleware` | ✅ | проверка типов токенов и effective scopes; Gateway session token не является Bot Access Token |
 | Installation context | ✅ | installation/bot/server scopes доступны |
 | Snapshot scopes | ✅ | granted scopes                          |
 | Granted permissions | ✅ | базовая проверка                        |
@@ -505,7 +532,10 @@
 | Gateway state | ✅ | `bot_gateway_states` |
 | Runtime switch webhook/ws | ✅ | installation-level |
 | Gateway ACK | ✅ | monotonic ACK проверен, старый ACK не откатывает seq |
-| Gateway resume | ✅ | replay missed events по `last_ack_seq` проверен |
+| Gateway resume | ✅ | replay missed events по `last_ack_seq`; проверка текущего connection/epoch/scopes, E2E на реальном событии |
+| Gateway single-use session token | ✅ | replay/reconnect/concurrent handshake regression; только один победитель при повторном использовании (staging) |
+| Gateway lifecycle authorization | ✅ | suspend/revoke/reinstall и runtime configuration changes закрывают старое соединение и инвалидируют соответствующие session tokens (staging) |
+| Gateway epoch isolation | ✅ | текущая generation для backlog, ACK/resume и REST reads; старые события не возвращаются после смены подписок или reinstall (staging) |
 | Duplicate protection | ✅ | |
 | Reconnect replacement | ✅ | |
 | Last seen / last ack tracking | ✅ | `last_seen_at` / `last_acked_at` обновляются при ACK/heartbeat |
@@ -545,6 +575,8 @@
 - limit protection
 - чтение из `bot_gateway_events`
 - server/installation boundary
+- current `GatewayEpoch`, expiry, event subscription и scope filtering для list/detail/context/batch и Dev Portal event list (DP 3.10.1.7, staging)
+- прежние поколения недоступны для replay; sequence не сбрасывается
 - Dev Portal UI для ручного просмотра событий
 - красивые карточки событий
 - поиск и прокрутка event subscriptions в Dev Portal
@@ -645,6 +677,11 @@
 - `BotGatewayEvent`
     - persistent backlog для websocket delivery
     - resume/replay через seq
+    - `gateway_epoch` (default 0 для исторических записей)
+- `BotInstallation` (дополнение DP 3.10.1.7)
+    - `gateway_epoch` (default 1) — текущая authorization generation Gateway
+    - не повышать epoch старых событий при миграции; они недоступны и удаляются по retention
+    - новая generation при релевантных lifecycle/config transitions; обычный reconnect/credential rotation сохраняют epoch и последовательность seq
 
 ### P2.4 runtime protection models
 
@@ -971,17 +1008,23 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ### 6.2 Установка на сервер ✅
 
+**Актуальный сценарий (DP 3.9.1 + DP 3.10.1.5):** разработчик задаёт `OAuth Start URL` и зарегистрированный `Redirect URI`; backend бота создаёт случайные `state` и `code_verifier`, вычисляет `code_challenge` (S256) и хранит state/verifier на своей стороне. Браузер открывает Dev Portal с `state`, `redirect_uri`, `code_challenge`, `code_challenge_method=S256`; пользователь подтверждает сервер и scopes. Dev Portal передаёт эти параметры в `/oauth/authorize`, затем переходит по `redirect_to`. Backend бота проверяет `state` и обменивает code через `/oauth/token` с `client_id`, `client_secret`, исходным `redirect_uri` и `code_verifier`, затем вызывает `/bot/me`. Client secret и runtime-токены не передаются через browser redirect. Исторический локальный flow на порту 3001 завершился `OAuth callback and /bot/me succeeded. (TEST ONLY: tokens not stored.)`; обновлённый PKCE-flow отдельно подтверждён browser E2E на staging. Production — HTTPS; HTTP loopback только для выделенных BotApp ID из `BOT_OAUTH_LOOPBACK_BOT_IDS` (по умолчанию пусто).
+
 | Шаг | Статус |
 |-----|--------|
 | Выбор сервера | ✅ |
 | Выбор scopes | ✅ |
 | `/oauth/authorize` | ✅ |
-| Выдача code | ✅ |
+| Выдача code и redirect_to на callback | ✅ |
 | `/oauth/token` | ✅ |
 | Создание installation | ✅ |
 | Создание bot user | ✅ |
 | Добавление bot user в server participants | ✅ | Нужно для отображения/модерации бота как участника сервера |
 | Выдача access/refresh token | ✅ |
+| Проверка `state` на callback и автоматический обмен code | ✅ E2E |
+| Проверка access token через `/bot/me` после обмена | ✅ E2E |
+| PKCE S256 / точное совпадение Redirect URI | ✅ staging E2E |
+| Replay/concurrent redemption, refresh rotation и revoke/reinstall | ✅ staging E2E |
 
 ### 6.3 Runtime ✅
 
@@ -1014,6 +1057,9 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Gateway resume | ✅ |
 | Gateway duplicate protection | ✅ |
 | Gateway reconnect hardening | ✅ |
+| Gateway real event delivery → ACK → Resume → REST | ✅ staging E2E |
+| Gateway subscription epoch / reinstall backlog isolation | ✅ staging E2E |
+| Gateway concurrent connect / revoke и runtime config lifecycle | ✅ staging E2E (bounded) |
 
 ### 6.5 Slash Commands ✅
 
@@ -1247,7 +1293,15 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | Frontend/token log sanitization | ✅ | P4.0.4: centralized security log redaction/fingerprinting; token/Authorization/Cookie/URL/body sanitization applied to critical runtime paths |
 | Dependency/SCA gate | ✅ | P4.0.5: govulncheck reachable=0, frontend audit clean, Trivy source/image vulnerability scan clean for release gate; backend root runtime documented as temporary TLS-key exception |
 | Effective scope downgrade | ✅ | P4.0.6: runtime использует effective scopes из `BotAuthMiddleware`; старый token не может получить scope вне token snapshot и немедленно теряет отозванный scope |
-| Cross-installation / cross-server IDOR regression | ✅ | P4.0.6: resource/event/interaction/media boundaries проверены; batch permission check использует единый access validator; media session Get/List/Refresh/Disconnect изолированы по `installation_id` |
+| Cross-installation / cross-server IDOR regression | ✅ | P4.0.6: resource/event/interaction/media boundaries проверены; batch permission check использует единый access validator; media session Get/List/Refresh/Disconnect изолированы по `installation_id`; расширенная ревизия DP 3.10.2 впереди |
+| User JWT validation | ✅ | DP 3.10.1.1: HS256, signing key из окружения, expiry/issuer/session validation; tampered/alg none, token-type confusion, ordinary user admin denial проверены |
+| OAuth code / state / PKCE | ✅ | digest, TTL, atomic consume, обязательный S256, exact redirect, ограниченный HTTP loopback; DP 3.10.1 staging |
+| Credential rotation / token lifecycle | ✅ | atomic rotation/revoke, no secret metadata, pending code invalidation, one active installation, old token denial after reinstall |
+| OAuth Rate Limiter Fail-Closed | ✅ | Redis outage: пять защищённых routes возвращают 503 + `rate_limiter_unavailable`, `Retry-After`, `Cache-Control: no-store`; восстановление подтверждено |
+| Gateway authorization generation | ✅ | single-use session tokens, current connection fence, epoch-bound delivery/replay/read; live E2E PASS, room-level RBAC отдельно |
+| User recovery & session revocation | ✅ | recovery TTL/attempt limit/one-time, atomic login/revoke, exact-session kick, Refresh WS continuity, concurrent Login/Reset, Logout E2E PASS |
+| Backend race detector | ✅ | Linux CGO `go test -race`: пять тестируемых пакетов PASS; `auth` без test files; не доказывает отсутствие гонок за пределами покрытия |
+| Production deployment DP 3.10.1 | ⚠️ | полное развёртывание последнего staging-набора и post-deploy smoke не подтверждены |
 
 ---
 
@@ -1265,7 +1319,19 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 | **P1 / Medium** | Event contract evolution | post-release backlog | текущий v1 contract фиксируется для релиза; formal deprecation machinery — P4.1 |
 | **P1 / Medium** | Supply-chain vulnerabilities | ✅ текущий release gate закрыт в P4.0.5 | автоматизацию постоянного SCA/CI можно расширять post-release |
 
-**Уже закрытая утечка:** message content больше не должен обходить `message.content.view` через Webhook/Gateway: event payload redaction выполняется per-installation до persistence и replay.
+**Уже закрытая утечка:** message content больше не должен обходить `message.content.view` через Webhook/Gateway: event payload redaction выполняется per-installation до persistence и replay. DP 3.10.1.7 дополнительно проверяет current generation и scope filtering для Gateway backlog/read paths. Это не заменяет ревизию комнатного RBAC и Webhook в DP 3.10.2/3.10.4.
+
+Дополнение release risk matrix после DP 3.10.1:
+
+| Риск | Статус | Release action |
+|---|---|---|
+| JWT tampering / token-type confusion / admin access | ✅ staging regression | post-deploy safe smoke |
+| OAuth code/state replay, credential rotation race, PKCE downgrade | ✅ staging regression | синхронное обновление backend/Dev Portal/examples; повторить browser flow |
+| Gateway session replay, stale connection, stale backlog | ✅ staging regression | проверить schema/epoch и взаимодействие с Interaction Runtime до релиза |
+| User session races / password recovery / stale WS | ✅ staging regression | post-deploy проверка Login/Refresh/Logout без затрагивания чужих сессий |
+| Redis OAuth limiter fail-open | ✅ staging outage | отдельно проверить прочие runtime/dependency fault paths |
+| Room-level RBAC, privilege escalation, cross-tenant access | 🚧 DP 3.10.2 | расширенная отрицательная матрица прав |
+| Browser/HTTP, secrets, supply chain, infrastructure | 🚧 DP 3.10.3–3.10.4 | актуальный audit и решение по release blockers |
 
 ---
 
@@ -1279,7 +1345,7 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 - ротировать credentials
 - публиковать бота
 - видеть публичный каталог
-- получать install code
+- получать authorization code через OAuth Redirect/Callback (без ручного копирования кода)
 - настроить webhook endpoint
 - настроить command base URL
 - выбрать webhook/websocket transport
@@ -1379,12 +1445,12 @@ Scopes определяют доступ бота к Runtime API, Resource API �
 
 ### 9.1 Принцип релиза (решение 2026-11-19)
 
-**Backend:** одна актуальная рабочая сборка Go, уже развёрнутая на VPS и проверенная реальными тестами. Не вводим обязательный Git-tag, Docker release-tag, RC1-процедуру и повторное развёртывание ради формальности. Для rollback сохранён отдельный Docker image прежней сборки, но реальный откат пока не тестировался.
+**Backend (решение 2026-11-19):** одна рабочая сборка Go на VPS; не вводим обязательный Git-tag, Docker release-tag, RC1-процедуру и повторное развёртывание ради формальности. Для rollback сохранён отдельный Docker image прежней сборки, но реальный откат пока не тестировался. Дополнение 2026-11-25: накопленные DP 3.10.1 security fixes требуют контролируемого обновления VPS; полное применение последнего staging-набора ещё не подтверждено.
 
 **Публичный релиз Bot Platform:** удобный для разработчика, собранный и размещённый на публичном хостинге **Dev Portal**, доступный по домену с HTTPS и понятным процессом регистрации/установки ботов. Не путать готовность backend с готовностью публичного developer experience.
 
 ```text
-Backend: реализован → E2E/regression/smoke проверен → работает на VPS
+Backend: рабочая сборка на VPS → security fixes проверены на staging → controlled deploy/smoke
                                                    ↓
 Dev Portal: UX/onboarding audit → исправления интерфейса → production build
                                                   ↓
@@ -1408,7 +1474,7 @@ Dev Portal: UX/onboarding audit → исправления интерфейса 
 | LiveKit admin failure → recovery | Go integration с PostgreSQL + mock LiveKit: первый `RemoveParticipant` завершился ошибкой, повтор — успешно, status `revoked` | ✅ PASS (integration; audit/usage не проверялись в этом тесте) |
 | Backend restart в состоянии `revoking` | 2026-11-18: после restart worker восстановил session, `participant_removed=true`, `usage_finalized=true`, `failed_sessions=0` | ✅ PASS (E2E) |
 | Concurrent Recovery, PostgreSQL CAS | Два конкурентных recovery scan: `checked=2`, `recovered=1`, `failed=0`, `livekit_remove_calls=1`, status `revoked` | ✅ PASS (integration; mock LiveKit) |
-| Redis/PostgreSQL outage / восстановление | Не проводилось контролируемое отключение инфраструктуры | ⏸️ Отложено |
+| Redis/PostgreSQL outage / восстановление | На момент P4.0.8 не проводилось; позднее DP 3.10.1 проверил OAuth Redis limiter на staging | ⏸️ Полный runtime/media outage отложен |
 | Go goroutine/heap/process collectors | `go_*` / `process_*` не были показаны текущим `/metrics`; Docker PIDs не заменяют проверку goroutines | ⏸️ Отложено |
 | Длительное backlog accumulation и orphan invariants под outage | Отдельный стресс/отказный прогон не проводился | ⏸️ Отложено |
 
@@ -1437,7 +1503,7 @@ Dev Portal: UX/onboarding audit → исправления интерфейса 
 | Metrics/Recovery Health | `/metrics` доступен; 7 recovery/scan error/pending/stale показателей равны 0 | ✅ PASS (snapshot) |
 | Ошибки логов | panic/fatal в просмотренном окне не обнаружены; присутствует `PERMS DEBUG` и единичный TLS handshake EOF | ✅ С замечаниями |
 
-**Границы smoke:** базовые установка/OAuth flow, interactive components, video/screen publish и весь набор RBAC проверялись на более ранних этапах. В ноябрьском финальном прогоне **не переиспытан целиком** полный путь `создать бота → выдать scopes → установить → получить code → exchange token → interaction → media`. Эти сценарии желательно пройти ещё раз именно с точки зрения UX нового разработчика на Dev Portal.
+**Границы smoke:** базовые установка/OAuth flow, interactive components, video/screen publish и весь набор RBAC проверялись на более ранних этапах. В финальном backend-прогоне 2026-11-19 **не переиспытан целиком** путь `создать бота → scopes → установить → code → token → interaction → media`. **Позднее, в DP 3.9.1, отдельно прошёл E2E OAuth Start → Callback → `/bot/me`**, однако он не заменяет полного прогона interactions/media и UX с публично размещённого Dev Portal. Эти сценарии остаются в DP 3.11.
 
 ### 9.4 Осознанно отложенные проверки и риски (не считать закрытыми)
 
@@ -1448,42 +1514,152 @@ Dev Portal: UX/onboarding audit → исправления интерфейса 
 | **Средний/высокий** | Offsite backup | Есть проверенная локальная копия на том же VPS, но нет подтверждения удалённой резервной копии | Отложено |
 | **Средний/высокий** | Реальный Docker rollback | Старый image сохранён, но сценарий возврата после обновления ещё не выполнялся | Отложено |
 | **Средний** | DB migration rollback | `ConnectDatabase()` при старте вызывает GORM `AutoMigrate`; схема не откатывается при возврате старого образа | Отложено по решению владельца; обратная совместимость обеспечивается перед релизом |
-| **Средний** | Redis/PostgreSQL failure windows | Не тестировали сбой и восстановление основных dependencies | Отложено для staging |
+| **Средний** | Redis/PostgreSQL failure windows | OAuth Redis limiter fail-closed и восстановление подтверждены 2026-11-25 на staging; PostgreSQL outage, LiveKit/Redis runtime-wide failure и backlog/orphan invariants не проверены | Частично проверено, остаток DP 3.10.4 |
 | **Средний** | Go runtime/backlog/orphan stress | Нет достаточного длинного stress/chaos proof с heap/goroutine и outage backlog | Отложено |
 | **Низкий** | Debug permission logs | В production видны многословные `[PERMS DEBUG]` с набором разрешений | Рекомендуется выключить до публичного запуска |
 
 Подробный отдельный список отложенных работ: `EchoTalk_P4.0.10_deferred_release_preparation.md` (зафиксирован ранее). Это не означает, что все перечисленные риски безопасны; особенно секреты в Git требуют отдельного устранения.
 
-### 9.5 Следующий этап — Dev Portal UX / Developer Onboarding Review 🚧
+### 9.5 Dev Portal UX / Developer Onboarding — итерация завершена, итоговый sign-off ожидается ✅ / ⚠️
 
-**Цель:** разработчик, впервые открывший Dev Portal, должен самостоятельно понять, как зарегистрировать Bot App, настроить transport, установить бота на сервер, получить токен, подписаться на события, добавить slash commands и отладить ошибки. До завершения аудита удобство интерфейса **не подтверждено**.
+**Цель:** внешний разработчик должен самостоятельно зарегистрировать Bot App, настроить OAuth, получить токены, определить установку/сервер/комнату, отправить первое сообщение и подключить события. Вопросы UX и документации проработаны в DP 3.1–3.9.5; фактический путь OAuth подтверждён E2E. Окончательное утверждение безопасности и поведения на публичном домене — отдельные этапы.
 
-| Путь разработчика | Что проверим в UI | Статус |
+| Направление | Фактически выполнено | Статус |
 |---|---|---|
-| Первое посещение | Понятное назначение Dev Portal, вход, навигация, документация, очевидная кнопка создания бота | ⏳ UX review |
-| Создание Bot App | Название, описание, иконка, scopes, валидация, ошибки, пустые состояния | ⏳ UX review |
-| Credentials & OAuth | Понятное отличие Client ID/Secret, user JWT, Bot Access/Refresh; безопасное копирование и rotation | ⏳ UX review |
-| Install flow | Как выбрать сервер и разрешения, подтвердить установку, узнать installation ID и дальнейшие действия | ⏳ UX review |
-| Transport | Когда использовать Webhook vs WebSocket; endpoint URL, подпись, subscribe events, connection status | ⏳ UX review |
-| Slash Commands | Command Base URL, создание `/help`, включение, проверка, error/timeout feedback | ⏳ UX review |
-| Event debugging | Deliveries/attempts, replay, Gateway seq/ACK/heartbeat, понятные ошибки и пустые состояния | ⏳ UX review |
-| Runtime Protection | Как увидеть лимиты, блокировки, violations, что делать при `429` | ⏳ UX review |
-| REST / Gateway docs | Доступность OpenAPI/AsyncAPI, Quick Start, примеры request/response и авторизации | ⏳ UX review |
-| Интерфейс | Адаптивность, формулировки, подтверждения опасных действий, состояния загрузки/ошибок, доступность | ⏳ UX review |
+| Основной интерфейс Dev Portal | создание/управление ботом, credentials, installations, Gateway status, Runtime Protection, slash commands, event replay, публичный каталог | ✅ |
+| README/карточка бота | `readme_md`, редактор/публичный Markdown, sanitization | ✅ |
+| OAuth settings UI | Start URL и Redirect URI приведены к единой структуре с модалками управления | ✅ |
+| Полный OAuth Flow | Start → Dev Portal → authorize → callback → token → `/bot/me`; локальная проверка с Go-сервером прошла | ✅ E2E |
+| Quick Start / REST / Gateway docs | переработаны определения, адреса, HTTP-контракты, примеры, ошибки, security-примечания, installation/server/room, Gateway и Webhook | ✅ по локальному QA |
+| Самостоятельный пример | Go OAuth demo в публичной папке frontend; отсутствие зависимости от приватного backend-репозитория | ✅ исходники, публикация не подтверждена |
+| Локальный QA frontend | последняя серия сообщала 84/84 успешных теста; Go demo компилировался и проходил проверки start/invalid state | ✅ в рамках предыдущих проверок |
+| Production UX smoke | тест реальным сторонним разработчиком на опубликованном HTTPS-хосте, прямые URL/перезагрузка SPA, адаптивность | ⏳ |
 
-UX-аудит может выявить небольшие **публикационные исправления клиента**, но не повод заново расширять backend feature scope.
+**Примечание:** локальный E2E использовал Dev Portal на `localhost:3000` и Go OAuth demo на `127.0.0.1:3001`. Это адреса конкретного теста, а не рекомендуемая конфигурация публичного бота; опубликованному боту необходим публичный HTTPS URL. Страница документации не должна ссылаться на закрытые `examples/*` из репозитория EchoTalk.
 
-### 9.6 Публикация Dev Portal — после UX Review
+### 9.6 Следующие этапы Dev Portal — 3.10 → 3.11 → 3.12
 
-- [ ] Внести UX/контент-исправления в Vue Dev Portal.
-- [ ] Выполнить production frontend build и typecheck/lint.
-- [ ] Проверить маршрутизацию SPA при прямом открытии и перезагрузке URL.
-- [ ] Разместить статическую сборку на выбранном хостинге.
-- [ ] Подключить домен, HTTPS и корректную конфигурацию API/CORS/redirect URLs (строгий allowlist, без wildcard CORS).
-- [ ] Выполнить публичный frontend smoke: login → create → credentials → OAuth/install → commands → events/diagnostics.
-- [ ] Опубликовать Dev Portal и документацию для разработчиков ботов EchoTalk.
+#### DP 3.10 — Security Audit 🚧 (текущий: 3.10.2)
 
-**Финал:** публичный Dev Portal доступен по домену и позволяет стороннему разработчику пройти весь путь от создания бота до работы с runtime. Backend остаётся текущей проверенной сборкой; новые теги не требуются.
+| Подэтап | Область проверки | Что считаем результатом |
+|---|---|---|
+| **3.10.1 OAuth & Tokens — ✅ STAGING VERIFIED** | JWT/user auth, token lifecycle, credentials, code/state digest/TTL, PKCE S256/exact redirect, OAuth limiter, Gateway lifecycle/backlog и user recovery | финальная регрессия 110 PASS / 0 FAIL / 4 SKIP; отдельные проверки выполнены; 12/12 блоков |
+| **3.10.2 RBAC & API — ⏳ следующий** | owner access, installation/server boundary, cross-installation IDOR, effective scopes, downgrade, resource/interaction/voice permissions | отрицательные тесты доступа и отсутствие расширения полномочий |
+| **3.10.3 Frontend & HTTP** | XSS/Markdown, браузерное хранение сессии, cookies/CSRF, CORS, CSP, security headers, unsafe redirects, ошибки и логирование | устранённые подтверждённые проблемы, production-safe headers |
+| **3.10.4 Runtime & Dependencies** | Webhook/Gateway/commands abuse controls, SSRF, payload/timeouts, audit/PII, Go SCA, `npm audit`, контейнерные настройки | актуальные отчёты и решение по release blockers |
+
+**Оставшиеся вопросы OAuth:** обязательный PKCE S256 и loopback policy реализованы и проверены в рамках DP 3.10.1. Проверить production-конфигурацию allowlist, unsafe Start URL/browser redirects, актуальные публичные docs/examples, browser session storage, поведение сторонних клиентов и ранее опубликованные секреты. Отдельно оценить refresh token family/reuse policy и восстановление при истечении refresh token, не считать их полностью покрытыми только по atomic rotation/replay regression. P4.0.1–P4.0.6 сохраняются как исторические проверки.
+
+**Принцип исправлений:** изучаем актуальные файлы; без широкого рефакторинга; backend-валидация является источником истины; не ослабляем CSRF/CORS ради тестов; покрываем изменения Go table-driven/integration и Vue component/contract tests. API и документация корректируются только после фактического изменения контрактов.
+
+##### DP 3.10.1 — OAuth & Tokens Security Audit ✅ (2026-11-25, STAGING VERIFIED)
+
+**Цель:** исключить проверенные обходы аутентификации, повторное использование OAuth/Gateway токенов, гонки ротации/отзыва, доступ к устаревшим событиям и сохранение пользовательских WebSocket после отзыва сессии. Backend и Dev Portal правились точечно; проверки destructive/mutation выполнялись на выделенном локальном staging (`http://127.0.0.1:18443`), PostgreSQL/Redis и временных fixtures. Production-safe проверки проводились отдельно и не доказывают, что последний staging build уже на VPS.
+
+| Подэтап | Реализованный hardening | Статус |
+|---|---|---|
+| 3.10.1.1 — JWT & User Authentication | HS256 и обязательные JWT claims; ключ из env, проверка активной сессии, admin privilege guard; recovery code crypto/HMAC, TTL и ограничение попыток | ✅ Проверено |
+| 3.10.1.2 — Bot Token Lifecycle | атомарное погашение и отзыв токенов, active app/installation checks, unique active installation, effective scope intersection, revoke/reinstall | ✅ Проверено |
+| 3.10.1.3 — Credentials Security & Rotation | CAS rotation, один активный credential, invalidation pending codes, metadata без секретов; обычная rotation не отзывает действующий runtime access | ✅ Проверено |
+| 3.10.1.4 — OAuth Code & State | случайные code/state, digest storage, TTL, atomic consume и rollback; повторный и конкурентный redemption | ✅ Проверено |
+| 3.10.1.5 — PKCE & Redirect URI | обязательный S256, точное сравнение redirect, явный loopback allowlist, обновление Vue OAuth flow/Go demo | ✅ Browser + staging E2E |
+| 3.10.1.6 — OAuth Rate Limiting | Redis-backed atomic quota, shared token/refresh bucket, payload cap, rate limits/concurrency, trusted proxy policy; fail-closed | ✅ Integration + outage E2E |
+| 3.10.1.7 — Security Regression & OAuth E2E | Security Runner, staging, browser callback, Gateway, recovery/sessions, outage, Linux race | ✅ 12/12 блоков |
+
+###### Финальный Security Runner — 110 PASS / 0 FAIL / 4 SKIP
+
+```text
+Date: 2026-11-25
+Mode: staging
+Report: security-report-20261125T105918.114319400Z.json
+PASS=110 FAIL=0 SKIP=4
+```
+
+Финальный результат подтверждён присланным выводом терминала после пересборки staging с user session hardening. Предыдущий успешный JSON-отчёт: `security-report-20261125T095110.306903800Z.json` (110/0/4). Ранее ошибки E2E fixture (room create permission и casing `ServerID`) устранены без ослабления production-авторизации. Fixture cleanup — PASS; исторические записи сохраняются. Финальный JSON отдельно не приложен, имя и итог взяты из вывода запуска.
+
+| Контрольный блок 3.10.1.7 | Evidence | Статус |
+|---|---|---|
+| Security Runner Unit Tests | unit/regression standalone runner | ✅ PASS |
+| Production Safe Anonymous | 8 PASS, 7 SKIP — read-only/negative subset ранее | ✅ PASS в пределах subset |
+| Production Safe Authenticated | 15 PASS, 6 SKIP — ordinary user JWT, safe subset ранее | ✅ PASS в пределах subset |
+| Backend Unit Tests | `go test` и `go vet` по затронутым пакетам, успешная staging Docker build/readiness | ✅ PASS |
+| PostgreSQL Integration Tests | `TestOAuthCodeStorePostgres`, token consume, `TestGatewayEventSecurityPostgres`, `TestUserRecoverySessionPostgres` | ✅ PASS отдельно |
+| Redis Integration Tests | `TestOAuthRateLimiterRedis`: atomic quota | ✅ PASS отдельно |
+| Staging OAuth E2E | финальный runner 110/0/4 | ✅ PASS |
+| Browser OAuth E2E | реальный Dev Portal → callback → token → `/bot/me`, включая PKCE | ✅ PASS отдельно |
+| Gateway Security Regression | real event/ACK/Resume/REST, subscription epoch, reinstall, config, concurrent connect/revoke | ✅ PASS |
+| User Recovery & Session Security | PostgreSQL + actual HTTP/WS E2E, 5 сценариев | ✅ PASS отдельно |
+| Redis Outage Fail-Closed | `redis-outage-e2e.ps1`: pause/unpause, 503 contract, readiness recovery | ✅ PASS отдельно |
+| Backend Go Race Detector | Linux Docker, CGO=1, `go test -race` по выбранным пакетам | ✅ PASS (test subset) |
+
+Четыре SKIP Security Runner ожидаемы и не являются FAIL: `browser Dev Portal / actual callback`, `PostgreSQL digest / TTL / rollback`, `Redis fail-closed / atomic quota`, `user recovery / session revocation` выполнены отдельными проверками. Их результаты не прибавляются к 110 PASS как дополнительные автоматические тесты runner.
+
+###### Gateway Security Regression
+
+- Single-use Gateway session token: разделение Bot Access/session tokens, повторный и конкурентный handshake, fresh reconnect и replacement старого сокета.
+- Lifecycle: при app suspension/installation revoke старый WS закрывается, unused tokens и новые session requests отклоняются; reinstall не оживляет старые access/refresh/session tokens; сохраняется уникальная installation.
+- `GatewayEpoch` на installation/event: current authorization generation проверяется при публикации, ACK/resume, heartbeat и чтении backlog; события старого поколения не видны, seq остаётся монотонным. Смена подписок, transport/runtime и revoke/reinstall проверены; ordinary reconnect/credential rotation не сбрасывают generation.
+- E2E с реальным `server.room.created`: доставка по WS, reconnect/resume, ACK с проверкой persisted status, REST list/detail/context/batch и owner event list; положительные и отрицательные проверки после изменения subscription и reinstall.
+- `TestGatewayEventSecurityRedaction`, `TestGatewayEventSecurityPolicy`, `TestGatewayEventSecurityPostgres` пройдены отдельно; дополнительная фильтрация message content и scopes на read paths.
+- Final runner: `Gateway real event delivery / ACK / Resume / REST`, `Gateway subscription epoch isolation`, `Gateway event delivery / backlog isolation`, `Gateway runtime config lifecycle`, `Gateway concurrent connect / revoke` — PASS. В последнем race-сценарии `upgrades=0, denied=3`: подтверждён отказ, а не закрытие успешно upgraded socket в этом конкретном запуске; отдельные live revoke/disconnect тесты PASS.
+- Ограничения: GW-006 (ошибки persistence/state) проверен частично; room-level effective RBAC — DP 3.10.2; `interaction.created` теперь подчиняется subscription/scopes policy, требуется повторный interaction E2E; multi-process Gateway, DB fault windows и in-flight delivery остаются вне полного доказательства.
+
+###### User Recovery & Session Security
+
+- `TestUserRecoverySessionPostgres` — PASS (1.83 s): TTL, attempts, one-time recovery, transactional session issue/revoke и rollback на временных таблицах.
+- `TestUserSessionKickExact` и `TestUserSessionCurrentConnectionFence` — PASS: адресный kick по SessionID и защита нового соединения.
+- `TestUserSessionE2EStaging` — PASS (6.26 s): Refresh сохраняет WS и SessionID; concurrent Login отклоняет старый JWT/WS; concurrent Reset отзывает сессии и запрещает replay; concurrent Login/Reset не оставляет active session со старой авторизацией; новый пароль работает, Logout отзывает HTTP/WS.
+- Использованы отдельная учётная запись staging и тестовый recovery code в БД, без реальной отправки писем. Сохранена политика одной активной пользовательской сессии, JWT/session TTL 72 часа и sliding refresh. Не утверждается абсолютное прекращение операций, уже начавшихся до revoke, или полное multi-instance покрытие.
+
+###### Redis outage и Go Race Detector
+
+- `tools/staging/redis-outage-e2e.ps1`: healthy OAuth/credentials invalid requests → HTTP 400; при `docker pause` Redis — HTTP 503 на `/oauth/authorize`, `/oauth/token`, `/oauth/token/refresh`, credentials create/rotate; проверены `rate_limiter_unavailable`, `Retry-After`, `Cache-Control: no-store`.
+- `/healthz` при outage остаётся 204, `/readyz` становится 503; после восстановления Redis readiness 204 и все пять запросов снова 400. `PASS Redis Outage Fail-Closed E2E`.
+- Это доказательство fail-closed на пяти защищённых routes с намеренно некорректными запросами, не полный runtime/media chaos test и не проверка успешной выдачи валидного токена в outage.
+- `go test -race -p 2 -count=1 -timeout=10m ./auth ./controllers ./controllers/bots ./middleware ./services/botplatform ./internal/sockets` выполнен в `golang:1.27.4-alpine` с CGO/build-base: пять пакетов PASS, `auth [no test files]`. `WARNING: DATA RACE` отсутствует; opt-in DB/E2E tests не были явно включены в этот запуск. Не заменяет race-instrumented server E2E, полный `./...` и нагрузочные проверки.
+
+###### Воспроизведение и evidence
+
+```powershell
+# Из корня EchoTalkServer, только локальный staging
+.\tools\staging\staging.ps1 -Action Up
+.\tools\staging\user-session-e2e.ps1
+.\tools\staging\redis-outage-e2e.ps1
+.\tools\staging\staging.ps1 -Action Test
+```
+
+Дополнительно: opt-in PostgreSQL/Redis integration tests с локальными переменными окружения по staging README; ручной browser E2E; Linux race detector командой выше. Не сохранять пароли, токены, `.env.staging.local` и чувствительные fixture outputs в Git. Evidence: `security-report-20261125T105918.114319400Z.json`, предыдущий JSON 110/0/4, терминальные логи `TestUserRecoverySessionPostgres`, `TestUserSessionE2EStaging`, Redis outage и race. Ссылки на evidence — имена локальных файлов/тестов, не публичные URL.
+
+###### Production checkpoint / оставшиеся ограничения
+
+**Статус DP 3.10.1: COMPLETED — STAGING VERIFIED.** Не равен GO на публичный запуск и не означает завершение всего DP 3.10. До rollout проверить свежий backup PostgreSQL и restore/rollback plan, schema changes (OAuth code/state digest, `code_challenge`, `gateway_epoch`, unique active installation), параметры signing/HMAC keys, proxy allowlist и production-пустой `BOT_OAUTH_LOOPBACK_BOT_IDS`. Старые pending codes без новых обязательных полей могут стать непригодными — начать новый authorize flow. `gateway_epoch` для installations default 1, historical events default 0: не backfill старые события в текущую generation; не запускать смешанные old/new Gateway-инстансы. Возврат старого Docker image сам по себе не откатывает схему и security policy. Backend, Dev Portal и публичный Go OAuth demo/документация должны быть совместимы по PKCE. После обновления — safe production smoke, проверка browser flow и controlled interaction regression; не проводить outage/fixture mutations на production без выделенного плана. Полный актуальный frontend build/typecheck/SCA и широкие RBAC/HTTP/runtime проверки остаются впереди.
+
+#### DP 3.11 — Final E2E & Regression ⏳
+
+DP 3.10.1 OAuth/Gateway/user session E2E уже выполнены на staging. DP 3.11 — отдельная финальная общеплатформенная регрессия после DP 3.10.2–3.10.4, с актуальным frontend и полным путём разработчика; результаты 110/0/4 являются baseline, а не заменой DP 3.11.
+
+- полный путь стороннего разработчика: создать → credentials → OAuth Start/Callback → `/bot/me` → server/rooms → сообщение;
+- OAuth негативные сценарии: неверный/повторный/истёкший code и `state`, redirect mismatch, refresh rotation/reuse, revoke, повторная установка;
+- установка/удаление на разных серверах и проверка scope/IDOR boundary;
+- Gateway hello/heartbeat/ACK/reconnect/resume, Webhook подпись/retry/дубли, slash/interactions;
+- браузерные сценарии после frontend/backend изменений, build/typecheck/lint/tests;
+- фиксируем evidence и явно отмечаем непроверенные infra chaos / long-run сценарии.
+
+#### DP 3.12 — Production Readiness & публикация ⏳
+
+- [x] Переработать OAuth UI, Quick Start и примеры (локальная проверка выполнена).
+- [x] Завершить DP 3.10.1 и staging security regression (110 PASS / 0 FAIL / 4 SKIP; отдельно проверены).
+- [ ] Контролируемый production rollout DP 3.10.1: backup, schema compatibility, rollback plan и safe smoke.
+- [ ] Завершить DP 3.10.2–3.10.4 и устранить release-blocking проблемы.
+- [ ] Выполнить 3.11 E2E/regression после исправлений.
+- [ ] Получить успешные production build, typecheck, lint, SCA на актуальном frontend/backend.
+- [ ] Проверить SPA history fallback, прямые ссылки, перезагрузку страниц и загрузку `public/examples/oauth-demo/main.go`.
+- [ ] Разместить frontend на публичном хостинге и подключить HTTPS-домен.
+- [ ] Сверить CORS allowlist, CSP, cookie/CSRF policy, OAuth Start/Redirect URI и API endpoint для публичного домена.
+- [ ] Провести публичный smoke: login → create → OAuth/install → messages → events/diagnostics.
+- [ ] Повторно оценить отложенные high-risk задачи §9.4 (`.env`/permissions/root); формальное решение о выпуске фиксировать только после оценки рисков.
+
+**Критерий публичного запуска:** Dev Portal доступен по домену и HTTPS и позволяет внешнему разработчику выполнить путь от создания бота до работы с Bot API без обращения к приватному репозиторию. Backend Git/Docker release-tag не является обязательным, но security-fix может требовать обновления running backend.
 
 ### 9.7 После запуска / post-release backlog
 
@@ -2571,9 +2747,45 @@ End-to-end проверки от 2026-08-25:
 | P4.0.9 Formal API version/deprecation | ⏸️ Post-release |
 | P4.0.10 Backup/Health/Smoke/Operational Readiness | ⚠️ Практические проверки пройдены, security/infra/rollback хвосты отложены |
 
-**Принятое решение:** не вводить RC1/Docker-tag/Git-tag как обязательные действия. Следующий непосредственный этап — **Dev Portal UX Review**, затем frontend build, hosting/domain и публичный запуск. См. §9.
+**Принятое решение:** не вводить RC1/Docker-tag/Git-tag как обязательные действия. После DP 3.1–3.9.5 завершён DP 3.10.1 (staging verified); следующий этап DP 3.10.2, далее DP 3.10.3–3.10.4, DP 3.11 и DP 3.12. См. §9.
+
+### DP 3.9.1–3.9.5 — OAuth Flow / Developer Onboarding ✅ (локально)
+
+**Не путать с backend `P3.9.x Voice/Media`.** Для Dev Portal выполнены OAuth start/callback, обновление UI настроек и несколько последовательных итераций Quick Start. Итоговая реализация включает адрес Start URL, зарегистрированные Redirect URI, автоматический browser redirect вместо модального вывода code, серверный token exchange, `/bot/me` check и публичный standalone Go OAuth demo.
+
+**Evidence:** пользовательский E2E показал `OAuth callback and /bot/me succeeded. (TEST ONLY: tokens not stored.)`; последняя серия тестов по frontend документации/demo сообщала `84/84 PASS`. Production-публикация и полная независимая сборка актуальной frontend-ветки не подтверждены; последующий DP 3.10.1 security audit завершён в проверенном staging-объёме (см. §9.6).
+
+### DP 3.10–3.12 — Public Release Preparation ⏳
+
+- **DP 3.10 — 🚧:** 3.10.1 OAuth/Tokens ✅ STAGING VERIFIED (110/0/4, 12/12 блоков); 3.10.2 RBAC/IDOR ⏳ следующий; 3.10.3 Frontend/HTTP и 3.10.4 Runtime/Dependencies ⏳.
+- **DP 3.11:** финальные E2E/regression, включая негативные и межустановочные сценарии.
+- **DP 3.12:** production build, deploy, HTTPS, домен и публичный smoke/sign-off.
 
 ## Changelog после последнего обновления документации от 2026-06-26
+
+### Актуализация 2026-11-25 — DP 3.10.1 Security Audit / Final Staging E2E ✅
+
+- Реализованы и проверены DP 3.10.1.1–3.10.1.6: JWT/user auth, bot tokens/credentials, code/state digest, PKCE S256/exact redirect, Redis OAuth limiter.
+- DP 3.10.1.7: single-use Gateway sessions, current connection/lifecycle fences, `GatewayEpoch` и scope/subscription filtering; real event delivery/ACK/Resume/REST, subscription и reinstall backlog isolation — PASS.
+- User recovery/session hardening: atomic session issue/revoke, recovery TTL/attempts/replay, exact-session kick, Refresh continuity; PostgreSQL/socket tests и пять HTTP/WS E2E сценариев — PASS.
+- Redis outage E2E: protected OAuth/credentials routes fail-closed 503, liveness 204/readiness 503, после восстановления 204 и нормальная обработка — PASS.
+- Linux `go test -race`: 5 packages PASS, `auth` без тестовых файлов; нет DATA RACE в выполненных тестах.
+- Финальный staging runner: `security-report-20261125T105918.114319400Z.json`, **110 PASS / 0 FAIL / 4 SKIP**, четыре skip проверены отдельно; 12/12 контрольных блоков DP 3.10.1.7 завершены.
+- Статус **COMPLETED — STAGING VERIFIED**. Контролируемый production deploy/backup/schema/rollback/smoke ещё не подтверждён. Следующий этап — DP 3.10.2 RBAC & IDOR; 3.10.3, 3.10.4, 3.11 и 3.12 открыты. Границы доказательства — §9.6.
+
+### Актуализация 2026-11-25 — Dev Portal OAuth / Developer Onboarding → Security Audit
+
+*Историческая запись до завершения DP 3.10.1; актуальные результаты security audit приведены выше.*
+
+- **DP 3.1–3.8:** выполнены основные итерации Dev Portal UX/onboarding, credentials, installations, webhook/gateway diagnostics, public catalog, docs.
+- **DP 3.8.1:** добавлено Markdown README бота (`readme_md`, до 64 КБ) с безопасным отображением в каталоге.
+- **DP 3.9:** проведены локальные frontend QA, read-only API smoke (18/18) и Bot REST/Gateway/OAuth проверки; ручная проверка Go runtime OAuth refresh/revoke пройдена в указанных сценариях.
+- **DP 3.9.1:** реализован полный браузерный OAuth redirect/callback: OAuth Start URL → Dev Portal authorize → callback → обмен кода на токены → `/bot/me`; пользователь подтвердил E2E success на локальном Go-сервере.
+- **DP 3.9.x UI:** унифицировано управление OAuth Start URL и Redirect URI через модалки; исправлено явное имя SQL-колонки `oauth_start_url` для GORM. Не подтверждено, удалена ли техническая лишняя колонка `o_auth_start_url` из БД — проверить при следующей схематической ревизии.
+- **DP 3.9.2–3.9.4:** Quick Start и OAuth-документация переработаны по замечаниям пользователя, Kimi и Gemini: точные HTTP-контракты, `state` и callback, installation/server/room, Bot API и Gateway/Webhook, единые HTTPS-примеры, локальный тест отдельно, без ссылок на приватные исходники.
+- **DP 3.9.5:** добавлен самостоятельный Go OAuth demo в `public/examples/oauth-demo/main.go`, ссылка скачивания и PowerShell-инструкция. По последней сообщённой серии локальных проверок — 84/84 frontend tests; Go demo компилируется и прошёл целевые обработчики. **Публичная доступность файла после deploy ещё не проверялась**.
+- **Текущий план:** DP 3.10 Security Audit → DP 3.11 final E2E/regression → DP 3.12 production readiness/hosting/domain/HTTPS. Документация принята как законченная итерация, но security audit и release gate не закрыты.
+- **Безопасность/операции:** исторические backend P4.0.1–P4.0.6 и P4.0.8 ограниченно подтверждены; `.env` в Git/права файлов, container root, миграции/rollback/offsite/chaos, возможные OAuth loopback/PKCE и актуальные зависимости остаются под review. Старый SCA PASS (2026-11-12) не отменяет нового `npm audit` на свежем frontend dependency tree.
 
 ### Актуализация 2026-11-19 — backend regression/smoke → Dev Portal publication
 
@@ -2712,28 +2924,33 @@ End-to-end проверки от 2026-08-25:
 - 2026-11-13: проверены recovery-health counters (`stale_revoking_sessions=0`, `pending_usage_recovery_tracks=0`, recovery errors/failures=0); это snapshot, а не доказательство восстановления после отказа
 - 2026-11-13: Docker CPU/RAM/PIDs sampled в 10-минутном окне; Go `go_goroutines`, heap/GC и process series в `/metrics` отсутствовали — отдельное измерение отложено
 - 2026-11-19: `/metrics` доступен, все 7 проверенных recovery error/stale/pending значений — `0`; healthz/readyz возвращают `204`, Docker отмечает backend как `healthy`
+- 2026-11-25: OAuth Redis outage на staging: liveness 204/readiness 503, после unpause readiness 204; пять OAuth/credentials routes fail-closed с безопасным error contract; не заменяет полный infrastructure chaos test
 
 ---
 
 ## 11. Вывод
 
-### Текущее состояние на 2026-11-19
+### Текущее состояние на 2026-11-25
 
-Backend Bot Platform реализован и работает на VPS: OAuth/install/credentials, webhook/WS Gateway (ACK/resume/replay), slash commands, interactions, resource/context API, RBAC, moderation, roles, voice/media и runtime protection. Существуют REST OpenAPI и Gateway AsyncAPI.
+Backend Bot Platform реализован и работает на VPS: OAuth/install/credentials, webhook/WS Gateway (ACK/resume/replay), slash commands, interactions, resource/context API, RBAC, moderation, roles, voice/media и runtime protection. Существуют REST OpenAPI и Gateway AsyncAPI. Backend media/recovery, backup/restore, health/readiness и smoke подтверждены в описанных ограниченных сценариях 2026-11-18—19.
 
-**Проверено:** в ноябре выполнены session/daily duration revoke, recovery после сбоя/restart/конкурентной гонки, PostgreSQL backup/restore, health/readiness, unit regression subset, HTTP/Gateway/Slash/Voice smoke и Recovery Metrics snapshot. Это достаточный проверенный функциональный объём для начала публикационной работы по Dev Portal, **но не эквивалент полного отказоустойчивого, security- и нагрузочного аудита**.
+**Dev Portal продвинулся дальше статуса от 2026-11-19:** основной интерфейс и onboarding переработаны; Markdown README и публичный каталог работают в реализованных сценариях; OAuth Start/Callback/token `/bot/me` локально прошёл E2E; OAuth Settings UI унифицирован; Quick Start дополнен спецификацией запросов, сценариями Bot REST/Gateway/Webhook и публично включаемым Go-примером. В последней серии этапа DP 3.9.5 сообщено о 84/84 успешно пройденных локальных тестах.
+
+**DP 3.10.1 — OAuth & Tokens Security Audit завершён (STAGING VERIFIED, 2026-11-25):** 110 PASS / 0 FAIL / 4 SKIP в финальном Security Runner; все четыре skip проверены отдельно, 12/12 контрольных блоков. JWT/OAuth/PKCE, credentials/token lifecycle, Gateway event/backlog isolation, user recovery/session E2E, Redis fail-closed и Linux Race Detector подтверждены в описанном объёме. Полный rollout последнего security-набора на VPS и post-deploy regression не подтверждены.
 
 ### Что осталось до публичного запуска
 
-**Основная задача — клиент Dev Portal:** оценить понятность интерфейса для нового разработчика, исправить UX/onboarding проблемы, собрать production frontend, разместить на хостинге, подключить домен и HTTPS, выполнить реальный путь регистрации/установки бота через опубликованную страницу.
+**Обязательная последовательность:** подготовить контролируемый rollout DP 3.10.1 и safe smoke; продолжить DP 3.10.2 RBAC/IDOR → DP 3.10.3 Browser/HTTP → DP 3.10.4 Runtime/Infrastructure/Dependencies → DP 3.11 финальная общеплатформенная E2E/regression → DP 3.12 frontend build, hosting, домен, HTTPS, публичный smoke и GO / NO-GO. Staging OAuth/Gateway E2E не заменяет проверку всей платформы на актуальных зависимостях.
 
-Официальный запуск будет означать **публичную доступность Dev Portal**. Отдельные backend RC1, Git-теги или Docker release-теги для этого не требуются.
+### Что не объявляется закрытым
 
-### Что сознательно не закрыто
+- известные риски секретов в Git, прав `.env`/TLS и запуска контейнера от `root` — требуют обязательной переоценки перед публичным релизом;
+- PKCE S256 и explicit loopback allowlist проверены; production-конфигурация, browser-security/unsafe redirects, frontend JWT storage/CORS/CSRF/CSP — DP 3.10.3;
+- room-level RBAC/IDOR, privilege escalation, Interaction Runtime после ужесточения подписок — DP 3.10.2/3.11;
+- GW-006 state/persistence faults, multi-process Gateway и in-flight concurrency, полный SCA/Runtime audit — DP 3.10.4;
+- автоматический `AutoMigrate`, отсутствие миграционного rollback, offsite backup и реального Docker rollback;
+- OAuth Redis outage проверен; PostgreSQL/LiveKit failure, Redis runtime-wide outage, долгий Go/backlog/orphan stress/chaos остаются открытыми;
+- Media Limits/Usage UI, interaction inspector, официальный SDK и глобальный Search API — отложенный backlog;
+- публичная production-сборка Dev Portal и итоговый smoke — ещё не подтверждены.
 
-- автоматический `AutoMigrate` без отдельного миграционного rollback;
-- offsite backup и реальный Docker rollback;
-- controlled Redis/PostgreSQL fault windows и длительные Go/backlog/orphan стресс-проверки;
-- Media Limits/Usage UI, interaction inspector, официальный SDK, global Search API — после запуска.
-
-➡️ **Текущий этап: Dev Portal — UX Review → frontend build → hosting/domain → официальный запуск.** Подробные сценарии проверки и ограничения — §9.
+➡️ **Текущий этап: DP 3.10.2 — RBAC & IDOR Security Audit.** DP 3.10.1 закрыт в проверенном staging-объёме, весь DP 3.10 ещё в работе. Исторические P4.0 и текущие security E2E не подменяют финальный production sign-off.
